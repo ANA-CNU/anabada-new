@@ -1,0 +1,22 @@
+# 1단계: 빌드 스테이지
+FROM node:22-alpine AS builder
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+RUN npm run build
+
+# 다단계 빌드.
+FROM node:22-alpine AS runner
+
+WORKDIR /app
+
+RUN npm install -g serve
+COPY --from=builder /app/dist ./dist
+
+EXPOSE 20030
+
+CMD ["serve", "-s", "dist", "-l", "20030"]
