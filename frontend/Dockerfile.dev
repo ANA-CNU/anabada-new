@@ -1,12 +1,17 @@
-FROM node:22-alpine
+FROM node:22.15.0-bullseye
 
 WORKDIR /app
 
+ENV ROLLUP_NO_NATIVE=true
+
+# package.json과 package-lock.json 복사
 COPY package*.json ./
 RUN npm install
 
+# 소스 코드 복사
 COPY . .
 
 EXPOSE 20030
 
+# 개발 서버 실행
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "20030"]
