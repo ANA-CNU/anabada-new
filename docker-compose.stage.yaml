@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   anabada-frontend:
     container_name: anabada-frontend
@@ -7,11 +6,14 @@ services:
       dockerfile: Dockerfile.prod
 
     ports:
-      - "20030:20030"
+      - "20050:20030"
 
-    networks:
-      - anaDB_network
-      - dmoj_nginx_network
+    # volumes:
+    #   - ./frontend:/app
+
+    environment:
+      - ADMIN_ID=${ADMIN_ID}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
 
     #dmoj_nginx_network 안에 nginx-gui-proxy dockernetwork가 포함되어 있습니다.
 
@@ -19,7 +21,7 @@ services:
     container_name: anabada-backend
     build:
       context: ./backend
-      dockerfile: Dockerfile.prod
+      dockerfile: Dockerfile.dev
 
     #PORT 불필요.. 내부에서 20031로 호스팅 하도록 합니다.
     #SSH 포트 터널링으로 테스트 할겸 열어만 두었습니다. 나중에 없애기...
@@ -33,15 +35,6 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
 
-    networks:
-      - anaDB_network
-      - dmoj_nginx_network
-
     #dmoj_nginx_network 안에 nginx-gui-proxy dockernetwork가 포함되어 있습니다.
 
-networks:
-  anaDB_network:
-    external: true
-  dmoj_nginx_network:
-    external: true
   
