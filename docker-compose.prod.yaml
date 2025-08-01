@@ -6,14 +6,29 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.prod
 
-    ports:
-      - "20030:20030"
-
     networks:
       - anaDB_network
       - dmoj_nginx_network
 
     #dmoj_nginx_network 안에 nginx-gui-proxy dockernetwork가 포함되어 있습니다.
+
+  anabada-middleware:
+    container_name: anabada-middleware
+    build:
+      context: ./middleware
+      dockerfile: Dockerfile
+
+    ports:
+      - "80:80"
+
+    environment:
+      - PORT=${PORT}
+      - NODE_ENV=${NODE_ENV}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
+      - ADMIN_USERNAME=${ADMIN_USERNAME}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - FRONTEND_URL=${FRONTEND_URL}
 
   anabada-backend:
     container_name: anabada-backend

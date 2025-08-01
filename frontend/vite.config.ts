@@ -33,5 +33,6 @@ export default defineConfig({
     hmr: {
       overlay: false,
     },
+    allowedHosts: ['anabada-frontend'],
   },
 })

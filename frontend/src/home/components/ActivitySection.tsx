@@ -198,7 +198,7 @@ function ActivitySection() {
                 최근 점수 획득
               </CardTitle>
             </CardHeader>
-            <CardContent className="max-h-[250px] md:max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-transparent scrollbar-track-transparent p-3" style={{ scrollbarColor: 'transparent transparent', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <CardContent className="max-h-[250px] md:max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-transparent scrollbar-track-transparent p-3 px-7" style={{ scrollbarColor: 'transparent transparent', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               <style>{`
                 .scrollbar-thin::-webkit-scrollbar {
                   width: 0px !important;
@@ -295,7 +295,7 @@ function ActivitySection() {
                 최근 해결한 문제
               </CardTitle>
             </CardHeader>
-            <CardContent className="max-h-[250px] md:max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-transparent scrollbar-track-transparent p-3" style={{ scrollbarColor: 'transparent transparent', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <CardContent className="max-h-[250px] md:max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-transparent scrollbar-track-transparent p-3 px-7" style={{ scrollbarColor: 'transparent transparent', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               <style>{`
                 .scrollbar-thin::-webkit-scrollbar {
                   width: 0px !important;
@@ -335,7 +335,7 @@ function ActivitySection() {
                 <TableHeader>
                   <TableRow className="border-white/10">
                     <TableHead className="text-white/70">유저</TableHead>
-                    <TableHead className="text-white/70">문제 번호</TableHead>
+                    <TableHead className="text-white/70">문제</TableHead>
                     <TableHead className="text-white/70">해결 시간</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -380,7 +380,7 @@ function ActivitySection() {
                 이번 달 문제 해결
               </CardTitle>
             </CardHeader>
-            <CardContent className="max-h-[250px] md:max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-transparent scrollbar-track-transparent p-3" style={{ scrollbarColor: 'transparent transparent', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            <CardContent className="max-h-[250px] md:max-h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-transparent scrollbar-track-transparent p-3 px-7" style={{ scrollbarColor: 'transparent transparent', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
               <style>{`
                 .scrollbar-thin::-webkit-scrollbar {
                   width: 0px !important;
