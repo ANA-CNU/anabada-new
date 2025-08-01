@@ -20,6 +20,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { EventAdd } from "./components/EventAdd";
+import ScoreManagement from "./components/ScoreManagement";
 
 function Admin() {
   console.log("🔧 Admin 컴포넌트 렌더링 시작");
@@ -46,6 +48,20 @@ function Admin() {
     // 로그인 페이지로 리다이렉트
     navigate("/login");
   };
+
+  // TODO: 서버에서 실제 유저 목록을 가져오는 로직
+  const nameList: string[] = [
+    "algo_master",
+    "coding_ninja", 
+    "problem_solver",
+    "code_wizard",
+    "algorithm_expert",
+    "code_master",
+    "algo_ninja",
+    "programming_guru",
+    "debug_master",
+    "solution_finder"
+  ];
 
   const menuItems = [
     {
@@ -110,19 +126,21 @@ function Admin() {
             </div>
           </div>
         );
+      case "score-status":
+        return <ScoreManagement nameList={nameList} />;
+      case "event-stats":
+        return <EventAdd />;
       default:
         return (
           <div className="space-y-6">
             <div>
               <h2 className="text-3xl font-bold tracking-tight">
                 {activeSection === "user-list" && "유저 목록"}
-                {activeSection === "score-status" && "점수 현황"}
                 {activeSection === "ranking" && "랭킹 관리"}
                 {activeSection === "activity-log" && "활동 로그"}
                 {activeSection === "system-log" && "시스템 로그"}
                 {activeSection === "access-log" && "접속 기록"}
                 {activeSection === "event-list" && "이벤트 목록"}
-                {activeSection === "event-stats" && "이벤트 통계"}
                 {activeSection === "notification" && "알림 관리"}
               </h2>
               <p className="text-muted-foreground">
