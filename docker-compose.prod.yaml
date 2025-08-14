@@ -23,7 +23,7 @@ services:
 
     environment:
       - PORT=${PORT}
-      - NODE_ENV=${NODE_ENV}
+      - NODE_ENV=production
       - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
       - ADMIN_USERNAME=${ADMIN_USERNAME}
