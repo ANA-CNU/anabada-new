@@ -6,7 +6,6 @@ import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { authRouter } from './routes/auth';
 import { adminRouter } from './routes/admin';
-import { homeRouter } from './routes/home';
 import { authMiddleware } from './middleware/auth';
 import { frontendProxy, proxyLogging } from './middleware/proxy';
 
