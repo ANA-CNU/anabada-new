@@ -7,8 +7,8 @@ services:
       dockerfile: Dockerfile.prod
 
     networks:
-      - anaDB_network
       - dmoj_nginx_network
+      - bada-network
 
     #dmoj_nginx_network 안에 nginx-gui-proxy dockernetwork가 포함되어 있습니다.
 
@@ -19,7 +19,7 @@ services:
       dockerfile: Dockerfile
 
     ports:
-      - "80:80"
+      - "20030:80"
 
     environment:
       - PORT=${PORT}
@@ -29,6 +29,10 @@ services:
       - ADMIN_USERNAME=${ADMIN_USERNAME}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - FRONTEND_URL=${FRONTEND_URL}
+
+    networks:
+      - dmoj_nginx_network
+      - bada-network
 
   anabada-backend:
     container_name: anabada-backend
@@ -49,14 +53,14 @@ services:
       - DB_NAME=${DB_NAME}
 
     networks:
-      - anaDB_network
       - dmoj_nginx_network
+      - bada-network
 
     #dmoj_nginx_network 안에 nginx-gui-proxy dockernetwork가 포함되어 있습니다.
 
 networks:
-  anaDB_network:
-    external: true
   dmoj_nginx_network:
+    external: true
+  bada-network:
     external: true
   

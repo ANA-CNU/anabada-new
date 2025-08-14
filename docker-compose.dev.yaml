@@ -8,7 +8,6 @@ services:
     # volumes:
     #   - ./frontend:/app
 
-
     #dmoj_nginx_network 안에 nginx-gui-proxy dockernetwork가 포함되어 있습니다.
 
   anabada-middleware:
@@ -18,7 +17,7 @@ services:
       dockerfile: Dockerfile
 
     ports:
-      - "80:80"
+      - "20030:80"
 
     environment:
       - PORT=${PORT}
