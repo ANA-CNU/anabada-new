@@ -41,9 +41,9 @@ services:
       dockerfile: Dockerfile.prod
 
     #PORT 불필요.. 내부에서 20031로 호스팅 하도록 합니다.
-    #SSH 포트 터널링으로 테스트 할겸 열어만 두었습니다. 나중에 없애기...
+    #PORT 20031로 직접 접근하면 안됩니다. 나중에 막습니다.
     ports:
-      - "20031:20031"
+      - "20031:3000"
 
     environment:
       - DB_HOST=${DB_HOST}

@@ -1,0 +1,98 @@
+import { Elysia } from "elysia";
+import { getDatabase } from "../../db/database.js";
+import { logger } from "../../index.js";
+
+export const recentlyScore = new Elysia()
+  .get('/api/statistics/recently-score', async ({ query }) => {
+    try {
+      const db = getDatabase();
+      const page = parseInt(query.page as string) || 1;
+      const limit = parseInt(query.limit as string) || 10;
+      const offset = (page - 1) * limit;
+
+      // 페이지네이션된 데이터 조회
+      const sql = `
+        SELECT
+          u.name AS username,
+          sh.desc,
+          sh.bias,
+          sh.created_at AS createdAt
+        FROM score_history sh
+        JOIN user u ON sh.user_id = u.id
+        ORDER BY sh.created_at DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `;
+
+      logger.debug(`SQL QUERY: ${sql} with limit: ${limit}, offset: ${offset}`);
+
+      const [rows] = await db.execute(sql);
+      const data = rows as any[];
+      logger.debug(`최근 점수 기록 페이지 ${page} 조회 성공`);
+
+      return {
+        success: true,
+        data: data,
+        message: `최근 점수 기록 페이지 ${page} 조회 성공`,
+        summary: {
+          count: data.length,
+          description: '사용자별 최근 점수 기록',
+          order: '생성 시간 기준 내림차순',
+          limit: limit,
+          page: page
+        }
+      };
+
+    } catch (error: any) {
+      logger.error('최근 점수 기록 페이지 조회 실패:', error);
+      return {
+        success: false,
+        error: error.message,
+        message: '최근 점수 기록 페이지 조회에 실패했습니다.'
+      };
+    }
+  })
+
+  .get('/api/statistics/recently-score/top', async ({ query }) => {
+    try {
+      const db = getDatabase();
+      const limit = parseInt(query.limit as string) || 100;
+
+      const sql = `
+        SELECT
+          u.name AS username,
+          sh.desc,
+          sh.bias,
+          sh.created_at AS createdAt
+        FROM score_history sh
+        JOIN user u ON sh.user_id = u.id
+        ORDER BY sh.created_at DESC
+        LIMIT ${limit}
+      `;
+
+      logger.debug(`SQL QUERY: ${sql} with limit: ${limit}`);
+
+      const [rows] = await db.execute(sql);
+      const data = rows as any[];
+      logger.debug(`최근 점수 기록 TOP ${limit} 조회 성공`);
+
+      return {
+        success: true,
+        data: data,
+        message: `최근 점수 기록 TOP ${limit} 조회 성공`,
+        summary: {
+          count: data.length,
+          description: '사용자별 최근 점수 기록 TOP',
+          order: '생성 시간 기준 내림차순',
+          limit: limit
+        }
+      };
+
+    } catch (error: any) {
+      logger.error('최근 점수 기록 TOP 조회 실패:', error);
+      return {
+        success: false,
+        error: error.message,
+        message: '최근 점수 기록 TOP 조회에 실패했습니다.'
+      };
+    }
+  });
