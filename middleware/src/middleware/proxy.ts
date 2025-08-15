@@ -19,7 +19,7 @@ export const frontendProxy = createProxyMiddleware({
     'Accept-Language': 'ko-KR,ko;q=0.9,en;q=0.8',
     'Accept-Encoding': 'gzip, deflate, br',
     'Cache-Control': isProduction ? 'public, max-age=3600' : 'no-cache',
-    'Pragma': isProduction ? undefined : 'no-cache'
+    ...(isProduction ? {} : { 'Pragma': 'no-cache' })
   }
 });
 
