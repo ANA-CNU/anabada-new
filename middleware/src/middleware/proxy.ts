@@ -59,40 +59,23 @@ export const safariCompatibilityHeaders = (req: Request, res: Response, next: Ne
       'X-Frame-Options': 'DENY',
       'X-XSS-Protection': '1; mode=block'
     });
-  } else {
-    // Development: Safari 호환성을 위한 헤더
-    const PORT = isDevelopment ? '20030' : isStage ? '20050' : '20040';
-    const origin = req.get('Origin');
     
-    // Safari에서 Origin이 undefined일 때의 처리
-    if (!origin || origin === 'null' || origin === 'undefined') {
-      // Origin이 없는 경우 (Safari에서 자주 발생)
-      res.set({
-        'Access-Control-Allow-Origin': `http://localhost:${PORT}`,
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, Range, If-None-Match, If-Modified-Since',
-        'Access-Control-Allow-Credentials': 'true',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      });
-    } else {
-      // Origin이 있는 경우
-      res.set({
-        'Access-Control-Allow-Origin': origin,
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, Range, If-None-Match, If-Modified-Since',
-        'Access-Control-Allow-Credentials': 'true',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      });
-    }
+    console.log('🔒 Production 환경: CORS 헤더 설정됨');
+  } else {
+    // Development/Stage: CORS 헤더 비활성화
+    console.log('🌐 Development/Stage 환경: CORS 헤더 비활성화');
+    
+    // 기본적인 보안 헤더만 설정
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    });
   }
   
-  // Safari에서 OPTIONS 요청 처리
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
+  // Production이 아닌 경우 OPTIONS 요청도 그냥 통과
+  if (!isProduction && req.method === 'OPTIONS') {
+    next();
     return;
   }
   

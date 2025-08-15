@@ -60,31 +60,11 @@ if (isProduction) {
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
   }));
+  
+  console.log('🔒 Production 환경: CORS 제한 활성화');
 } else {
-  // Development: Safari 호환성을 위한 CORS 설정
-  app.use(cors({
-    origin: function(origin, callback) {
-      // Safari에서 origin이 undefined일 수 있음
-      if (!origin || origin === 'null' || origin === 'undefined') {
-        // Origin이 없는 경우 (Safari에서 자주 발생)
-        console.log('🌐 Safari에서 Origin이 undefined로 요청됨 - 허용');
-        callback(null, true);
-      } else {
-        // Origin이 있는 경우 - localhost 도메인만 허용
-        const isLocalhost = origin.includes('localhost') || origin.includes('127.0.0.1');
-        if (isLocalhost) {
-          console.log(`🌐 허용된 Origin: ${origin}`);
-          callback(null, true);
-        } else {
-          console.log(`🚫 차단된 Origin: ${origin}`);
-          callback(new Error('CORS 정책에 의해 차단됨'));
-        }
-      }
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Range', 'If-None-Match', 'If-Modified-Since']
-  }));
+  // Development/Stage: CORS 비활성화
+  console.log('🌐 Development/Stage 환경: CORS 비활성화');
 }
 
 // 로깅 설정
