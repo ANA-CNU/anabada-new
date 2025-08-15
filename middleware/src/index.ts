@@ -45,23 +45,15 @@ if (isProduction) {
 
 // 환경별 CORS 설정
 if (isProduction) {
-  // Production: 제한된 CORS
-  const allowedOrigins = process.env.ALLOWED_ORIGIN;
+  // Production: 일시적으로 모든 origin 허용 (쿠키 전송 허용)
   
   app.use(cors({
-    origin: function(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('CORS 정책에 의해 차단됨'));
-      }
-    },
-    credentials: true,
+    origin: process.env.ALLOWED_ORIGIN!, // 모든 origin 허용
+    credentials: true, // 쿠키 전송 허용
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cookie']
   }));
   
-  console.log('🔒 Production 환경: CORS 제한 활성화');
 } else {
   // Development/Stage: 쿠키 전송을 위한 CORS 설정
   app.use(cors({
