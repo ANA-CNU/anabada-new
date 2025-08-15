@@ -18,17 +18,17 @@ export const logger = pino({
 
 dotenv.config();
 
-const corsConfig = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? [process.env.ALLOWED_ORIGIN!] // 프로덕션 도메인
-    : ['http://localhost:3000', 'http://localhost:20030', 'http://localhost:20050'], // 개발 도메인
+const isProduction = process.env.NODE_ENV === 'production';
+
+const corsConfig = isProduction ? {
+  origin: [process.env.ALLOWED_ORIGIN!], // 프로덕션 도메인
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-};
+} : undefined; // production이 아니면 CORS 비활성화
 
 const app = new Elysia()
-  .use(cors(corsConfig))
+  .use(isProduction ? cors(corsConfig) : cors()) // production이 아니면 기본 CORS (모든 origin 허용)
   .onRequest(({ request }) => {
     logger.info(`요청 수신: ${request.method} ${request.url}`);
     logger.debug(`Origin: ${request.headers.get('origin')}`);
@@ -76,5 +76,6 @@ const app = new Elysia()
 
 logger.info(`ELYSIA Server 3000번 포트에서 실행합니다.`)
 logger.info(`ANABADA용 백엔드 서버`)
-logger.info(`CORS 설정: ${JSON.stringify(corsConfig.origin)}`)
+logger.info(`환경: ${process.env.NODE_ENV || 'undefined'}`)
+logger.info(`CORS 설정: ${isProduction ? `제한됨 (${process.env.ALLOWED_ORIGIN})` : '모든 origin 허용'}`)
 logger.info(`Swagger UI: http://localhost:3000/swagger`)
