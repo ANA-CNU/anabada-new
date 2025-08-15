@@ -22,6 +22,7 @@ import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EventAdd } from "./components/EventAdd";
 import ScoreManagement from "./components/ScoreManagement";
+import EventList from "./components/EventList";
 
 function Admin() {
   console.log("🔧 Admin 컴포넌트 렌더링 시작");
@@ -128,6 +129,8 @@ function Admin() {
         );
       case "score-status":
         return <ScoreManagement nameList={nameList} />;
+      case "event-list":
+        return <EventList />;
       case "event-stats":
         return <EventAdd />;
       default:
@@ -140,7 +143,6 @@ function Admin() {
                 {activeSection === "activity-log" && "활동 로그"}
                 {activeSection === "system-log" && "시스템 로그"}
                 {activeSection === "access-log" && "접속 기록"}
-                {activeSection === "event-list" && "이벤트 목록"}
                 {activeSection === "notification" && "알림 관리"}
               </h2>
               <p className="text-muted-foreground">

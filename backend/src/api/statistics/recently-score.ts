@@ -10,13 +10,19 @@ export const recentlyScore = new Elysia()
       const limit = parseInt(query.limit as string) || 10;
       const offset = (page - 1) * limit;
 
-      // 페이지네이션된 데이터 조회
+      // 세션 시간대를 KST로 설정
+      await db.execute("SET time_zone = '+09:00'");
+
+      // 페이지네이션된 데이터 조회 (KST 시간대 유지)
       const sql = `
         SELECT
           u.name AS username,
           sh.desc,
           sh.bias,
-          sh.created_at AS createdAt
+          CONCAT(
+            DATE_FORMAT(sh.created_at, '%Y-%m-%dT%H:%i:%s'),
+            '+09:00'
+          ) AS createdAt
         FROM score_history sh
         JOIN user u ON sh.user_id = u.id
         ORDER BY sh.created_at DESC
@@ -62,7 +68,10 @@ export const recentlyScore = new Elysia()
           u.name AS username,
           sh.desc,
           sh.bias,
-          sh.created_at AS createdAt
+          CONCAT(
+            DATE_FORMAT(sh.created_at, '%Y-%m-%dT%H:%i:%s'),
+            '+09:00'
+          ) AS createdAt
         FROM score_history sh
         JOIN user u ON sh.user_id = u.id
         ORDER BY sh.created_at DESC

@@ -54,6 +54,7 @@ services:
       - NODE_ENV=production
       - ALLOWED_ORIGIN=https://badar.anacnu.kr
       - FRONTEND_URL=${FRONTEND_URL}
+      - JWT_SECRET=${JWT_SECRET}
 
     networks:
       - bada-network

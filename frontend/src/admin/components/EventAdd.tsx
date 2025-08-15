@@ -5,13 +5,16 @@ import { Calendar, Clock, Plus, X, AlertCircle, ChevronDown } from "lucide-react
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { URL } from "@/resource/constant";
 
 export function EventAdd() {
   const [eventTitle, setEventTitle] = useState("");
+  const [eventDesc, setEventDesc] = useState("");
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [startTime, setStartTime] = useState("10:00");
@@ -19,7 +22,10 @@ export function EventAdd() {
   const [problemIds, setProblemIds] = useState("");
   const [selectedProblems, setSelectedProblems] = useState<string[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [dateError, setDateError] = useState<string>("");
+
 
   const handleAddProblems = () => {
     if (!problemIds.trim()) return;
@@ -44,7 +50,25 @@ export function EventAdd() {
     setSelectedProblems(prev => prev.filter(id => id !== problemId));
   };
 
-  const handleSubmit = () => {
+  // 날짜 유효성 검사 함수
+  const validateDates = () => {
+    if (startDate && endDate) {
+      const startDateTime = new Date(startDate.getTime() + new Date(`2000-01-01T${startTime}`).getTime());
+      const endDateTime = new Date(endDate.getTime() + new Date(`2000-01-01T${endTime}`).getTime());
+      
+      if (endDateTime <= startDateTime) {
+        setDateError("종료일시는 시작일시보다 늦어야 합니다.");
+        return false;
+      } else {
+        setDateError("");
+        return true;
+      }
+    }
+    setDateError("");
+    return true;
+  };
+
+  const handleSubmit = async () => {
     const newErrors: string[] = [];
     
     if (!eventTitle.trim()) {
@@ -59,6 +83,11 @@ export function EventAdd() {
       newErrors.push("종료 날짜를 선택해주세요.");
     }
     
+    // 날짜 유효성 검사
+    if (!validateDates()) {
+      newErrors.push("날짜를 올바르게 설정해주세요.");
+    }
+    
     if (selectedProblems.length === 0) {
       newErrors.push("최소 하나 이상의 문제를 추가해주세요.");
     }
@@ -68,16 +97,86 @@ export function EventAdd() {
       return;
     }
     
-    // TODO: 서버에 이벤트 추가 API 호출
-    const eventData = {
-      title: eventTitle,
-      startDate: startDate ? new Date(startDate.getTime() + new Date(`2000-01-01T${startTime}`).getTime()).toISOString() : "",
-      endDate: endDate ? new Date(endDate.getTime() + new Date(`2000-01-01T${endTime}`).getTime()).toISOString() : "",
-      problemIds: selectedProblems
-    };
+    setIsSubmitting(true);
+    setErrors([]);
+    setSuccessMessage("");
     
-    console.log("이벤트 추가:", eventData);
-    // 여기에 실제 API 호출 로직 추가
+    try {
+      // 날짜와 시간을 올바르게 결합하여 YYYY-MM-DD HH:MM:SS 형식으로 생성
+      const createDateTime = (date: Date, time: string) => {
+        const [hours, minutes] = time.split(':').map(Number);
+        const newDate = new Date(date);
+        newDate.setHours(hours, minutes, 0, 0);
+        return newDate;
+      };
+      
+      const startDateTime = createDateTime(startDate!, startTime);
+      const endDateTime = createDateTime(endDate!, endTime);
+      
+      // YYYY-MM-DD HH:MM:SS 형식으로 변환하는 함수
+      const formatToMySQLDateTime = (date: Date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+        
+        return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+      };
+      
+      const eventData = {
+        title: eventTitle.trim(),
+        desc: eventDesc.trim() || null,
+        begin: formatToMySQLDateTime(startDateTime), // YYYY-MM-DD HH:MM:SS 형식
+        end: formatToMySQLDateTime(endDateTime),     // YYYY-MM-DD HH:MM:SS 형식
+        problems: selectedProblems.map(id => parseInt(id))
+      };
+      
+      console.log("이벤트 생성 요청:", eventData);
+      
+      // JWT 토큰 가져오기 (httpOnly 쿠키에서)
+      const token = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('accessToken='))
+        ?.split('=')[1];
+
+      if (!token) {
+        setErrors(['로그인이 필요합니다. 다시 로그인해주세요.']);
+        return;
+      }
+
+      const response = await fetch(`${URL}/api/event/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(eventData)
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        setSuccessMessage('이벤트가 성공적으로 생성되었습니다!');
+        // 폼 초기화
+        setEventTitle("");
+        setEventDesc("");
+        setStartDate(undefined);
+        setEndDate(undefined);
+        setStartTime("10:00");
+        setEndTime("18:00");
+        setSelectedProblems([]);
+        setProblemIds("");
+      } else {
+        setErrors([result.message || '이벤트 생성에 실패했습니다.']);
+      }
+    } catch (error) {
+      console.error('이벤트 생성 오류:', error);
+      setErrors(['서버 연결에 실패했습니다. 다시 시도해주세요.']);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -105,6 +204,17 @@ export function EventAdd() {
         </Card>
       )}
 
+      {successMessage && (
+        <Card className="border-green-200 bg-green-50">
+          <CardContent className="pt-6">
+            <div className="flex items-center space-x-2 text-green-600">
+              <AlertCircle className="h-4 w-4" />
+              <span className="font-medium">{successMessage}</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-6">
         {/* 이벤트 기본 정보 */}
         <Card>
@@ -125,7 +235,18 @@ export function EventAdd() {
               />
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="event-desc">이벤트 설명</Label>
+              <Textarea
+                id="event-desc"
+                placeholder="이벤트에 대한 설명을 입력하세요 (선택사항)"
+                value={eventDesc}
+                onChange={(e) => setEventDesc(e.target.value)}
+                rows={3}
+              />
+            </div>
+            
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="start-date-picker" className="px-1">
                   시작 날짜 *
@@ -150,7 +271,9 @@ export function EventAdd() {
                         fromYear={2020}
                         toYear={2030}
                         onSelect={(date) => {
-                          setStartDate(date)
+                          setStartDate(date);
+                          // 날짜 변경 시 유효성 검사
+                          setTimeout(() => validateDates(), 100);
                         }}
                       />
                     </PopoverContent>
@@ -159,7 +282,11 @@ export function EventAdd() {
                     type="time"
                     step="1"
                     value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
+                    onChange={(e) => {
+                      setStartTime(e.target.value);
+                      // 시간 변경 시 유효성 검사
+                      setTimeout(() => validateDates(), 100);
+                    }}
                     className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
                   />
                 </div>
@@ -189,7 +316,9 @@ export function EventAdd() {
                         fromYear={2020}
                         toYear={2030}
                         onSelect={(date) => {
-                          setEndDate(date)
+                          setEndDate(date);
+                          // 시간 변경 시 유효성 검사
+                          setTimeout(() => validateDates(), 100);
                         }}
                       />
                     </PopoverContent>
@@ -198,12 +327,24 @@ export function EventAdd() {
                     type="time"
                     step="1"
                     value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
+                    onChange={(e) => {
+                      setEndTime(e.target.value);
+                      // 시간 변경 시 유효성 검사
+                      setTimeout(() => validateDates(), 100);
+                    }}
                     className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
                   />
                 </div>
               </div>
             </div>
+            
+            {/* 날짜 오류 메시지 */}
+            {dateError && (
+              <div className="text-red-600 text-sm flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                {dateError}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -213,6 +354,7 @@ export function EventAdd() {
             <CardTitle>문제 추가</CardTitle>
             <CardDescription>
               쉼표로 구분하여 문제 ID를 입력하세요. (1-49999, 예: 1001, 1002, 1003)
+              {`   string.split(',').map(id => IntParse(id.trim()))`}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -263,10 +405,20 @@ export function EventAdd() {
           <Button 
             size="lg" 
             onClick={handleSubmit}
+            disabled={isSubmitting}
             className="px-8"
           >
-            <Plus className="h-4 w-4 mr-2" />
-            이벤트 추가하기
+            {isSubmitting ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                생성 중...
+              </>
+            ) : (
+              <>
+                <Plus className="h-4 w-4 mr-2" />
+                이벤트 추가하기
+              </>
+            )}
           </Button>
         </div>
       </div>

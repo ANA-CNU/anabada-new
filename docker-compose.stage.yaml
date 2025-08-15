@@ -52,6 +52,7 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
       - NODE_ENV=stage
+      - JWT_SECRET=${JWT_SECRET}
 
     networks:
       - dmoj_nginx_network
