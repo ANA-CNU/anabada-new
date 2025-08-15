@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { logger } from '.';
 
 export function checkAdminAuth(request: Request): { isAuthenticated: boolean; user: any } {
   // httpOnly 쿠키에서 accessToken 추출
@@ -13,10 +14,12 @@ export function checkAdminAuth(request: Request): { isAuthenticated: boolean; us
     return { isAuthenticated: false, user: null };
   }
 
-  const accessToken = accessTokenMatch[1];
+
+  const accessToken = decodeURIComponent(accessTokenMatch[1]);
   if (!accessToken.startsWith('Bearer ')) {
     return { isAuthenticated: false, user: null };
-  }
+  } 
+
 
   const token = accessToken.substring(7); // "Bearer " 제거
   const jwtSecret = process.env.JWT_SECRET;
@@ -26,8 +29,10 @@ export function checkAdminAuth(request: Request): { isAuthenticated: boolean; us
     return { isAuthenticated: false, user: null };
   }
 
+
   try {
     const decoded = jwt.verify(token, jwtSecret) as any;
+
     return { 
       isAuthenticated: true, 
       user: {
