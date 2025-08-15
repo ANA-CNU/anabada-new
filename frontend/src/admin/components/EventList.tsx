@@ -68,7 +68,9 @@ const EventList: React.FC = () => {
   const fetchEvents = async (page: number = 1) => {
     try {
       setLoading(true);
-      const response = await fetch(`${URL}/api/events?page=${page}&limit=10`);
+      const response = await fetch(`${URL}/api/events?page=${page}&limit=10`, {
+        credentials: 'include' // 쿠키 포함
+      });
       const result = await response.json();
 
       if (result.success) {
@@ -88,7 +90,9 @@ const EventList: React.FC = () => {
   // 이벤트 상세 조회
   const fetchEventDetail = async (eventId: number) => {
     try {
-      const response = await fetch(`${URL}/api/events/${eventId}`);
+      const response = await fetch(`${URL}/api/events/${eventId}`, {
+        credentials: 'include' // 쿠키 포함
+      });
       const result = await response.json();
 
       if (result.success) {
@@ -112,6 +116,7 @@ const EventList: React.FC = () => {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // 쿠키 포함
         body: JSON.stringify(editForm)
       });
       const result = await response.json();
@@ -137,7 +142,8 @@ const EventList: React.FC = () => {
 
     try {
       const response = await fetch(`${URL}/api/events/${eventToDelete.id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        credentials: 'include' // 쿠키 포함
       });
       const result = await response.json();
 

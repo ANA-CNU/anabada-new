@@ -135,23 +135,12 @@ export function EventAdd() {
       
       console.log("이벤트 생성 요청:", eventData);
       
-      // JWT 토큰 가져오기 (httpOnly 쿠키에서)
-      const token = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('accessToken='))
-        ?.split('=')[1];
-
-      if (!token) {
-        setErrors(['로그인이 필요합니다. 다시 로그인해주세요.']);
-        return;
-      }
-
       const response = await fetch(`${URL}/api/event/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
+        credentials: 'include', // 쿠키 포함
         body: JSON.stringify(eventData)
       });
       
