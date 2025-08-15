@@ -46,7 +46,7 @@ if (isProduction) {
 // 환경별 CORS 설정
 if (isProduction) {
   // Production: 제한된 CORS
-  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [process.env.FRONTEND_URL];
+  const allowedOrigins = process.env.ALLOWED_ORIGIN;
   
   app.use(cors({
     origin: function(origin, callback) {

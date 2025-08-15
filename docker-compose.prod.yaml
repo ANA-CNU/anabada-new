@@ -48,6 +48,7 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
       - NODE_ENV=production
+      - ALLOWED_ORIGIN=https://badar.anacnu.kr
 
     networks:
       - bada-network

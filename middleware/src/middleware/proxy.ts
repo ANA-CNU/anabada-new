@@ -42,7 +42,7 @@ export const staticAssetsProxy = createProxyMiddleware({
 export const safariCompatibilityHeaders = (req: Request, res: Response, next: NextFunction) => {
   if (isProduction) {
     // Production: 보안 강화된 헤더
-    const allowedOrigin = process.env.ALLOWED_ORIGIN || process.env.FRONTEND_URL;
+    const allowedOrigin = process.env.ALLOWED_ORIGIN;
 
     if (!allowedOrigin) {
       console.error('ALLOWED_ORIGIN 환경 변수가 설정되지 않았습니다.');
