@@ -68,10 +68,7 @@ const app = new Elysia()
     framework: "Elysia",
     runtime: "Bun"
   }))
-  .get("/api/swagger", ({ set }) => {
-    set.status = 302;
-    set.headers['Location'] = '/swagger';
-  })
+
   .use(monthlyStats)
   .use(recentlySolve)
   .use(recentlyScore)
