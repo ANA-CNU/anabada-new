@@ -49,6 +49,7 @@ services:
       - DB_NAME=${DB_NAME}
       - NODE_ENV=production
       - ALLOWED_ORIGIN=https://badar.anacnu.kr
+      - FRONTEND_URL=${FRONTEND_URL}
 
     networks:
       - bada-network

@@ -85,10 +85,12 @@ export const safariCompatibilityHeaders = (req: Request, res: Response, next: Ne
 // 프록시 로깅 미들웨어
 export const proxyLogging = (req: Request, res: Response, next: NextFunction) => {
   if (!isProduction) {
-    // Development에서만 상세 로깅
+    // Development/Stage에서 상세 로깅
     console.log(`🔄 프록시 요청: ${req.method} ${req.url} → ${frontendUrl}${req.url}`);
     console.log(`🌐 User-Agent: ${req.get('User-Agent')}`);
     console.log(`📍 Origin: ${req.get('Origin') || 'undefined (Safari)'}`);
+    console.log(`🏗️ 환경: ${process.env.NODE_ENV || 'undefined'}`);
+    console.log(`🎯 프론트엔드 URL: ${frontendUrl}`);
   }
   next();
 }; 

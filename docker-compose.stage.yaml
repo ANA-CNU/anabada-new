@@ -18,8 +18,8 @@ services:
       context: ./middleware
       dockerfile: Dockerfile
 
-    ports:
-      - "20050:80"
+    # ports:
+    #   - "20050:80"
 
     environment:
       - PORT=${PORT}
@@ -28,8 +28,8 @@ services:
       - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
       - ADMIN_USERNAME=${ADMIN_USERNAME}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-      - ALLOWED_ORIGIN=https://badar.anacnu.kr
-
+      - FRONTEND_URL=${FRONTEND_URL}
+      - ALLOWED_ORIGIN=${ALLOWED_ORIGIN}
     networks:
       - dmoj_nginx_network
       - bada-network
@@ -51,6 +51,7 @@ services:
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
+      - NODE_ENV=stage
 
     networks:
       - dmoj_nginx_network
