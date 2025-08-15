@@ -63,8 +63,15 @@ if (isProduction) {
   
   console.log('🔒 Production 환경: CORS 제한 활성화');
 } else {
-  // Development/Stage: CORS 비활성화
-  console.log('🌐 Development/Stage 환경: CORS 비활성화');
+  // Development/Stage: 쿠키 전송을 위한 CORS 설정
+  app.use(cors({
+    origin: true, // 모든 origin 허용
+    credentials: true, // 쿠키 전송 허용
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cookie']
+  }));
+  
+  console.log('🌐 Development/Stage 환경: CORS 활성화 (쿠키 전송 허용)');
 }
 
 // 로깅 설정

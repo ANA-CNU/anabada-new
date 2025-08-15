@@ -26,11 +26,17 @@ const corsConfig = isProduction ? {
   origin: [process.env.ALLOWED_ORIGIN!], // 프로덕션 도메인
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-} : undefined; // production이 아니면 CORS 비활성화
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cookie']
+} : {
+  // 개발 환경: 쿠키 전송을 위한 CORS 설정
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cookie']
+};
 
 const app = new Elysia()
-  .use(isProduction ? cors(corsConfig) : cors()) // production이 아니면 기본 CORS (모든 origin 허용)
+  .use(cors(corsConfig)) // 항상 CORS 활성화
   .onRequest(({ request }) => {
     logger.info(`요청 수신: ${request.method} ${request.url}`);
     logger.debug(`Origin: ${request.headers.get('origin')}`);
