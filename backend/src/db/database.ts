@@ -11,9 +11,6 @@ const DB_CONFIG = {
   charset: 'utf8mb4',
   timezone: '+09:00',
   connectionLimit: 10,
-  acquireTimeout: 60000,
-  timeout: 60000,
-  reconnect: true
 };
 
 // 데이터베이스 연결 풀
