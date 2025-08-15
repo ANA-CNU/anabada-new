@@ -31,7 +31,7 @@ function EventSection() {
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const [ongoingResonse, pastResponse] = await Promise.all([
+        const [ongoingResponse, pastResponse] = await Promise.all([
           fetch(`${URL}/api/events/ongoing`),
           fetch(`${URL}/api/events/past`)
         ]);
