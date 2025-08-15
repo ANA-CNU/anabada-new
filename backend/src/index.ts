@@ -7,6 +7,8 @@ import { monthlyStats } from './api/statistics/monthly-stats.js';
 import { recentlySolve } from './api/statistics/recently-solve.js';
 import { recentlyScore } from './api/statistics/recently-score.js';
 import { event } from './api/event/event.js';
+import { rank } from "./api/rank.js";
+import { board } from "./api/board.js";
 
 export const logger = pino({
   level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
@@ -68,11 +70,12 @@ const app = new Elysia()
     framework: "Elysia",
     runtime: "Bun"
   }))
-
+  .use(rank)
   .use(monthlyStats)
   .use(recentlySolve)
   .use(recentlyScore)
   .use(event)
+  .use(board)
   .listen(3000);
 
 logger.info(`ELYSIA Server 3000번 포트에서 실행합니다.`)

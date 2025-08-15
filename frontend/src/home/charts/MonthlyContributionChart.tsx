@@ -1,36 +1,55 @@
-import React, { useMemo, useCallback } from "react";
-import { dummyStats } from "@/resource/dummy";
+import { URL } from "@/resource/constant";
+import React, { useMemo, useCallback, useState, useEffect } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 
+interface MonthlyData {
+  date: string;
+  solved_problem: number;
+}
+
 function MonthlyContributionChart() {
+  const [monthlyStats, setMonthlyStats] = useState<MonthlyData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchMonthlyStats = async () => {
+      try {
+        const response = await fetch(`${URL}/api/statistics/monthly-problems`);
+        const result = await response.json();
+        
+        if (result.success) {
+          setMonthlyStats(result.data);
+        }
+      } catch (error) {
+        console.error('월별 통계 데이터 가져오기 실패:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMonthlyStats();
+  }, []);
+
   // 월별 데이터로 변환하고 누적 계산
   const monthlyData = useMemo(() => {
-    const monthlyStats: { [key: string]: number } = {};
-    
-    // 날짜별 기여도를 월별로 그룹화
-    dummyStats.forEach(stat => {
-      const date = new Date(stat.date);
-      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      monthlyStats[monthKey] = (monthlyStats[monthKey] || 0) + stat.contribution;
-    });
+    if (monthlyStats.length === 0) return [];
 
-    // 월별 데이터를 배열로 변환하고 누적 계산
-    const sortedMonths = Object.keys(monthlyStats).sort();
+    // API 데이터를 차트용으로 변환하고 누적 계산
     let cumulative = 0;
     
-    return sortedMonths.map(month => {
-      cumulative += monthlyStats[month];
-      const [year, monthNum] = month.split('-');
+    return monthlyStats.map(stat => {
+      cumulative += stat.solved_problem;
+      const [year, monthNum] = stat.date.split('-');
       const monthName = new Date(parseInt(year), parseInt(monthNum) - 1).toLocaleDateString('ko-KR', { month: 'short' });
       
       return {
         month: monthName,
-        contribution: monthlyStats[month],
+        contribution: stat.solved_problem,
         cumulative: cumulative,
-        fullMonth: month
+        fullMonth: stat.date
       };
     });
-  }, []);
+  }, [monthlyStats]);
 
   // 숫자 포맷팅 함수 (3자리마다 쉼표) - useCallback으로 최적화
   const formatNumber = useCallback((num: number) => {
@@ -54,10 +73,10 @@ function MonthlyContributionChart() {
         <div className="bg-black/90 border border-gray-700 rounded-lg p-3 text-white">
           <p className="font-semibold">{label}</p>
           <p className="text-sm text-gray-300">
-            이번 달 기여: {formatNumber(payload[0].payload.contribution)}개
+            이번 달 해결: {formatNumber(payload[0].payload.contribution)}문제
           </p>
           <p className="text-sm text-blue-400">
-            누적 기여: {formatNumber(payload[0].payload.cumulative)}개
+            누적 해결: {formatNumber(payload[0].payload.cumulative)}문제
           </p>
         </div>
       );
@@ -65,10 +84,18 @@ function MonthlyContributionChart() {
     return null;
   }, [formatNumber]);
 
+  if (loading) {
+    return (
+      <div className="w-full h-full flex items-center justify-center">
+        <div className="text-white">데이터 로딩 중...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full h-full flex items-center justify-center">
       <div className="w-full">
-        <h3 className="text-white text-lg font-semibold mb-4 text-center">월별 기여도</h3>
+        <h3 className="text-white text-lg font-semibold mb-4 text-center">월별 문제 해결 통계</h3>
         <ResponsiveContainer width="100%" height={250}>
           <AreaChart data={monthlyData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
             <defs>

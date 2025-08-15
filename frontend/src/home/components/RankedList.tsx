@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"; // shadcn/ui의 Card �
 
 interface RankedListProps {
   list: Ranked[];
+  showBias?: boolean; // bias 표시 여부 (첫 번째 리스트용)
 }
 
 const borderColors = [
@@ -13,7 +14,7 @@ const borderColors = [
   "border-amber-700 shadow-[0_0_8px_2px_rgba(205,127,50,0.22)] hover:shadow-[0_0_16px_4px_rgba(205,127,50,0.35)] hover:scale-105",
 ];
 
-function RankedList({ list }: RankedListProps) {
+function RankedList({ list, showBias = false }: RankedListProps) {
   const listRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const animationRef = useRef<gsap.core.Tween | null>(null);
@@ -155,13 +156,17 @@ function RankedList({ list }: RankedListProps) {
               }}
             >
               <div className="flex items-center gap-1">
-                <span className="font-bold text-sm w-5 text-right text-white">{item.rank}</span>
+                <span className="font-bold text-sm w-5 text-right text-white">{idx + 1}</span>
                 <span className="font-mono text-xs text-white">{item.username}</span>
               </div>
               <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                 <span>티어: {item.tier}</span>
                 <span>|</span>
-                <span>푼 문제: {item.solved}</span>
+                {showBias ? (
+                  <span>가중치: {item.bias}</span>
+                ) : (
+                  <span>푼 문제: {item.solved}</span>
+                )}
               </div>
             </CardContent>
           </Card>

@@ -1,10 +1,39 @@
+import { URL } from "@/resource/constant";
 import { useMemo, useState, useEffect } from "react";
 
+
+interface TotalProblemsData {
+  total_problems: number;
+}
+
 function ContributionStats() {
-  // 총 누적 기여수 계산
-  const totalCumulativeContribution = useMemo(() => {
-    return 12351251;
+  const [totalProblems, setTotalProblems] = useState<TotalProblemsData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // API에서 전체 문제 수 가져오기
+  useEffect(() => {
+    const fetchTotalProblems = async () => {
+      try {
+        const response = await fetch(`${URL}/api/statistics/total-problems`);
+        const result = await response.json();
+        
+        if (result.success) {
+          setTotalProblems(result.data);
+        }
+      } catch (error) {
+        console.error('전체 문제 수 가져오기 실패:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTotalProblems();
   }, []);
+
+  // 총 누적 기여수 계산 (API 데이터 사용)
+  const totalCumulativeContribution = useMemo(() => {
+    return totalProblems?.total_problems || 0;
+  }, [totalProblems]);
 
   // 애니메이션용 상태
   const [animatedValue, setAnimatedValue] = useState(0);
@@ -54,6 +83,14 @@ function ContributionStats() {
     };
   }, [totalCumulativeContribution]);
 
+  if (loading) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center">
+        <div className="text-white text-2xl">데이터 로딩 중...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full h-full flex flex-col items-center justify-center">
       <div className="text-center">
@@ -64,7 +101,7 @@ function ContributionStats() {
           WebkitTextFillColor: "transparent",
           backgroundClip: "text"
         }}>
-          누적 기여수
+          전체 문제 수
         </h1>
         <div 
           className="text-6xl font-bold text-white mb-4"
@@ -78,7 +115,7 @@ function ContributionStats() {
           {formatNumber(animatedValue)}
         </div>
         <p className="text-white/70 text-sm mb-10">
-          지금까지 함께 성장한 기여자들의 기록
+          지금까지 해결된 모든 문제의 기록
         </p>
       </div>
     </div>

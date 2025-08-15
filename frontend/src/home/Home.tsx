@@ -19,11 +19,11 @@ function Home() {
           </div>
         </div>
 
+        <ActivitySection/>
         <StatsSection/>
         
         <EventSection/>
         
-        <ActivitySection/>
         <Footer />
       </Background>
       

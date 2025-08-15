@@ -4,7 +4,8 @@ export class Ranked {
     username: string;
     rank: number;
     tier: number;
-    solved : number;
+    solved? : number;
+    bias? : number;
 
     constructor(username: string, rank: number, tier: number, solved: number) {
         this.username = username;
