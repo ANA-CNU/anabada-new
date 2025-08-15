@@ -1,13 +1,24 @@
 import jwt from 'jsonwebtoken';
 
 export function checkAdminAuth(request: Request): { isAuthenticated: boolean; user: any } {
-  const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  // httpOnly 쿠키에서 accessToken 추출
+  const cookieHeader = request.headers.get('cookie');
+  if (!cookieHeader) {
     return { isAuthenticated: false, user: null };
   }
 
-  const token = authHeader.substring(7);
+  // accessToken=Bearer <token> 형식에서 토큰 추출
+  const accessTokenMatch = cookieHeader.match(/accessToken=([^;]+)/);
+  if (!accessTokenMatch) {
+    return { isAuthenticated: false, user: null };
+  }
+
+  const accessToken = accessTokenMatch[1];
+  if (!accessToken.startsWith('Bearer ')) {
+    return { isAuthenticated: false, user: null };
+  }
+
+  const token = accessToken.substring(7); // "Bearer " 제거
   const jwtSecret = process.env.JWT_SECRET;
   
   if (!jwtSecret) {
@@ -20,8 +31,8 @@ export function checkAdminAuth(request: Request): { isAuthenticated: boolean; us
     return { 
       isAuthenticated: true, 
       user: {
-        username: decoded.username,
-        role: decoded.role,
+        username: decoded.username || 'admin',
+        role: decoded.role || 'admin',
       }
     };
   } catch (error) {
