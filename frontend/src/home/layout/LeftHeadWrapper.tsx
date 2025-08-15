@@ -13,26 +13,34 @@ function LeftHeadWrapper() {
         animationRef.current.kill();
       }
       
-      // 성능 최적화를 위한 설정 (Safari 최적화 포함)
-      gsap.set(leftRef.current.querySelectorAll(".title-item"), {
-        willChange: "transform, opacity",
-        transform: "translateZ(0)",
-        backfaceVisibility: "hidden",
-        webkitBackfaceVisibility: "hidden"
-      });
-      
-      animationRef.current = gsap.fromTo(
-        (leftRef.current.querySelectorAll(".title-item") as NodeListOf<HTMLElement>),
-        { y: 40, opacity: 0 },
-        {
-          y: 0,
-          opacity: 1,
-          stagger: 1.1,
-          duration: 0.8,
-          ease: "power3.out",
-          force3D: true, // GPU 가속 강제 활성화
+      // DOM 요소가 렌더링된 후 애니메이션 실행을 위한 지연
+      const timer = setTimeout(() => {
+        const titleItems = leftRef.current?.querySelectorAll(".title-item");
+        if (titleItems && titleItems.length > 0) {
+          // 성능 최적화를 위한 설정 (Safari 최적화 포함)
+          gsap.set(titleItems, {
+            willChange: "transform, opacity",
+            transform: "translateZ(0)",
+            backfaceVisibility: "hidden",
+            webkitBackfaceVisibility: "hidden"
+          });
+          
+          animationRef.current = gsap.fromTo(
+            titleItems,
+            { y: 40, opacity: 0 },
+            {
+              y: 0,
+              opacity: 1,
+              stagger: 1.1,
+              duration: 0.8,
+              ease: "power3.out",
+              force3D: true, // GPU 가속 강제 활성화
+            }
+          );
         }
-      );
+      }, 100); // 100ms 지연으로 DOM 렌더링 완료 보장
+
+      return () => clearTimeout(timer);
     }
 
     // 컴포넌트 언마운트 시 애니메이션 정리

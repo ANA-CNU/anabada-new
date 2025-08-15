@@ -76,6 +76,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     });
 
     res.status(200).json({ 
+      success: true,
       message: '로그인 성공',
       user: {
         username: adminUsername,

@@ -9,6 +9,10 @@ services:
     networks:
       - bada-network
 
+    environment:
+      - NODE_ENV=production
+      - BACKEND_URL=https://badar.anacnu.kr/
+
   anabada-middleware:
     container_name: anabada-middleware
     build:
