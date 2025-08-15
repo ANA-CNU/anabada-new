@@ -30,7 +30,7 @@ services:
       - ADMIN_USERNAME=${ADMIN_USERNAME}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - FRONTEND_URL=${FRONTEND_URL}
-
+      - ALLOWED_ORIGIN=https://badar.anacnu.kr
     networks:
       - bada-network
 
