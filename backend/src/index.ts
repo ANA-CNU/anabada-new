@@ -38,7 +38,6 @@ const app = new Elysia()
     logger.error(`에러 발생: ${request.method} ${request.url}`, error as any);
   })
   .use(swagger({
-    path: '/api/swagger',
     documentation: {
       info: {
         title: 'ANABADA Backend API',
@@ -69,6 +68,10 @@ const app = new Elysia()
     framework: "Elysia",
     runtime: "Bun"
   }))
+  .get("/api/swagger", ({ set }) => {
+    set.status = 302;
+    set.headers['Location'] = '/swagger';
+  })
   .use(monthlyStats)
   .use(recentlySolve)
   .use(recentlyScore)
@@ -79,4 +82,4 @@ logger.info(`ELYSIA Server 3000번 포트에서 실행합니다.`)
 logger.info(`ANABADA용 백엔드 서버`)
 logger.info(`환경: ${process.env.NODE_ENV || 'undefined'}`)
 logger.info(`CORS 설정: ${isProduction ? `제한됨 (${process.env.ALLOWED_ORIGIN})` : '모든 origin 허용'}`)
-logger.info(`Swagger UI: https://badar.anacnu.kr/api/swagger`)
+logger.info(`Swagger UI: http://localhost:3000/swagger`)
