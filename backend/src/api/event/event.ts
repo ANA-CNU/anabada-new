@@ -197,9 +197,10 @@ export const event = new Elysia()
   // 이벤트 목록 조회 (페이지네이션)
   .get('/api/events', async ({ query }) => {
     try {
-      const db = getDatabase();
-      const page = parseInt(query.page as string) || 1;
-      const limit = parseInt(query.limit as string) || 10;
+      const db = await getDatabase();
+      const page = Math.max(parseInt(query.page as string) || 1, 1);
+      const limitRaw = parseInt(query.limit as string) || 10;
+      const limit = Math.min(Math.max(limitRaw, 1), 100);
       const offset = (page - 1) * limit;
 
       // 전체 이벤트 수 조회
@@ -220,10 +221,10 @@ export const event = new Elysia()
         LEFT JOIN event_problem ep ON e.id = ep.event_id
         GROUP BY e.id
         ORDER BY e.created_at DESC
-        LIMIT ${limit} OFFSET ${offset}
+        LIMIT ?, ?
       `;
 
-      const [rows] = await db.execute(sql);
+      const [rows] = await db.execute(sql, [limit, offset]);
       const data = rows as any[];
 
       return {

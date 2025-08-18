@@ -110,6 +110,135 @@ export const scoreHistory = new Elysia()
 				message: "요청 처리에 실패했습니다.",
 			};
 		}
+	})
+
+	// 관리자용 score_history 조회 (페이지네이션, 필터)
+	.get("/api/admin/score-history", async ({ request, query }) => {
+		if (isProduction && !checkAdminAuth(request).isAuthenticated) {
+			return {
+				success: false,
+				message: "관리자 권한이 없습니다.",
+			};
+		}
+
+		try {
+			const db = await getDatabase();
+			const page = Math.max(parseInt((query as any).page as string) || 1, 1);
+			const limit = Math.min(Math.max(parseInt((query as any).limit as string) || 10, 1), 100);
+			const offset = (page - 1) * limit;
+			const username = (query as any).username as string | undefined;
+
+			const whereSql = username ? "WHERE u.name = ?" : "";
+			const whereParams = username ? [username] : [];
+
+            //injection 절때 안당함 당할수가없음.
+			const countSql = `
+				SELECT COUNT(*) AS total
+				FROM score_history sh
+				JOIN user u ON sh.user_id = u.id
+				${whereSql}
+			`;
+			const [countRows] = await db.execute(countSql, whereParams);
+			const total = (countRows as any[])[0]?.total ?? 0;
+
+            //injection 절때 안당함 당할수가없음.
+			const dataSql = `
+				SELECT 
+					sh.id,
+					u.name AS username,
+					sh.\`desc\`,
+					sh.bias,
+					sh.event_id,
+					sh.problem_id,
+					sh.created_at
+				FROM score_history sh
+				JOIN user u ON sh.user_id = u.id
+				${whereSql}
+				ORDER BY sh.created_at DESC
+				LIMIT ? OFFSET ?
+			`;
+			const [rows] = await db.execute(dataSql, [...whereParams, limit, offset]);
+
+			return {
+				success: true,
+				data: rows,
+				pagination: {
+					page,
+					limit,
+					total,
+					total_pages: Math.ceil(total / limit),
+				},
+				message: "score_history 조회 성공",
+			};
+		} catch (error: any) {
+			logger.error("score_history 조회 실패", error);
+			return {
+				success: false,
+				error: error?.message ?? String(error),
+				message: "score_history 조회 중 오류가 발생했습니다.",
+			};
+		}
+	})
+
+	// score_history 수정
+	.put("/api/score-history/:id", async ({ request, body, params }) => {
+		if (isProduction && !checkAdminAuth(request).isAuthenticated) {
+			return {
+				success: false,
+				message: "관리자 권한이 없습니다.",
+			};
+		}
+
+		try {
+			const id = Number((params as any).id);
+			if (!Number.isFinite(id)) {
+				return { success: false, message: "유효하지 않은 id 입니다." };
+			}
+
+			const { desc, bias, eventId, problemId } = (body as any) ?? {};
+			const fields: string[] = [];
+			const values: any[] = [];
+
+			if (typeof desc !== "undefined") { fields.push("`desc` = ?"); values.push(desc); }
+			if (typeof bias !== "undefined") { fields.push("bias = ?"); values.push(Number(bias) || 0); }
+			if (typeof eventId !== "undefined") { fields.push("event_id = ?"); values.push(eventId ?? null); }
+			if (typeof problemId !== "undefined") { fields.push("problem_id = ?"); values.push(problemId ?? null); }
+
+			if (fields.length === 0) {
+				return { success: false, message: "수정할 필드가 없습니다." };
+			}
+
+			const db = getDatabase();
+			const sql = `UPDATE score_history SET ${fields.join(", ")} WHERE id = ?`;
+			await db.execute(sql, [...values, id]);
+
+			return { success: true, message: "수정 완료" };
+		} catch (error: any) {
+			logger.error("score_history 수정 실패", error);
+			return { success: false, message: "수정 중 오류가 발생했습니다.", error: error?.message ?? String(error) };
+		}
+	})
+
+	// score_history 삭제
+	.delete("/api/score-history/:id", async ({ request, params }) => {
+		if (isProduction && !checkAdminAuth(request).isAuthenticated) {
+			return {
+				success: false,
+				message: "관리자 권한이 없습니다.",
+			};
+		}
+
+		try {
+			const id = Number((params as any).id);
+			if (!Number.isFinite(id)) {
+				return { success: false, message: "유효하지 않은 id 입니다." };
+			}
+
+			const db = getDatabase();
+			await db.execute(`DELETE FROM score_history WHERE id = ?`, [id]);
+			return { success: true, message: "삭제 완료" };
+		} catch (error: any) {
+			logger.error("score_history 삭제 실패", error);
+			return { success: false, message: "삭제 중 오류가 발생했습니다.", error: error?.message ?? String(error) };
+		}
 	});
-
-

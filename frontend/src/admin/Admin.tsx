@@ -24,6 +24,8 @@ import { EventAdd } from "./components/EventAdd";
 import ScoreManagement from "./components/ScoreManagement";
 import EventList from "./components/EventList";
 import { URL } from "@/resource/constant";
+import LogManagement from "./components/LogManagement";
+import BiasManagement from "./components/BiasManagement";
 
 function Admin() {
   console.log("🔧 Admin 컴포넌트 렌더링 시작");
@@ -83,7 +85,8 @@ function Admin() {
       items: [
         { name: "유저 목록", icon: <UserCheck className="h-4 w-4" />, id: "user-list" },
         { name: "점수 관리", icon: <Award className="h-4 w-4" />, id: "score-status" },
-        { name: "로그 관리", icon: <Star className="h-4 w-4" />, id: "ranking" },
+        { name: "로그 관리", icon: <Star className="h-4 w-4" />, id: "log-management" },
+        { name: "가중치 관리", icon: <TrendingUp className="h-4 w-4" />, id: "bias-management" },
       ]
     },
     {
@@ -141,6 +144,10 @@ function Admin() {
         );
       case "score-status":
         return <ScoreManagement nameList={nameList} />;
+      case "log-management":
+        return <LogManagement />;
+      case "bias-management":
+        return <BiasManagement />;
       case "event-list":
         return <EventList />;
       case "event-stats":

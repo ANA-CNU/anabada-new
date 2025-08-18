@@ -5,9 +5,10 @@ import { logger } from "../../index.js";
 export const recentlyScore = new Elysia()
   .get('/api/statistics/recently-score', async ({ query }) => {
     try {
-      const db = getDatabase();
-      const page = parseInt(query.page as string) || 1;
-      const limit = parseInt(query.limit as string) || 10;
+      const db = await getDatabase();
+      const page = Math.max(parseInt(query.page as string) || 1, 1);
+      const limitRaw = parseInt(query.limit as string) || 10;
+      const limit = Math.min(Math.max(limitRaw, 1), 100);
       const offset = (page - 1) * limit;
 
       // 세션 시간대를 KST로 설정
@@ -61,7 +62,8 @@ export const recentlyScore = new Elysia()
   .get('/api/statistics/recently-score/top', async ({ query }) => {
     try {
       const db = getDatabase();
-      const limit = parseInt(query.limit as string) || 100;
+      const limitRaw = parseInt(query.limit as string) || 100;
+      const limit = Math.min(Math.max(limitRaw, 1), 500);
 
       const sql = `
         SELECT
@@ -75,12 +77,12 @@ export const recentlyScore = new Elysia()
         FROM score_history sh
         JOIN user u ON sh.user_id = u.id
         ORDER BY sh.created_at DESC
-        LIMIT ${limit}
+        LIMIT ?
       `;
 
       logger.debug(`SQL QUERY: ${sql} with limit: ${limit}`);
 
-      const [rows] = await db.execute(sql);
+      const [rows] = await db.execute(sql, [limit]);
       const data = rows as any[];
       logger.debug(`최근 점수 기록 TOP ${limit} 조회 성공`);
 

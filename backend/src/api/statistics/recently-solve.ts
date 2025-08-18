@@ -6,8 +6,9 @@ export const recentlySolve = new Elysia()
   .get('/api/statistics/recently-solved', async ({ query }) => {
     try {
       const db = getDatabase();
-      const page = parseInt(query.page as string) || 1;
-      const limit = parseInt(query.limit as string) || 10;
+      const page = Math.max(parseInt(query.page as string) || 1, 1);
+      const limitRaw = parseInt(query.limit as string) || 10;
+      const limit = Math.min(Math.max(limitRaw, 1), 100);
       const offset = (page - 1) * limit;
 
       // 세션 시간대를 KST로 설정
