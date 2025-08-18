@@ -26,6 +26,7 @@ import EventList from "./components/EventList";
 import { URL } from "@/resource/constant";
 import LogManagement from "./components/LogManagement";
 import BiasManagement from "./components/BiasManagement";
+import UserManagement from "./components/UserManagement";
 
 function Admin() {
   console.log("🔧 Admin 컴포넌트 렌더링 시작");
@@ -142,6 +143,8 @@ function Admin() {
             </div>
           </div>
         );
+      case "user-list":
+        return <UserManagement />;
       case "score-status":
         return <ScoreManagement nameList={nameList} />;
       case "log-management":
@@ -157,7 +160,6 @@ function Admin() {
           <div className="space-y-6">
             <div>
               <h2 className="text-3xl font-bold tracking-tight">
-                {activeSection === "user-list" && "유저 목록"}
                 {activeSection === "ranking" && "랭킹 관리"}
                 {activeSection === "activity-log" && "활동 로그"}
                 {activeSection === "system-log" && "시스템 로그"}

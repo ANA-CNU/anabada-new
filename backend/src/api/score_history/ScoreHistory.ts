@@ -122,7 +122,7 @@ export const scoreHistory = new Elysia()
 		}
 
 		try {
-			const db = await getDatabase();
+			const db = getDatabase();
 			const page = Math.max(parseInt((query as any).page as string) || 1, 1);
 			const limit = Math.min(Math.max(parseInt((query as any).limit as string) || 10, 1), 100);
 			const offset = (page - 1) * limit;
@@ -131,7 +131,7 @@ export const scoreHistory = new Elysia()
 			const whereSql = username ? "WHERE u.name = ?" : "";
 			const whereParams = username ? [username] : [];
 
-            //injection 절때 안당함 당할수가없음.
+            //injection 절
 			const countSql = `
 				SELECT COUNT(*) AS total
 				FROM score_history sh
@@ -141,7 +141,6 @@ export const scoreHistory = new Elysia()
 			const [countRows] = await db.execute(countSql, whereParams);
 			const total = (countRows as any[])[0]?.total ?? 0;
 
-            //injection 절때 안당함 당할수가없음.
 			const dataSql = `
 				SELECT 
 					sh.id,
@@ -155,7 +154,7 @@ export const scoreHistory = new Elysia()
 				JOIN user u ON sh.user_id = u.id
 				${whereSql}
 				ORDER BY sh.created_at DESC
-				LIMIT ? OFFSET ?
+				LIMIT ${limit} OFFSET ${offset}
 			`;
 			const [rows] = await db.execute(dataSql, [...whereParams, limit, offset]);
 
