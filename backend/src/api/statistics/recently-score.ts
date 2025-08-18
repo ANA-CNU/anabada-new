@@ -26,6 +26,7 @@ export const recentlyScore = new Elysia()
           ) AS createdAt
         FROM score_history sh
         JOIN user u ON sh.user_id = u.id
+        WHERE u.ignored = 0
         ORDER BY sh.created_at DESC
         LIMIT ${limit} OFFSET ${offset}
       `;

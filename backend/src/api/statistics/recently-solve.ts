@@ -26,6 +26,7 @@ export const recentlySolve = new Elysia()
         FROM problem p
         JOIN user u ON p.name = u.name
         WHERE p.repeatation = 0
+          AND u.ignored = 0
         ORDER BY p.time DESC
         LIMIT ${limit} OFFSET ${offset}
       `;
