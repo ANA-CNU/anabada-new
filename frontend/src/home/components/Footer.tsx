@@ -25,7 +25,7 @@ function Footer() {
       role: "Contributor"
     },
     {
-      name: "이준희",
+      name: "이준휘",
       github: "https://github.com/example3", 
       role: "Contributor"
     },

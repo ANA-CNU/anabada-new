@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "lucide-react";
-import { getProblemCountColor, type MonthlyProblem } from './types';
+import { getProblemCountColor, getTotalSolvedColor, type MonthlyProblem } from './types';
 import { URL } from "@/resource/constant";
 
 interface MonthlyProblemsTableProps {
@@ -16,26 +16,36 @@ interface ApiResponse {
     username: string;
     tier: number;
     solved: number;
+    total_solved: number;
   }[];
   message: string;
 }
 
+// 테이블 전용 확장 타입 (누적 포함)
+interface MonthlyProblemRow {
+  id: string;
+  user: string;
+  problemCount: number;
+  totalSolved: number;
+}
+
 function MonthlyProblemsTable({ problems: initialProblems }: MonthlyProblemsTableProps) {
-  const [problems, setProblems] = useState<MonthlyProblem[]>([]);
+  const [problems, setProblems] = useState<MonthlyProblemRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchMonthlyProblems = async () => {
       try {
-        const response = await fetch(`${URL}/api/ranking/solved`);
+        const response = await fetch(`${URL}/api/ranking/monthly-solved`);
         const result: ApiResponse = await response.json();
         
         if (result.success) {
-          // API 응답을 MonthlyProblem 형식으로 변환
-          const convertedProblems: MonthlyProblem[] = result.data.map((item, index) => ({
+          // API 응답을 테이블용 형식으로 변환
+          const convertedProblems: MonthlyProblemRow[] = result.data.map((item, index) => ({
             id: (index + 1).toString(),
             user: item.username,
-            problemCount: item.solved
+            problemCount: item.solved,
+            totalSolved: item.total_solved,
           }));
           setProblems(convertedProblems);
         }
@@ -43,7 +53,14 @@ function MonthlyProblemsTable({ problems: initialProblems }: MonthlyProblemsTabl
         console.error('이번 달 문제 해결 데이터 가져오기 실패:', error);
         // API 실패 시 초기 데이터 사용
         if (initialProblems) {
-          setProblems(initialProblems);
+          setProblems(
+            initialProblems.map((p, idx) => ({
+              id: p.id ?? String(idx + 1),
+              user: p.user,
+              problemCount: p.problemCount,
+              totalSolved: 0,
+            }))
+          );
         }
       } finally {
         setLoading(false);
@@ -52,6 +69,18 @@ function MonthlyProblemsTable({ problems: initialProblems }: MonthlyProblemsTabl
 
     fetchMonthlyProblems();
   }, [initialProblems]);
+
+  
+  //디버그 시에만 사용 하길 바람 그외에는 주석 처리해서 commit.
+  // const isDebug = process.env.NODE_ENV === 'development';
+  const isDebug = false;
+
+  const displayProblems = useMemo(() => {
+    if (!isDebug) return problems;
+    const debugTotals = [3000, 2500, 2000, 1500, 1400, 1300, 1200, 1100, 1000, 900, 650, 400, 200, 100, 50];
+    return problems.map((p, idx) => idx < debugTotals.length ? { ...p, totalSolved: debugTotals[idx] } : p);
+  }, [problems, isDebug]);
+
   return (
     <Card className="bg-white/5 backdrop-blur-md border-purple-400/30">
       <CardHeader className="pb-2">
@@ -100,15 +129,21 @@ function MonthlyProblemsTable({ problems: initialProblems }: MonthlyProblemsTabl
             <TableRow className="border-white/10">
               <TableHead className="text-white/70">유저</TableHead>
               <TableHead className="text-white/70">이번 달 해결</TableHead>
+              <TableHead className="text-white/70">누적 해결</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {problems.map((problem) => (
+            {displayProblems.map((problem) => (
               <TableRow key={problem.id} className="border-white/10 hover:bg-white/5">
                 <TableCell className="text-white font-medium">{problem.user}</TableCell>
                 <TableCell>
                   <Badge className={getProblemCountColor(problem.problemCount)}>
                     {problem.problemCount}개
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <Badge className={getTotalSolvedColor(problem.totalSolved)}>
+                    {problem.totalSolved}개
                   </Badge>
                 </TableCell>
               </TableRow>

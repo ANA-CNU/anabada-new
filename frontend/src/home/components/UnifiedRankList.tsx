@@ -1,5 +1,8 @@
 import { URL } from "@/resource/constant";
 import React, { useEffect, useRef, useState } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Spool, Spotlight } from "lucide-react";
+import SpotlightCard from "@/react_bits/SpotlightCard/SpotlightCard";
 
 // API 응답 타입 (/api/v2/ranking/bias)
 interface RankingItemV2 {
@@ -25,7 +28,7 @@ const trophyByRank: Record<number, { src: string; alt: string; fallback: string 
 };
 
 const rowBaseClass =
-  "flex items-center justify-between w-full rounded-2xl px-5 py-4 mb-3 bg-white/5 border border-white/10 shadow-sm";
+  "flex items-center justify-between w-full rounded-2xl px-5 mb-3 py-4 bg-white/5 border border-white/10 shadow-sm";
 
 const highlightFirstClass =
   "bg-gradient-to-r from-amber-500/30 via-amber-300/15 to-transparent border-amber-300/30";
@@ -39,6 +42,7 @@ export default function UnifiedRankList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const imgErrorRef = useRef<Record<number, boolean>>({});
+  const [animate, setAnimate] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -46,11 +50,14 @@ export default function UnifiedRankList() {
       try {
         setLoading(true);
         setError(null);
+        setAnimate(false);
         const res = await fetch(`${URL}/api/v2/ranking/bias`);
         const json: ApiV2Response = await res.json();
         if (!mounted) return;
         if (json.success && Array.isArray(json.data)) {
           setList(json.data);
+          // DOM 페인트 후 순차 애니메이션 시작
+          setTimeout(() => setAnimate(true), 60);
         } else {
           setError(json.message || "랭킹 데이터를 가져오지 못했습니다.");
         }
@@ -66,13 +73,7 @@ export default function UnifiedRankList() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="w-full max-w-[640px] lg:max-w-[520px] px-3">
-        <div className={`${rowBaseClass} animate-pulse`} />
-        <div className={`${rowBaseClass} animate-pulse`} />
-        <div className={`${rowBaseClass} animate-pulse`} />
-      </div>
-    );
+    return <></>
   }
 
   if (error) {
@@ -101,6 +102,7 @@ export default function UnifiedRankList() {
           -webkit-overflow-scrolling: touch;
         }
       `}</style>
+
       {list.map((u) => {
         const isTop = u.rank <= 3;
         const trophy = trophyByRank[u.rank];
@@ -125,8 +127,13 @@ export default function UnifiedRankList() {
         const trophyImgClass = isTop ? "w-10 h-10 object-contain" : "w-6 h-6 object-contain";
         const trophyEmojiClass = isTop ? "text-3xl" : "text-xl";
 
+        const motionClass = animate ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3";
         return (
-          <div key={u.username} className={rowClass}>
+          <div
+            key={u.username}
+            className={`${rowClass} will-change-transform transition-all duration-500 ease-out ${motionClass}`}
+            style={{ transitionDelay: `${(u.rank - 1) * 60}ms` }}
+          >
             {/* Left - Rank & Trophy & Username */}
             <div className="flex items-center gap-4 min-w-0">
               <div className={leftSlotClass}>
@@ -162,17 +169,21 @@ export default function UnifiedRankList() {
 
             {/* Right - Stats */}
             <div className="flex items-center gap-4">
-              <div className="text-sm text-white/90">
-                <span className="font-semibold">{u.monthly_problem}</span>
-                <span className="ml-1 text-white/70">문제</span>
+              {/* 모바일: 숨김, 데스크톱: 문제 수 표시 */}
+              <div className="hidden sm:block text-sm text-white/90">
+                <span className="font-semibold">{u.bias}</span>
+                <span className="ml-1 text-white/70">BIA</span>
               </div>
-              <div className="hidden sm:block text-xs text-white/70">
-                <span>이번달 점수: {u.bias}</span>
-                <span className="mx-2 text-white/20">|</span>
-                <span>누적: {u.total_problem}</span>
+              {/* 모바일: 점수만, 데스크톱: 모든 정보 */}
+              <div className="text-xs text-white/70">
+                <span className="sm:hidden text-base font-bold text-white/90">{u.bias} BIA</span>
+                <span className="hidden sm:inline">월간 풀이: {u.monthly_problem}</span>
+                <span className="hidden sm:inline mx-2 text-white/20">|</span>
+                <span className="hidden sm:inline">누적 풀이: {u.total_problem}</span>
               </div>
             </div>
           </div>
+        
         );
       })}
     </div>

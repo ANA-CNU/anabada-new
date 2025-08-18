@@ -88,3 +88,17 @@ export const getProblemCountColor = (count: number) => {
   if (count >= 5) return "bg-gray-400/30 text-gray-200 border-gray-300/50 shadow-lg shadow-gray-400/25";
   return "bg-gray-500/20 text-gray-300 border-gray-400/30";
 };
+
+// 누적 해결 배지 색상 (마일스톤 기반)
+export const getTotalSolvedColor = (count: number) => {
+  if (count >= 2500) return "bg-gradient-to-r from-rose-500/70 via-purple-500/70 to-indigo-500/70 text-white border-white/30 shadow-xl shadow-purple-500/30 animate-pulse";
+  if (count >= 2000) return "bg-gradient-to-r from-fuchsia-500/60 to-violet-500/60 text-white border-white/20 shadow-lg";
+  if (count >= 1500) return "bg-gradient-to-r from-amber-500/60 to-rose-500/60 text-white border-white/20 shadow-lg";
+  if (count >= 1000) return "bg-gradient-to-r from-blue-500/50 to-cyan-500/50 text-white border-white/20";
+  if (count >= 900) return "bg-emerald-400/25 text-emerald-100 border-emerald-300/30";
+  if (count >= 650) return "bg-green-500/25 text-green-100 border-green-300/30";
+  if (count >= 400) return "bg-lime-500/25 text-lime-100 border-lime-300/30";
+  if (count >= 200) return "bg-yellow-500/25 text-yellow-100 border-yellow-300/30";
+  if (count >= 100) return "bg-amber-500/25 text-amber-100 border-amber-300/30";
+  return "bg-gray-500/20 text-gray-300 border-gray-400/30";
+};

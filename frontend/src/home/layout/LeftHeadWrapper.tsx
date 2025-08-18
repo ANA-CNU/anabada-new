@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
 import gsap from "gsap";
 import styles from './LeftHeadWrapper.module.css';
 
@@ -53,15 +54,15 @@ function LeftHeadWrapper() {
 
   return (
     <div
-      className="flex flex-col justify-center items-center mb-4 lg:mb-10 lg:items-start h-full px-8 lg:pl-12 lg:pr-4 w-full lg:w-[40%] text-center lg:text-left"
+      className="flex flex-col justify-center items-center mb-6 lg:mb-10 lg:items-start h-full px-4 sm:px-6 lg:pl-12 lg:pr-4 w-full lg:w-[40%] text-center lg:text-left max-w-[900px]"
       ref={leftRef}
     >
-      <h1 className="title-item text-4xl font-bold text-white mb-6 opacity-0 flex gap-2 flex-wrap justify-center lg:justify-start">
+      <h1 className="title-item font-bold text-white opacity-0 mb-4 lg:mb-6 flex gap-2 flex-wrap justify-center lg:justify-start leading-tight text-[clamp(24px,6vw,48px)]">
         <span className={styles['floating-title1']}>Challange</span>
         <span className={styles['floating-title2']}>Rank</span>
         <span className={styles['floating-title3']}>Win</span>
       </h1>
-      <h1 className="title-item text-2xl font-medium text-white mb-6 opacity-0">
+      <h1 className="title-item font-medium text-white opacity-0 mb-4 lg:mb-6 leading-snug text-[clamp(18px,4vw,28px)]">
         <span className={`${styles['gradient-text']} mr-2`}>문제</span>
         <span>를 풀고,</span>
         <span className={`${styles['gradient-text']} mx-2`}>상품</span>
@@ -69,9 +70,22 @@ function LeftHeadWrapper() {
         <span className={`${styles['gradient-text']} mx-2`}>성장</span>
         <span>하세요.</span>
       </h1>
-      <h1 className={`title-item opacity-0 ${styles['anabada-title']}`}>
+      <h1 className={`title-item opacity-0 ${styles['anabada-title']} text-[clamp(32px,10vw,80px)] tracking-tight`}>
         ANABADA
       </h1>
+
+      {/* Call-to-Action */}
+      <div className="title-item opacity-0 mt-4 lg:mt-6">
+        <a href="/enter" className="inline-block">
+          <Button
+            size="lg"
+            className="group rounded-full px-6 py-6 text-base lg:text-lg font-semibold bg-white/5 hover:bg-white/10 text-white/95 border border-white/10 shadow-sm transition-transform duration-200 ease-out hover:scale-[1.03] focus-visible:scale-[1.03]"
+          >
+            ANABADA에 참여하기
+            <span className="ml-2 transition-transform duration-200 group-hover:translate-x-0.5">→</span>
+          </Button>
+        </a>
+      </div>
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { X, Plus, Users, Award, Settings, Copy } from "lucide-react";
+import { URL } from "@/resource/constant";
 
 interface ScoreEntry {
   id: string;
@@ -130,7 +131,35 @@ function ScoreManagement({ nameList }: ScoreManagementProps) {
 
   const handleSubmit = () => {
     console.log("점수 관리 데이터:", entries);
-    // TODO: API 호출 로직 구현
+    const records = entries.map(e => ({
+      username: e.username,
+      bias: Number(e.weight) || 0,
+      desc: e.reason ?? ""
+    }));
+
+    fetch(`${URL}/api/score-history/bulk`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      credentials: "include",
+      body: JSON.stringify({ records })
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data?.success === false) {
+          throw new Error(data?.message || `요청 실패 (status ${res.status})`);
+        }
+        return data;
+      })
+      .then((data) => {
+        console.log("등록 성공:", data);
+        alert(`등록 완료: ${data.insertedCount}건, 실패: ${data.failed?.length || 0}건`);
+      })
+      .catch((err) => {
+        console.error("등록 실패:", err);
+        alert(`등록 실패: ${err.message}`);
+      });
   };
 
   return (

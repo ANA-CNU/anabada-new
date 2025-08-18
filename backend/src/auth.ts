@@ -25,7 +25,7 @@ export function checkAdminAuth(request: Request): { isAuthenticated: boolean; us
   const jwtSecret = process.env.JWT_SECRET;
   
   if (!jwtSecret) {
-    console.error('JWT_SECRET이 설정되지 않았습니다.');
+    logger.error('JWT_SECRET이 설정되지 않았습니다.');
     return { isAuthenticated: false, user: null };
   }
 
@@ -41,7 +41,8 @@ export function checkAdminAuth(request: Request): { isAuthenticated: boolean; us
       }
     };
   } catch (error) {
-    console.error('JWT 검증 실패:', error);
+    logger.debug('JWT 검증 실패:');
+    logger.debug(error);
     return { isAuthenticated: false, user: null };
   }
 }

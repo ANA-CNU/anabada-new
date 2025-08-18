@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
   Users, 
@@ -23,6 +23,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { EventAdd } from "./components/EventAdd";
 import ScoreManagement from "./components/ScoreManagement";
 import EventList from "./components/EventList";
+import { URL } from "@/resource/constant";
 
 function Admin() {
   console.log("🔧 Admin 컴포넌트 렌더링 시작");
@@ -50,19 +51,30 @@ function Admin() {
     navigate("/login");
   };
 
-  // TODO: 서버에서 실제 유저 목록을 가져오는 로직
-  const nameList: string[] = [
-    "algo_master",
-    "coding_ninja", 
-    "problem_solver",
-    "code_wizard",
-    "algorithm_expert",
-    "code_master",
-    "algo_ninja",
-    "programming_guru",
-    "debug_master",
-    "solution_finder"
-  ];
+  // 유저 이름 목록 상태
+  const [nameList, setNameList] = useState<string[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await fetch(`${URL}/api/users/all`, {
+          credentials: 'include',
+        });
+        const json = await res.json();
+        if (!mounted) return;
+        if (json?.success && Array.isArray(json?.data)) {
+          const names = json.data.map((u: any) => u.name).filter((n: any) => typeof n === 'string');
+          setNameList(names);
+        } else {
+          console.warn('유저 목록 조회 실패:', json?.message);
+        }
+      } catch (err) {
+        console.error('유저 목록 불러오기 오류:', err);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   const menuItems = [
     {

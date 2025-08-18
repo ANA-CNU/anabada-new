@@ -9,6 +9,8 @@ import { recentlyScore } from './api/statistics/recently-score.js';
 import { event } from './api/event/event.js';
 import { rank } from "./api/rank.js";
 import { board } from "./api/board.js";
+import { scoreHistory } from "./api/score_history/ScoreHistory.js";
+import { users } from "./api/user/User.js";
 
 export const logger = pino({
   level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
@@ -82,6 +84,8 @@ const app = new Elysia()
   .use(recentlyScore)
   .use(event)
   .use(board)
+  .use(scoreHistory)
+  .use(users)
   .listen(3000);
 
 logger.info(`ELYSIA Server 3000번 포트에서 실행합니다.`)
