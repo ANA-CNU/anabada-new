@@ -1,6 +1,7 @@
 import Background from "./stats/Background";
 import LeftHeadWrapper from "./layout/LeftHeadWrapper";
 import RightHeadWrapper from "./layout/RightHeadWrapper";
+import UnifiedRankList from "./components/UnifiedRankList";
 import Header from "./layout/Header";
 import StatsSection from "./stats/StatsSection";
 import EventSection from "./components/EventSection";
@@ -15,7 +16,7 @@ function Home() {
           <Header />
           <div className="flex-1 flex flex-col items-center justify-center lg:flex-row lg:items-center lg:px-3 gap-4 lg:gap-0 py-4 lg:py-0">
             <LeftHeadWrapper />
-            <RightHeadWrapper />
+            <UnifiedRankList />
           </div>
         </div>
 
