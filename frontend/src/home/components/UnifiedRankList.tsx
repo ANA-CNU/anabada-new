@@ -158,7 +158,14 @@ export default function UnifiedRankList() {
               </div>
 
               <div className="min-w-0">
-                <div className="text-white font-semibold truncate">{u.username}</div>
+                <a 
+                  href={`https://solved.ac/profile/${u.username}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-white font-semibold truncate hover:text-red-300 hover:underline transition-colors cursor-pointer block"
+                >
+                  {u.username}
+                </a>
                 <div className="text-xs text-white/60 flex items-center gap-2">
                   <span>티어: {u.tier}</span>
                   <span className="text-white/20">|</span>

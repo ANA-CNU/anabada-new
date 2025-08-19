@@ -5,14 +5,14 @@ import { logger } from "../../index.js";
 export const recentlyScore = new Elysia()
   .get('/api/statistics/recently-score', async ({ query }) => {
     try {
-      const db = await getDatabase();
+      const db = getDatabase();
       const page = Math.max(parseInt(query.page as string) || 1, 1);
       const limitRaw = parseInt(query.limit as string) || 10;
       const limit = Math.min(Math.max(limitRaw, 1), 100);
       const offset = (page - 1) * limit;
 
       // 세션 시간대를 KST로 설정
-      await db.execute("SET time_zone = '+09:00'");
+      // await db.execute("SET time_zone = '+09:00'");
 
       // 페이지네이션된 데이터 조회 (KST 시간대 유지)
       const sql = `
@@ -20,10 +20,7 @@ export const recentlyScore = new Elysia()
           u.name AS username,
           sh.desc,
           sh.bias,
-          CONCAT(
-            DATE_FORMAT(sh.created_at, '%Y-%m-%dT%H:%i:%s'),
-            '+09:00'
-          ) AS createdAt
+          DATE_FORMAT(sh.created_at, '%Y-%m-%dT%H:%i:%s') AS createdAt
         FROM score_history sh
         JOIN user u ON sh.user_id = u.id
         WHERE u.ignored = 0

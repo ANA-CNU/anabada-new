@@ -79,7 +79,7 @@ function LeftHeadWrapper() {
         <a href="/enter" className="inline-block">
           <Button
             size="lg"
-            className="group rounded-full px-6 py-6 text-base lg:text-lg font-semibold bg-white/5 hover:bg-white/10 text-white/95 border border-white/10 shadow-sm transition-transform duration-200 ease-out hover:scale-[1.03] focus-visible:scale-[1.03]"
+            className="group rounded-full px-6 py-6 text-base lg:text-lg font-semibold bg-white/5 hover:cursor-pointer hover:bg-white/10 text-white/95 border border-white/10 shadow-sm transition-transform duration-200 ease-out hover:scale-[1.03] focus-visible:scale-[1.03]"
           >
             ANABADA에 참여하기
             <span className="ml-2 transition-transform duration-200 group-hover:translate-x-0.5">→</span>

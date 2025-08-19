@@ -16,7 +16,8 @@ import {
   Eye,
   AlertTriangle,
   CheckCircle,
-  XCircle
+  XCircle,
+  MoreVertical
 } from "lucide-react";
 // toast 대신 alert 사용
 
@@ -227,72 +228,91 @@ const EventList: React.FC = () => {
 
   return (
     <div className="space-y-6">
-              <div>
-          <h2 className="text-3xl font-bold tracking-tight">이벤트 목록</h2>
-          <p className="text-muted-foreground">
-            전체 {pagination.total}개의 이벤트를 관리할 수 있습니다.
-          </p>
-        </div>
+      <div>
+        <h2 className="text-3xl font-bold tracking-tight">이벤트 목록</h2>
+        <p className="text-muted-foreground">
+          전체 {pagination.total}개의 이벤트를 관리할 수 있습니다.
+        </p>
+      </div>
 
       {/* 이벤트 목록 */}
-      <div className="space-y-2">
+      <div className="space-y-4">
         {events.map((event) => {
           const eventStatus = getEventStatus(event.begin, event.end);
           return (
-            <div key={event.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-              {/* 이벤트 정보 */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 mb-2">
-                  <h3 className="font-semibold text-lg truncate">{event.title}</h3>
-                  <Badge className={`${eventStatus.color} text-white text-xs`}>
-                    {eventStatus.icon}
-                    <span className="ml-1">{eventStatus.status}</span>
-                  </Badge>
-                  <Badge variant="secondary" className="text-xs">
-                    {event.problem_count}문제
-                  </Badge>
-                </div>
-                
-                <div className="flex items-center gap-4 text-sm text-gray-600">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    <span>{formatDate(event.begin)}</span>
+            <Card key={event.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                {/* 모바일 최적화된 레이아웃 */}
+                <div className="space-y-3">
+                  {/* 헤더 영역 */}
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-lg text-gray-900 truncate pr-2">
+                        {event.title}
+                      </h3>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Badge className={`${eventStatus.color} text-white text-xs`}>
+                        {eventStatus.icon}
+                        <span className="ml-1 hidden sm:inline">{eventStatus.status}</span>
+                        <span className="ml-1 sm:hidden">{eventStatus.status}</span>
+                      </Badge>
+                      <Badge variant="secondary" className="text-xs">
+                        {event.problem_count}문제
+                      </Badge>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    <span>{formatDate(event.end)}</span>
-                  </div>
+
+                  {/* 설명 (있는 경우만 표시) */}
                   {event.desc && (
-                    <span className="truncate max-w-xs">{event.desc}</span>
+                    <p className="text-sm text-gray-600 line-clamp-2">
+                      {event.desc}
+                    </p>
                   )}
+
+                  {/* 날짜 정보 */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-600">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-gray-500" />
+                      <span className="font-medium">시작:</span>
+                      <span>{formatDate(event.begin)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-gray-500" />
+                      <span className="font-medium">종료:</span>
+                      <span>{formatDate(event.end)}</span>
+                    </div>
+                  </div>
+
+                  {/* 액션 버튼 */}
+                  <div className="flex items-center gap-2 pt-2 border-t">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditDialog(event)}
+                      className="flex-1 sm:flex-none h-9"
+                    >
+                      <Edit className="mr-1 h-3 w-3" />
+                      <span className="hidden sm:inline">수정</span>
+                      <span className="sm:hidden">수정</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setEventToDelete(event);
+                        setDeleteDialogOpen(true);
+                      }}
+                      className="flex-1 sm:flex-none h-9 text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="mr-1 h-3 w-3" />
+                      <span className="hidden sm:inline">삭제</span>
+                      <span className="sm:hidden">삭제</span>
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              
-              {/* 액션 버튼 */}
-              <div className="flex items-center gap-2 ml-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => openEditDialog(event)}
-                  className="h-8 px-3"
-                >
-                  <Edit className="mr-1 h-3 w-3" />
-                  수정
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setEventToDelete(event);
-                    setDeleteDialogOpen(true);
-                  }}
-                  className="h-8 px-3 text-red-600 hover:text-red-700"
-                >
-                  <Trash2 className="mr-1 h-3 w-3" />
-                  삭제
-                </Button>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           );
         })}
       </div>
@@ -305,10 +325,11 @@ const EventList: React.FC = () => {
             size="sm"
             onClick={() => fetchEvents(pagination.page - 1)}
             disabled={pagination.page <= 1}
+            className="h-9 px-3"
           >
             이전
           </Button>
-          <span className="text-sm">
+          <span className="text-sm px-4 py-2 bg-gray-100 rounded-md">
             {pagination.page} / {pagination.total_pages}
           </span>
           <Button
@@ -316,6 +337,7 @@ const EventList: React.FC = () => {
             size="sm"
             onClick={() => fetchEvents(pagination.page + 1)}
             disabled={pagination.page >= pagination.total_pages}
+            className="h-9 px-3"
           >
             다음
           </Button>
@@ -324,7 +346,7 @@ const EventList: React.FC = () => {
 
       {/* 이벤트 수정 다이얼로그 */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto sm:max-h-[80vh]">
           <DialogHeader>
             <DialogTitle>이벤트 수정</DialogTitle>
             <DialogDescription>
@@ -333,7 +355,7 @@ const EventList: React.FC = () => {
           </DialogHeader>
           
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="title">제목 *</Label>
                 <Input
@@ -354,7 +376,7 @@ const EventList: React.FC = () => {
               </div>
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="end">종료일시 *</Label>
                 <Input
@@ -387,11 +409,11 @@ const EventList: React.FC = () => {
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)} className="w-full sm:w-auto">
               취소
             </Button>
-            <Button onClick={handleEditEvent}>
+            <Button onClick={handleEditEvent} className="w-full sm:w-auto">
               수정
             </Button>
           </DialogFooter>
@@ -400,7 +422,7 @@ const EventList: React.FC = () => {
 
       {/* 삭제 확인 다이얼로그 */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-red-500" />
@@ -413,11 +435,11 @@ const EventList: React.FC = () => {
             </DialogDescription>
           </DialogHeader>
           
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} className="w-full sm:w-auto">
               취소
             </Button>
-            <Button variant="destructive" onClick={handleDeleteEvent}>
+            <Button variant="destructive" onClick={handleDeleteEvent} className="w-full sm:w-auto">
               삭제
             </Button>
           </DialogFooter>

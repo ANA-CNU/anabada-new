@@ -15,7 +15,9 @@ import {
   Star,
   TrendingUp,
   AlertCircle,
-  Plus
+  Plus,
+  Menu,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -32,6 +34,7 @@ function Admin() {
   console.log("🔧 Admin 컴포넌트 렌더링 시작");
   
   const [activeSection, setActiveSection] = useState("dashboard");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -175,15 +178,41 @@ function Admin() {
     }
   };
 
+  // 모바일에서 메뉴 클릭 시 사이드바 닫기
+  const handleMenuClick = (sectionId: string) => {
+    setActiveSection(sectionId);
+    setSidebarOpen(false);
+  };
+
   try {
     return (
       <div className="flex h-screen bg-background">
+        {/* Mobile Sidebar Overlay */}
+        {sidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
         {/* Sidebar */}
-        <div className="w-64 border-r bg-background">
+        <div className={`
+          fixed lg:static inset-y-0 left-0 z-50 w-64 border-r bg-background transform transition-transform duration-300 ease-in-out
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        `}>
           <div className="flex h-full flex-col">
             {/* Header */}
-            <div className="flex h-16 items-center border-b px-6">
+            <div className="flex h-16 items-center justify-between border-b px-6">
               <h1 className="text-xl font-bold">Anabada</h1>
+              {/* Mobile close button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="lg:hidden"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
             
             {/* Navigation */}
@@ -192,7 +221,7 @@ function Admin() {
                 <Button
                   variant={activeSection === "dashboard" ? "secondary" : "ghost"}
                   className="w-full justify-start"
-                  onClick={() => setActiveSection("dashboard")}
+                  onClick={() => handleMenuClick("dashboard")}
                 >
                   <BarChart3 className="mr-2 h-4 w-4" />
                   대시보드
@@ -214,7 +243,7 @@ function Admin() {
                         key={itemIndex}
                         variant={activeSection === item.id ? "secondary" : "ghost"}
                         className="w-full justify-start pl-8"
-                        onClick={() => setActiveSection(item.id)}
+                        onClick={() => handleMenuClick(item.id)}
                       >
                         {item.icon}
                         <span className="ml-2">{item.name}</span>
@@ -249,7 +278,22 @@ function Admin() {
         
         {/* Main Content */}
         <div className="flex-1 overflow-auto">
-          <div className="container mx-auto p-6">
+          {/* Mobile Header */}
+          <div className="lg:hidden border-b bg-background p-4">
+            <div className="flex items-center justify-between">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSidebarOpen(true)}
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+              <h1 className="text-lg font-semibold">Anabada Admin</h1>
+              <div className="w-10"></div> {/* 균형을 위한 빈 공간 */}
+            </div>
+          </div>
+
+          <div className="container mx-auto p-4 lg:p-6">
             {renderContent()}
           </div>
         </div>
