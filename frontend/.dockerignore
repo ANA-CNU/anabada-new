@@ -1,0 +1,61 @@
+# 의존성 디렉토리
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 빌드 결과물
+dist
+build
+.next
+.nuxt
+.vuepress/dist
+
+# 개발 도구 설정
+.git
+.gitignore
+README.md
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE 설정
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS 생성 파일
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 로그 파일
+*.log
+logs
+
+# 임시 파일
+*.tmp
+*.temp
+.cache
+
+# 테스트 관련
+coverage
+.nyc_output
+.jest
+
+# Docker 관련
+Dockerfile*
+docker-compose*
+.dockerignore
+package-lock.json
+
+# 기타
+.eslintcache
+.stylelintcache 

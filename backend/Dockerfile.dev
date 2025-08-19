@@ -1,0 +1,22 @@
+FROM oven/bun:1-alpine
+
+WORKDIR /app
+
+# package.json과 package-lock.json 복사
+COPY package*.json ./
+
+# 의존성 설치
+RUN bun install --frozen-lockfile
+
+# 소스 코드 복사
+COPY . .
+
+# 환경 변수 설정
+ENV NODE_ENV=development
+ENV PORT=3000
+
+# 포트 노출
+EXPOSE 3000
+
+# 개발 서버 실행
+CMD ["bun", "run", "dev"]

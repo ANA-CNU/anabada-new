@@ -1,0 +1,80 @@
+version: '3.8'
+services:
+  anabada-frontend:
+    container_name: anabada-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+
+    networks:
+      - dmoj_nginx_network
+      - bada-network
+
+    #dmoj_nginx_network 안에 nginx-gui-proxy dockernetwork가 포함되어 있습니다.
+
+  anabada-middleware:
+    container_name: anabada-middleware
+    build:
+      context: ./middleware
+      dockerfile: Dockerfile
+
+    # ports:
+    #   - "20050:80"
+
+    environment:
+      - PORT=${PORT}
+      - NODE_ENV=${NODE_ENV}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
+      - ADMIN_USERNAME=${ADMIN_USERNAME}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - ALLOWED_ORIGIN=${ALLOWED_ORIGIN}
+    networks:
+      - dmoj_nginx_network
+      - bada-network
+
+  anabada-backend:
+    container_name: anabada-backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+
+    #PORT 불필요.. 내부에서 20031로 호스팅 하도록 합니다.
+    #SSH 포트 터널링으로 테스트 할겸 열어만 두었습니다. 나중에 없애기...
+    ports:
+      - "20031:3000"
+
+    environment:
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - NODE_ENV=stage
+      - JWT_SECRET=${JWT_SECRET}
+
+    networks:
+      - dmoj_nginx_network
+      - bada-network
+
+    #dmoj_nginx_network 안에 nginx-gui-proxy dockernetwork가 포함되어 있습니다.
+
+  bada-nginx:
+    image: nginx:latest
+
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+    ports:
+      - "20050:80"
+
+    depends_on:
+      - anabada-backend
+      - anabada-middleware
+
+networks:
+  dmoj_nginx_network:
+    external: true
+  bada-network:
+    external: true
+  
