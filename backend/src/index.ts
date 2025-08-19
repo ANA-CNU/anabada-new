@@ -8,7 +8,7 @@ import { recentlySolve } from './api/statistics/recently-solve.js';
 import { recentlyScore } from './api/statistics/recently-score.js';
 import { event } from './api/event/event.js';
 import { rank } from "./api/rank.js";
-import { board } from "./api/board.js";
+import { board } from "./api/ranking_boards/board.js";
 import { scoreHistory } from "./api/score_history/ScoreHistory.js";
 import { users } from "./api/user/User.js";
 import { bias } from "./api/user_total_bias/Bias.js";

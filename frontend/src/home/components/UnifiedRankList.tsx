@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spool, Spotlight } from "lucide-react";
 import SpotlightCard from "@/react_bits/SpotlightCard/SpotlightCard";
+import LastUpdateTime from "./LastUpdateTime";
 
 // API 응답 타입 (/api/v2/ranking/bias)
 interface RankingItemV2 {
@@ -102,6 +103,8 @@ export default function UnifiedRankList() {
           -webkit-overflow-scrolling: touch;
         }
       `}</style>
+
+      <LastUpdateTime />
 
       {list.map((u) => {
         const isTop = u.rank <= 3;

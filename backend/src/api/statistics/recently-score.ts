@@ -12,7 +12,7 @@ export const recentlyScore = new Elysia()
       const offset = (page - 1) * limit;
 
       // 세션 시간대를 KST로 설정
-      // await db.execute("SET time_zone = '+09:00'");
+      await db.execute("SET time_zone = '+00:00'");
 
       // 페이지네이션된 데이터 조회 (KST 시간대 유지)
       const sql = `
@@ -20,7 +20,7 @@ export const recentlyScore = new Elysia()
           u.name AS username,
           sh.desc,
           sh.bias,
-          DATE_FORMAT(sh.created_at, '%Y-%m-%dT%H:%i:%s') AS createdAt
+          CONCAT (DATE_FORMAT(sh.created_at, '%Y-%m-%dT%H:%i:%s'), '+09:00') AS createdAt
         FROM score_history sh
         JOIN user u ON sh.user_id = u.id
         WHERE u.ignored = 0
@@ -31,8 +31,12 @@ export const recentlyScore = new Elysia()
       logger.debug(`SQL QUERY: ${sql} with limit: ${limit}, offset: ${offset}`);
 
       const [rows] = await db.execute(sql);
+
+      await db.execute("SET time_zone = '+09:00'");
+
       const data = rows as any[];
       logger.debug(`최근 점수 기록 페이지 ${page} 조회 성공`);
+      logger.info(data);
 
       return {
         success: true,
