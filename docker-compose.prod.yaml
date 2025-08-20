@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   anabada-frontend:
     container_name: anabada-frontend
