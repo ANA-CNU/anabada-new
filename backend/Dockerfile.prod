@@ -20,6 +20,7 @@ FROM oven/bun:1-alpine AS runtime
 WORKDIR /app
 
 # 프로덕션 의존성만 설치
+RUN apk add --no-cache curl
 COPY package*.json ./
 RUN bun install --frozen-lockfile --production
 

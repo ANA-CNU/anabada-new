@@ -18,6 +18,8 @@ ENV PORT=3000
 # 포트 노출
 EXPOSE 3000
 
+RUN apk add --no-cache curl
+
 # 헬스체크
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3000/health || exit 1
