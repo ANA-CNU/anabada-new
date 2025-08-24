@@ -35,7 +35,7 @@ EXPOSE 3000
 
 # 헬스체크
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD bun run healthcheck || exit 1
+  CMD curl -f http://localhost:3000/health || exit 1
 
 # 애플리케이션 실행
 CMD ["bun", "run", "dist/index.js"]
