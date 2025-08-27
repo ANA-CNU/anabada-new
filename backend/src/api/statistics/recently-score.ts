@@ -36,7 +36,6 @@ export const recentlyScore = new Elysia()
 
       const data = rows as any[];
       logger.debug(`최근 점수 기록 페이지 ${page} 조회 성공`);
-      logger.info(data);
 
       return {
         success: true,

@@ -7,7 +7,7 @@ const StatsSection = React.memo(() => {
     <div className="w-full h-min flex flex-col items-center justify-center px-8 pt-10 mb-10">
       <div className="w-full flex flex-col md:flex-row">
         {/* 왼쪽 - 그래프 영역 (65%) / 아래쪽 (모바일) */}
-        <div className="w-full md:w-[65%] h-full md:h-full md:order-1 order-2">
+        <div className="w-full md:w-[65%] md:max-w-[800px] mx-auto h-full md:h-full md:order-1 order-2">
           <MonthlyContributionChart />
         </div>
         

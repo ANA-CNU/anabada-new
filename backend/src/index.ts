@@ -3,6 +3,8 @@ import { swagger } from '@elysiajs/swagger';
 import { cors } from '@elysiajs/cors';
 import dotenv from "dotenv";
 import pino from 'pino';
+
+// API 플러그인들
 import { monthlyStats } from './api/statistics/monthly-stats.js';
 import { recentlySolve } from './api/statistics/recently-solve.js';
 import { recentlyScore } from './api/statistics/recently-score.js';
@@ -12,34 +14,61 @@ import { board } from "./api/ranking_boards/board.js";
 import { scoreHistory } from "./api/score_history/ScoreHistory.js";
 import { users } from "./api/user/User.js";
 import { bias } from "./api/user_total_bias/Bias.js";
+import { userSearch } from "./api/user/search.js";
+import { userScoreHistory } from "./api/score_history/user.js";
+import { userProblems } from "./api/user/problems.js";
+import { userRankHistory } from "./api/ranking_boards/user-rank-history.js";
+import { topGainers } from "./api/ranking_boards/top-gainers.js";
+import { userMonthly } from "./api/user/monthly.js";
 
+// 설정
+dotenv.config();
+const isProduction = process.env.NODE_ENV === 'production';
+
+// 로거 설정
 export const logger = pino({
-  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+  level: isProduction ? 'info' : 'debug',
   transport: {
-    target: 'pino-pretty', // 콘솔 보기 좋게
+    target: 'pino-pretty',
     options: { colorize: true }
   }
 });
 
-dotenv.config();
-
-const isProduction = process.env.NODE_ENV === 'production';
-
+// CORS 설정
 const corsConfig = isProduction ? {
-  origin: [process.env.ALLOWED_ORIGIN!], // 프로덕션 도메인
+  origin: [process.env.ALLOWED_ORIGIN!],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cookie']
 } : {
-  // 개발 환경: 쿠키 전송을 위한 CORS 설정
   origin: true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Cookie']
 };
 
+// API 플러그인 배열
+const apiPlugins = [
+  rank,
+  monthlyStats,
+  recentlySolve,
+  recentlyScore,
+  event,
+  board,
+  scoreHistory,
+  users,
+  bias,
+  userSearch,
+  userScoreHistory,
+  userProblems,
+  userRankHistory,
+  topGainers,
+  userMonthly
+];
+
+// 앱 생성
 const app = new Elysia()
-  .use(cors(corsConfig)) // 항상 CORS 활성화
+  .use(cors(corsConfig))
   .onRequest(({ request }) => {
     logger.info(`요청 수신: ${request.method} ${request.url}`);
     logger.debug(`Origin: ${request.headers.get('origin')}`);
@@ -78,20 +107,16 @@ const app = new Elysia()
     version: "1.0.0", 
     framework: "Elysia",
     runtime: "Bun"
-  }))
-  .use(rank)
-  .use(monthlyStats)
-  .use(recentlySolve)
-  .use(recentlyScore)
-  .use(event)
-  .use(board)
-  .use(scoreHistory)
-  .use(users)
-  .use(bias)
-  .listen(3000);
+  }));
 
-logger.info(`ELYSIA Server 3000번 포트에서 실행합니다.`)
-logger.info(`ANABADA용 백엔드 서버`)
-logger.info(`환경: ${process.env.NODE_ENV || 'undefined'}`)
-logger.info(`CORS 설정: ${isProduction ? `제한됨 (${process.env.ALLOWED_ORIGIN})` : '모든 origin 허용'}`)
-logger.info(`Swagger UI: http://localhost:3000/swagger`)
+// API 플러그인들 등록
+apiPlugins.forEach(plugin => app.use(plugin));
+
+// 서버 시작
+app.listen(3000);
+
+logger.info(`ELYSIA Server 3000번 포트에서 실행합니다.`);
+logger.info(`ANABADA용 백엔드 서버`);
+logger.info(`환경: ${process.env.NODE_ENV || 'undefined'}`);
+logger.info(`CORS 설정: ${isProduction ? `제한됨 (${process.env.ALLOWED_ORIGIN})` : '모든 origin 허용'}`);
+logger.info(`Swagger UI: http://localhost:3000/swagger`);

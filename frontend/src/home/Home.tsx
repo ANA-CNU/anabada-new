@@ -1,14 +1,17 @@
-import Background from "./stats/Background";
-import LeftHeadWrapper from "./layout/LeftHeadWrapper";
-import RightHeadWrapper from "./layout/RightHeadWrapper";
-import UnifiedRankList from "./components/UnifiedRankList";
-import Header from "./layout/Header";
-import StatsSection from "./stats/StatsSection";
-import EventSection from "./components/EventSection";
-import ActivitySection from "./components/ActivitySection";
-import Footer from "./components/Footer";
+import React from 'react';
+import Header from './layout/Header';
+import LeftHeadWrapper from './layout/LeftHeadWrapper';
+import RightHeadWrapper from './layout/RightHeadWrapper';
+import UnifiedRankList from './components/UnifiedRankList';
+import ActivitySection from './components/ActivitySection';
+import StatsSection from './stats/StatsSection';
+import EventSection from './components/EventSection';
+import Background from './stats/Background';
+import UserSearch from './components/UserSearch';
+import UserSearchGuide from './components/UserSearchGuide';
+import Footer from './components/Footer';
 
-function Home() {
+const Home: React.FC = () => {
   return (
     <div className="min-h-screen w-full bg-[#0a1026]">
       <Background>
@@ -25,11 +28,22 @@ function Home() {
         
         <EventSection/>
         
+        {/* 사용자 검색 섹션: 2-column */}
+        <section className="py-16 px-4 lg:px-6">
+          <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+            <div className="order-2 lg:order-1">
+              <UserSearch wide />
+            </div>
+            <div className="order-1 lg:order-2">
+              <UserSearchGuide />
+            </div>
+          </div>
+        </section>
+
         <Footer />
       </Background>
-      
     </div>
   );
-}
+};
 
 export default Home; 

@@ -1,11 +1,12 @@
-import './App.css'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import Home from './home/Home'
-import Admin from './admin/Admin'
+import './App.css';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Home from './home/Home';
+import Admin from './admin/Admin';
 import Login from './login/Login';
 import Enter from './enter/Enter';
+import UserProfile from './home/components/UserProfile';
 
-function App() {
+const App: React.FC = () => {
   return (
     <Router>
       <Routes>
@@ -13,9 +14,10 @@ function App() {
         <Route path="/admin" element={<Admin />} />
         <Route path="/login" element={<Login />} />
         <Route path="/enter" element={<Enter />} />
+        <Route path="/user/:id" element={<UserProfile />} />
       </Routes>
     </Router>
   );
-}
+};
 
-export default App
+export default App;

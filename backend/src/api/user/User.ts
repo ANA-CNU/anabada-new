@@ -53,6 +53,28 @@ export const users = new Elysia()
 		}
 	})
 
+	// 단일 사용자 조회
+	.get('/api/users/:id', async ({ params }) => {
+		try {
+			const id = Number((params as any).id);
+			if (!Number.isFinite(id)) {
+				return { success: false, message: '유효하지 않은 id 입니다.' };
+			}
+			const db = getDatabase();
+			const sql = `
+				SELECT id, name, corrects, submissions, solution, kr_name, atcoder_handle, codeforces_handle, tier, ignored
+				FROM user WHERE id = ? LIMIT 1
+			`;
+			const [rows] = await db.execute(sql, [id]) as any[];
+			const data = Array.isArray(rows) ? rows[0] : null;
+			if (!data) return { success: false, message: '사용자를 찾을 수 없습니다.' };
+			return { success: true, data };
+		} catch (error: any) {
+			logger.error('단일 사용자 조회 실패:', error);
+			return { success: false, message: '조회 중 오류가 발생했습니다.', error: error?.message ?? String(error) };
+		}
+	})
+
 	// 유저 수정
 	.put('/api/users/:id', async ({ request, params, body }) => {
 		if (isProduction && !checkAdminAuth(request).isAuthenticated) {
