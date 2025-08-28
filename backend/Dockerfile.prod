@@ -11,6 +11,7 @@ RUN bun install --frozen-lockfile
 # 소스 코드 복사
 COPY . .
 
+ENV NODE_ENV=production
 # 프로덕션 빌드
 RUN bun run build
 
