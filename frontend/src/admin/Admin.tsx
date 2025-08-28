@@ -31,7 +31,7 @@ import BiasManagement from "./components/BiasManagement";
 import UserManagement from "./components/UserManagement";
 
 function Admin() {
-  console.log("🔧 Admin 컴포넌트 렌더링 시작");
+
   
   const [activeSection, setActiveSection] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);

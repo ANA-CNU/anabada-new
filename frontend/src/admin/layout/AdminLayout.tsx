@@ -3,7 +3,7 @@ import { AdminSidebar } from "../components/Sidebar";
 import { ContentArea } from "../components/ContentArea";
 
 export function AdminLayout() {
-  console.log("🔧 AdminLayout 렌더링 시작");
+
   
   const [activeSection, setActiveSection] = useState("dashboard");
 

@@ -133,7 +133,7 @@ export function EventAdd() {
         problems: selectedProblems.map(id => parseInt(id))
       };
       
-      console.log("이벤트 생성 요청:", eventData);
+
       
       const response = await fetch(`${URL}/api/event/create`, {
         method: 'POST',

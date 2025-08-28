@@ -48,19 +48,16 @@ function Login() {
 
         const data: LoginResponse = await response.json();
 
-        console.log("응답 상태:", response.status);
-        console.log("응답 데이터:", data);
+
         
         if (response.ok && data.success) {
           // 로그인 성공 - httpOnly 쿠키는 자동으로 브라우저에 저장됨
-          console.log("로그인 성공:", data.message);
-          
+
           // 로그인 성공 시 admin 페이지로 즉시 리다이렉트
-          console.log("리다이렉트 시작: /admin");
           window.location.href = "/admin";
         } else {
           // 로그인 실패
-          console.log("로그인 실패:", data.error || data.message);
+
           setError(data.error || data.message || "로그인에 실패했습니다. 아이디와 비밀번호를 확인해주세요.");
         }
       } catch (err) {

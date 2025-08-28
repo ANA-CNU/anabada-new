@@ -130,7 +130,7 @@ function ScoreManagement({ nameList }: ScoreManagementProps) {
   };
 
   const handleSubmit = () => {
-    console.log("점수 관리 데이터:", entries);
+
     const records = entries.map(e => ({
       username: e.username,
       bias: Number(e.weight) || 0,
@@ -153,7 +153,7 @@ function ScoreManagement({ nameList }: ScoreManagementProps) {
         return data;
       })
       .then((data) => {
-        console.log("등록 성공:", data);
+
         alert(`등록 완료: ${data.insertedCount}건, 실패: ${data.failed?.length || 0}건`);
       })
       .catch((err) => {
