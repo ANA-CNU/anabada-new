@@ -10,7 +10,7 @@ services:
 
     environment:
       - NODE_ENV=production
-      - BACKEND_URL=https://badar.anacnu.kr/
+      - BACKEND_URL=https://bada.anacnu.kr/
 
   anabada-middleware:
     container_name: anabada-middleware
@@ -29,7 +29,7 @@ services:
       - ADMIN_USERNAME=${ADMIN_USERNAME}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - FRONTEND_URL=${FRONTEND_URL}
-      - ALLOWED_ORIGIN=https://badar.anacnu.kr
+      - ALLOWED_ORIGIN=https://bada.anacnu.kr
     networks:
       - bada-network
 
@@ -51,7 +51,7 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
       - NODE_ENV=production
-      - ALLOWED_ORIGIN=https://badar.anacnu.kr
+      - ALLOWED_ORIGIN=https://bada.anacnu.kr
       - FRONTEND_URL=${FRONTEND_URL}
       - JWT_SECRET=${JWT_SECRET}
 
