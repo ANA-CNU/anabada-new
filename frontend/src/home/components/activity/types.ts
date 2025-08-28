@@ -24,9 +24,6 @@ export const formatRelativeTime = (timeString: string) => {
   const now = new Date();
   const time = new Date(timeString);
 
-  console.log(timeString);
-  console.log(time);
-
   const diffInMs = now.getTime() - time.getTime();
   const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
   const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
