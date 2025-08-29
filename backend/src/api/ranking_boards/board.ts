@@ -57,12 +57,8 @@ export const board = new Elysia()
             '%Y-%m-%dT%H:%i:%s.000+09:00'
           ) AS updatedAt
         FROM ranking_boards
-        WHERE id = (
-          SELECT id 
-          FROM ranking_boards
-          ORDER BY created_at DESC
-          LIMIT 1
-        )
+        ORDER BY id DESC
+        LIMIT 1
       `;
 
       logger.debug(`SQL QUERY: ${sql}`);
