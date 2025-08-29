@@ -1,1 +1,1 @@
-export const URL = import.meta.env.MODE === 'production' ? '' : (import.meta.env.BACKEND_URL || 'https://bada.anacnu.kr');
+export const URL = import.meta.env.MODE === 'production' ? '' : (import.meta.env.VITE_BACKEND_URL || 'https://bada.anacnu.kr');

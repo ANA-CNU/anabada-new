@@ -60,6 +60,14 @@ services:
 
     #dmoj_nginx_network 안에 nginx-gui-proxy dockernetwork가 포함되어 있습니다.
 
+  anabada-crawling:
+    container_name: anabada-crawling
+    build:
+      context: ./anabada_crawling
+      dockerfile: Dockerfile
+    networks:
+      - bada-network
+
   bada-nginx:
     image: nginx:latest
 

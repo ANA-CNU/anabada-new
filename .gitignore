@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
  
 .env*
+
+database/mysql_data/*
+!database/mysql_data/.gitkeep

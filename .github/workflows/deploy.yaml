@@ -18,7 +18,7 @@ jobs:
         key: ${{ secrets.DEPLOY_KEY}}
         port: ${{ secrets.DEPLOY_PORT }}
         script: |
-          cd /home/bada/apps/anabada/anabada-new
+          cd /home/ana/Desktop/ana/anabada-new
           git checkout main
           git pull origin main
           docker compose -f docker-compose.prod.yaml down

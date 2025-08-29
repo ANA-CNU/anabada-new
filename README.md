@@ -59,7 +59,7 @@ FRONTEND_URL=http://anabada-frontend:5173
 ```
 
 프론트엔드의 API 기본 URL은 `frontend/src/resource/constant.ts`에서
-개발 모드일 때 `import.meta.env.BACKEND_URL`(없으면 `http://localhost:3000`)을 사용합니다.
+개발 모드일 때 `import.meta.env.VITE_BACKEND_URL`(없으면 `http://localhost:3000`)을 사용합니다.
 필요 시 다음을 `frontend/.env`에 추가하세요:
 
 ```env

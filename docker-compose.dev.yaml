@@ -47,9 +47,15 @@ services:
       - DB_NAME=${DB_NAME}
       - JWT_SECRET=${JWT_SECRET}
 
-  
-
     #dmoj_nginx_network 안에 nginx-gui-proxy dockernetwork가 포함되어 있습니다.
+
+  anabada-crawling:
+    container_name: anabada-crawling
+    build:
+      context: ./anabada_crawling
+      dockerfile: Dockerfile
+    networks:
+      - bada-network
   bada-nginx:
     image: nginx:latest
 
@@ -61,3 +67,5 @@ services:
     depends_on:
       - anabada-backend
       - anabada-middleware
+  
+

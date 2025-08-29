@@ -74,6 +74,36 @@ services:
     depends_on:
       - anabada-backend
       - anabada-middleware
+  
+  anabada-mysql:
+    image: mysql:latest
+    container_name: anabada-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+
+    ports:
+      - '20040:3306'
+
+    volumes:
+      - ./database/mysql_data:/var/lib/mysql
+      - ./database/my.cnf:/etc/mysql/conf.d/my.cnf:ro
+      # dump 폴더안에, dump 파일들을 넣어놓으면, 컨테이너 실행시 최초 실행한다.
+      - ./database/dump:/docker-entrypoint-initdb.d  
+
+    networks:
+      - bada-network
+
+  anabada-crawling:
+    container_name: anabada-crawling
+    build:
+      context: ./anabada_crawling
+      dockerfile: Dockerfile
+    networks:
+      - bada-network
+
+    env_file:
+      - .env.bot
 
 networks:
   dmoj_nginx_network:
