@@ -74,7 +74,32 @@ export default function UnifiedRankList() {
   }, []);
 
   if (loading) {
-    return <></>
+    return (
+      <div className="w-full max-w-[680px] lg:max-w-[560px] px-3 max-h-[600px] overflow-y-auto unified-scroll">
+        <style>{`
+          .unified-scroll::-webkit-scrollbar { 
+            width: 0 !important; 
+            height: 0 !important; 
+            display: none !important; 
+            background: transparent !important;
+          }
+          .unified-scroll { 
+            -ms-overflow-style: none; 
+            scrollbar-width: none; 
+            -webkit-overflow-scrolling: touch;
+          }
+        `}</style>
+        
+        {/* 로딩 중 보이지 않는 플레이스홀더 카드들 */}
+        {Array.from({ length: 8 }).map((_, index) => (
+          <div
+            key={`loading-${index}`}
+            className="flex items-center justify-between w-full rounded-2xl px-5 mb-3 py-4 bg-transparent border border-transparent"
+            style={{ height: '72px' }} // 실제 카드와 동일한 높이
+          />
+        ))}
+      </div>
+    );
   }
 
   if (error) {
@@ -134,7 +159,7 @@ export default function UnifiedRankList() {
         return (
           <div
             key={u.username}
-            className={`${rowClass} will-change-transform transition-all duration-500 ease-out ${motionClass}`}
+            className={`${rowClass} transition-all duration-500 ease-out ${motionClass}`}
             style={{ transitionDelay: `${(u.rank - 1) * 60}ms` }}
           >
             {/* Left - Rank & Trophy & Username */}

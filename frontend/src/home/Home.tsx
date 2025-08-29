@@ -10,6 +10,7 @@ import Background from './stats/Background';
 import UserSearch from './components/UserSearch';
 import UserSearchGuide from './components/UserSearchGuide';
 import Footer from './components/Footer';
+import LastMonthRanking from './components/LastMonthRanking';
 
 const Home: React.FC = () => {
   return (
@@ -22,6 +23,8 @@ const Home: React.FC = () => {
             <UnifiedRankList />
           </div>
         </div>
+
+        <LastMonthRanking />
 
         <ActivitySection/>
         <StatsSection/>
