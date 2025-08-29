@@ -58,6 +58,8 @@ services:
     networks:
       - bada-network
 
+    restart: unless-stopped
+
     #dmoj_nginx_network 안에 nginx-gui-proxy dockernetwork가 포함되어 있습니다.
 
   bada-nginx:
