@@ -19,6 +19,7 @@ import { userScoreHistory } from "./api/score_history/user.js";
 import { userProblems } from "./api/user/problems.js";
 import { userRankHistory } from "./api/ranking_boards/user-rank-history.js";
 import { topGainers } from "./api/ranking_boards/top-gainers.js";
+import { lastMonthBoard } from "./api/ranking_boards/selected-month-board.js";
 import { userMonthly } from "./api/user/monthly.js";
 
 // 설정
@@ -65,6 +66,7 @@ const apiPlugins = [
   userProblems,
   userRankHistory,
   topGainers,
+  lastMonthBoard,
   userMonthly
 ];
 
