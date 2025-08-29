@@ -45,7 +45,7 @@ def do_crawling(name, corrects, submissions):
             #print(service.has_got_score_today(name, date_time))
             problem_id = service.add_problem(name, problem, problems_tier[problem], date_time, level)
             
-            if not service.is_solved_before(name, problem) and not service.has_score_today(user_id, date_time) and level >= -5:
+            if not service.is_solved_before(name, problem) and not service.has_score_today(user_id, date_time) and (level >= -5 or problems_tier[problem] >= 11):
                 service.scored_by_problem(user_id, problem, problem_id, date_time)
                 msg(f'{name}님이 {problem}번 문제를 풀어 1점을 획득하였습니다.')
             
