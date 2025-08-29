@@ -27,3 +27,7 @@ dist-ssr
 
 database/mysql_data/*
 !database/mysql_data/.gitkeep
+
+querys/
+querys/main.py
+querys/*
