@@ -296,6 +296,11 @@ def set_url_ignored (url_ids: [int]) -> None :
     __cursor.execute(sql, tuple(url_ids))
     conn.commit()
 
+def get_name_by_id(id: int) -> str:
+    sql = 'SELECT name FROM user WHERE id = %s'
+    __cursor.execute(sql, (id))
+    return __cursor.fetchone()[0]
+
     
 """
 #디버깅용 삭제 쿼리

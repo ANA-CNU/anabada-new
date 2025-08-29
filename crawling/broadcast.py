@@ -4,14 +4,17 @@ from dotenv import load_dotenv
 from logger import msg, warning, error, debug
 load_dotenv()
 
+SITE_URL = os.getenv("SITE_URL")
+
 def get_message (lotto: list[tuple]) : 
     message = [
         "추첨 결과가 바뀌었습니다.",
         f"{SITE_URL} 에서 자세히 확인하세요!",
         ""
     ]
+
     for i in range(min(10, len(lotto))):
-        message.append(f"{i+1}. `{lotto[i][0]}`: {lotto[i][1]} 문제")
+        message.append(f"{i+1}. `{db.get_name_by_id(lotto[i][0])}`: {lotto[i][1]} 문제")
     # message.append("") # padding / deprecated / discord remove last empty line
 
     return message;

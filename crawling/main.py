@@ -25,7 +25,7 @@ def update_bias():
     solvedac.load_db()
     for name, corrects, submissions in people:
         solvedac.do_crawling(name, corrects, submissions)
-        time.sleep(0.5)
+        time.sleep(0.3)
 
     service.update_bias()
 
@@ -37,12 +37,11 @@ def update_bias():
         pre_lotto = lotto
 
         service.save_ranking(lotto, date_time)
-        #broadcast.broadcast(lotto)
+        broadcast.broadcast(lotto)
     else:
         msg("추첨 결과 변화가 없어 디스코드 알림을 보내지 않습니다.")
 
 
-    broadcast.broadcast(lotto)
     service.db_commit()
     service.close_db()
     msg("크롤링 완료!")
