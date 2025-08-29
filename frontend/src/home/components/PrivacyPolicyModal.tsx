@@ -138,7 +138,7 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ isOpen, onClose
 
           <div className="text-center pt-4">
             <p className="text-gray-400 text-xs">
-              본 방침은 {currentYear}년 {new Date().getMonth() + 1}월 {new Date().getDate()}일부터 시행됩니다.
+              본 방침은 2025년 09월 01일부터 시행됩니다.
             </p>
           </div>
         </div>
