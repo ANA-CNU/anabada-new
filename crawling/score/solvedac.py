@@ -15,14 +15,19 @@ def load_db():
         db_people[name] = (corrects, submissions, solution)
 
 def do_crawling(name, corrects, submissions):
-    msg(f'{name}님의 정보를 가져오는 중입니다.')
     if corrects == 0: return  # 맞힌 문제가 0이면 탐색 안함
 
     user_tier = 0
     date_time = datetime.datetime.now()
 
     if name in db_people:
-        if db_people[name][1] == submissions: return  # 제출 수 변화가 없으면 탐색 안함
+        # 제출 수 변화가 없으면 탐색 안함
+        if db_people[name][1] == submissions: 
+            msg(f'{name}님의 풀이 기록이 없습니다.')
+            return          
+
+        time.sleep(0.3)
+        msg(f'{name}님의 정보를 가져오는 중입니다.')
         user_id = service.get_user_id(name)
         data = user_info.recent_solved_problems(name, db_people[name][2])
 
@@ -55,6 +60,8 @@ def do_crawling(name, corrects, submissions):
         msg(f'{name}님 정보의 업데이트가 완료되었습니다. (새로 푼 문제 수: {len(data)})')
 
     else:
+        time.sleep(0.3)
+        msg(f'{name}님의 정보를 가져오는 중입니다.')
         solution = user_info.last_solution(name, "init")
         user_tier = solvedac_api.user_tier(name)
         service.update_user(name, corrects, submissions, solution, user_tier)

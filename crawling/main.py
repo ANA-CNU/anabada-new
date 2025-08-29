@@ -25,7 +25,7 @@ def update_bias():
     solvedac.load_db()
     for name, corrects, submissions in people:
         solvedac.do_crawling(name, corrects, submissions)
-        time.sleep(0.3)
+        # time.sleep(0.3)
 
     service.update_bias()
 
