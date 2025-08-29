@@ -127,13 +127,13 @@ function Footer() {
             <div className="flex items-center gap-6 text-white/60 text-sm">
               <button 
                 onClick={() => setIsPrivacyModalOpen(true)}
-                className="hover:text-white transition-colors duration-200"
+                className="hover:text-white transition-colors duration-200 cursor-pointer"
               >
                 개인정보처리방침
               </button>
               <button 
                 onClick={() => setIsTermsModalOpen(true)}
-                className="hover:text-white transition-colors duration-200"
+                className="hover:text-white transition-colors duration-200 cursor-pointer"
               >
                 이용약관
               </button>
