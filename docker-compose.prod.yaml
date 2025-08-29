@@ -97,7 +97,7 @@ services:
   anabada-crawling:
     container_name: anabada-crawling
     build:
-      context: ./anabada_crawling
+      context: ./crawling
       dockerfile: Dockerfile
     networks:
       - bada-network
