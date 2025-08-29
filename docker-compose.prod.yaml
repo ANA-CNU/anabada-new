@@ -94,16 +94,16 @@ services:
     networks:
       - bada-network
 
-  anabada-crawling:
-    container_name: anabada-crawling
-    build:
-      context: ./crawling
-      dockerfile: Dockerfile
-    networks:
-      - bada-network
+  # anabada-crawling:
+  #   container_name: anabada-crawling
+  #   build:
+  #     context: ./crawling
+  #     dockerfile: Dockerfile
+  #   networks:
+  #     - bada-network
 
-    env_file:
-      - .env.bot
+  #   env_file:
+  #     - .env.bot
 
 networks:
   dmoj_nginx_network:

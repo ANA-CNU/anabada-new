@@ -52,10 +52,11 @@ services:
   anabada-crawling:
     container_name: anabada-crawling
     build:
-      context: ./anabada_crawling
+      context: ./crawling
       dockerfile: Dockerfile
-    networks:
-      - bada-network
+
+    # networks:
+    #   - bada-network
   bada-nginx:
     image: nginx:latest
 
@@ -68,4 +69,7 @@ services:
       - anabada-backend
       - anabada-middleware
   
+networks:
+  bada-network:
+    driver: bridge
 
