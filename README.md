@@ -122,3 +122,5 @@ npm run dev
   - 개발 환경에서는 프론트가 직접 백엔드 URL로 호출하도록 설정
 - 관리자 로그인 문제
   - `ADMIN_ID`, `ADMIN_PASSWORD`, `JWT_SECRET` 재확인
+ 
+<img width="801" height="526" alt="image" src="https://github.com/user-attachments/assets/32cf44ae-acd7-4b07-8afd-66008a07a23f" />
