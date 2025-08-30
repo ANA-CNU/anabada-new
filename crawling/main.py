@@ -7,8 +7,10 @@ from logger import msg, warning, error, debug, LogLevel
 import datetime
 
 logger.set_level(LogLevel.DEBUG)
+pre_lotto = []
 
 def init():
+    global pre_lotto
     service.open_db()
     scores = service.get_bias()
     ranks = service.get_score_and_rank(list(scores.items()))
