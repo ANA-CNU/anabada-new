@@ -20,7 +20,7 @@ export const recentlyScore = new Elysia()
           u.name AS username,
           sh.desc,
           sh.bias,
-          CONCAT (DATE_FORMAT(DATE_SUB(sh.created_at, INTERVAL 9 HOUR), '%Y-%m-%dT%H:%i:%s'), '+09:00') AS createdAt
+          CONCAT (DATE_FORMAT(sh.created_at, '%Y-%m-%dT%H:%i:%s'), '+09:00') AS createdAt
         FROM score_history sh
         JOIN user u ON sh.user_id = u.id
         WHERE u.ignored = 0

@@ -272,8 +272,8 @@ def add_user_tier(user_id: int, tier: int):
     __cursor.execute(sql, (tier, user_id))
 
 def add_ranking_board(ranked_time: int, time: datetime.datetime):
-    sql = 'INSERT INTO ranking_boards (title, created_at) VALUES (%s, %s)'
-    __cursor.execute(sql, (f"{time.year}년 {time.month}월 {ranked_time}회차 추첨결과", time))
+    sql = 'INSERT INTO ranking_boards (title) VALUES (%s)'
+    __cursor.execute(sql, (f"{time.year}년 {time.month}월 {ranked_time}회차 추첨결과"))
     return __cursor.lastrowid
 
 def add_ranked_user(board_id: int, rank: int, user_id: int):
