@@ -42,6 +42,9 @@ def get_shuffle(ranks):
     res = [(name, score) for name, score in shuffled]
     return res
 
+def filter_ignored(ranks):
+    return [(name, score) for name, score in ranks if not db.get_user_ignored(name)]
+
 def update_bias():
     """
     월별 점수 이력을 합산하여 사용자 점수를 계산하고 변화가 있으면 데이터베이스 업데이트

@@ -8,11 +8,13 @@ import datetime
 
 logger.set_level(LogLevel.DEBUG)
 
-service.open_db()
-scores = service.get_bias()
-ranks = service.get_score_and_rank(list(scores.items()))
-pre_lotto = service.get_shuffle(ranks)
-service.close_db()
+def init():
+    service.open_db()
+    scores = service.get_bias()
+    ranks = service.get_score_and_rank(list(scores.items()))
+    filtered_ranks = service.filter_ignored(ranks)
+    pre_lotto = service.get_shuffle(filtered_ranks)
+    service.close_db()
 
 def update_bias():
     global pre_lotto
@@ -31,7 +33,8 @@ def update_bias():
 
     scores = service.get_bias()
     ranks = service.get_score_and_rank(list(scores.items()))
-    lotto: list[tuple] = service.get_shuffle(ranks)
+    filtered_ranks = service.filter_ignored(ranks)
+    lotto: list[tuple] = service.get_shuffle(filtered_ranks)
     if pre_lotto != lotto:
         msg("추첨 결과가 바뀌어 디스코드에 알림을 보냅니다.")
         pre_lotto = lotto
@@ -46,6 +49,7 @@ def update_bias():
     service.close_db()
     msg("크롤링 완료!")
 
+init()
 msg("Hello, World!")
 update_bias()
 

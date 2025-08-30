@@ -160,6 +160,11 @@ def get_user_score_history_by_event(user_id: int, event_id: int) -> tuple:
     __cursor.execute(sql, (user_id, event_id))
     return __cursor.fetchall()
 
+def get_user_ignored(name: str) -> bool:
+    sql = "SELECT ignored FROM user WHERE name = %s"
+    __cursor.execute(sql, name)
+    return __cursor.fetchone()[0]
+
 def get_score_history_by_month(time: datetime.datetime):
     year = time.year
     month = time.month
