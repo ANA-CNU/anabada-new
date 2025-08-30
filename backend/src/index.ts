@@ -21,6 +21,7 @@ import { userRankHistory } from "./api/ranking_boards/user-rank-history.js";
 import { topGainers } from "./api/ranking_boards/top-gainers.js";
 import { lastMonthBoard } from "./api/ranking_boards/selected-month-board.js";
 import { userMonthly } from "./api/user/monthly.js";
+import { hook } from "./api/hook/hook.js";
 
 // 설정
 dotenv.config();
@@ -67,7 +68,8 @@ const apiPlugins = [
   userRankHistory,
   topGainers,
   lastMonthBoard,
-  userMonthly
+  userMonthly,
+  hook,
 ];
 
 // 앱 생성

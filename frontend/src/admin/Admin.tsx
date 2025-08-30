@@ -17,7 +17,8 @@ import {
   AlertCircle,
   Plus,
   Menu,
-  X
+  X,
+  ExternalLink
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -29,6 +30,7 @@ import { URL } from "@/resource/constant";
 import LogManagement from "./components/LogManagement";
 import BiasManagement from "./components/BiasManagement";
 import UserManagement from "./components/UserManagement";
+import WebhookManagement from "./components/WebhookManagement";
 
 function Admin() {
 
@@ -91,6 +93,7 @@ function Admin() {
         { name: "점수 관리", icon: <Award className="h-4 w-4" />, id: "score-status" },
         { name: "로그 관리", icon: <Star className="h-4 w-4" />, id: "log-management" },
         { name: "가중치 관리", icon: <TrendingUp className="h-4 w-4" />, id: "bias-management" },
+        { name: "웹훅 관리", icon: <ExternalLink className="h-4 w-4" />, id: "webhook-management" },
       ]
     },
     {
@@ -154,6 +157,8 @@ function Admin() {
         return <LogManagement />;
       case "bias-management":
         return <BiasManagement />;
+      case "webhook-management":
+        return <WebhookManagement />;
       case "event-list":
         return <EventList />;
       case "event-stats":
