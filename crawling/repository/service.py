@@ -43,7 +43,7 @@ def get_shuffle(ranks):
     return res
 
 def filter_ignored(ranks):
-    return [(name, score) for name, score in ranks if not db.get_user_ignored(name)]
+    return [(user_id, score) for user_id, score in ranks if not db.get_user_ignored(user_id)]
 
 def update_bias():
     """
