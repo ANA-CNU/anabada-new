@@ -236,7 +236,10 @@ def get_users_by_problem(problem_id: int) -> tuple:
     return __cursor.fetchall()
 
 def get_bias():
-    sql = """SELECT user_id, total_point FROM user_bias_total"""
+    sql = """SELECT user_id, total_point FROM user_bias_total ut
+            JOIN `user` AS u ON u.id = ut.user_id
+            WHERE u.ignored = 0 AND total_point > 0
+            """
     __cursor.execute(sql)
     return __cursor.fetchall()
 
