@@ -49,7 +49,9 @@ def update_bias():
     """
     월별 점수 이력을 합산하여 사용자 점수를 계산하고 변화가 있으면 데이터베이스 업데이트
     """
-    score_history = db.get_score_history_by_month(datetime.datetime.now())
+
+    kst_now = datetime.datetime.now(timezone)
+    score_history = db.get_score_history_by_month(kst_now)
     bias_total = {}
 
     for user_id, score in score_history:
@@ -60,7 +62,7 @@ def update_bias():
 
     for user_id in bias_total:
         if bias_total[user_id] != db.get_user_bias(user_id):
-            db.update_user_bias(user_id, bias_total[user_id], datetime.datetime.now())
+            db.update_user_bias(user_id, bias_total[user_id], datetime.datetime.now(timezone))
 
 def is_eventing_problem(problem: int, time: datetime.datetime) -> bool:
     """

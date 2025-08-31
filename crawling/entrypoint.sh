@@ -20,6 +20,6 @@ ssh -f -N -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
     -i /root/.ssh/id_ed25519 &
 
 
-sleep 10
+sleep 5
 
 exec python main.py

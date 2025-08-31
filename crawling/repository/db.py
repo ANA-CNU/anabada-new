@@ -168,10 +168,10 @@ def get_user_ignored(user_id: int) -> bool:
 def get_score_history_by_month(time: datetime.datetime):
     year = time.year
     month = time.month
-    next_month = month + 1 if month != 12 else 1
-    next_year = year if month != 12 else year + 1
-    sql = """SELECT user_id, bias FROM score_history WHERE created_at >= %s AND created_at < %s """
-    __cursor.execute(sql, (datetime.datetime(year, month, 1), datetime.datetime(next_year, next_month, 1)))
+
+    start_date = f"{year}-{month}-01 00:00:00"
+    sql = f"SELECT user_id, bias FROM score_history WHERE created_at >= '{start_date}'" 
+    __cursor.execute(sql)
     return __cursor.fetchall()
 
 def get_problems(username: str) -> tuple:
