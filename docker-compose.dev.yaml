@@ -49,14 +49,19 @@ services:
 
     #dmoj_nginx_network 안에 nginx-gui-proxy dockernetwork가 포함되어 있습니다.
 
+
   anabada-crawling:
     container_name: anabada-crawling
     build:
       context: ./crawling
-      dockerfile: Dockerfile
-
+      #ssh 터널링 으로 DB에 집어넣음. .env.bot.env를 활용합니다.
+      dockerfile: Dockerfile.ssh
     # networks:
     #   - bada-network
+
+    env_file:
+      - ./.env.bot.dev
+
   bada-nginx:
     image: nginx:latest
 
