@@ -29,14 +29,14 @@ const trophyByRank: Record<number, { src: string; alt: string; fallback: string 
 };
 
 const rowBaseClass =
-  "flex items-center justify-between w-full rounded-2xl px-5 mb-3 py-4 bg-white/5 border border-white/10 shadow-sm";
+  "flex items-center justify-between w-full rounded-2xl px-5 mb-3 py-4 bg-white/5 border border-white/10";
 
 const highlightFirstClass =
-  "bg-gradient-to-r from-amber-500/30 via-amber-300/15 to-transparent border-amber-300/30";
+  "bg-gradient-to-r from-amber-400/25 via-amber-200/15 to-white/5 outline outline-1 outline-amber-300/30 outline-offset-0";
 const highlightSecondClass =
-  "bg-gradient-to-r from-gray-300/30 via-gray-200/15 to-transparent border-gray-300/30";
+  "bg-gradient-to-r from-gray-200/25 via-gray-100/15 to-white/5 outline outline-1 outline-gray-300/30 outline-offset-0";
 const highlightThirdClass =
-  "bg-gradient-to-r from-orange-400/30 via-orange-300/15 to-transparent border-orange-300/30";
+  "bg-gradient-to-r from-orange-400/25 via-orange-300/15 to-white/5 outline outline-1 outline-orange-300/30 outline-offset-0";
 
 export default function UnifiedRankList() {
   const [list, setList] = useState<RankingItemV2[]>([]);
@@ -134,6 +134,7 @@ export default function UnifiedRankList() {
       {list.map((u) => {
         const isTop = u.rank <= 3;
         const trophy = trophyByRank[u.rank];
+        const isTopThree = u.rank <= 3;
         const highlightClass = u.rank === 1
           ? highlightFirstClass
           : u.rank === 2
@@ -141,7 +142,9 @@ export default function UnifiedRankList() {
           : u.rank === 3
           ? highlightThirdClass
           : "";
-        const rowClass = `${rowBaseClass} ${highlightClass}`;
+        const rowClass = isTopThree 
+          ? `flex items-center justify-between w-full rounded-2xl px-4 mb-3 py-4 ${highlightClass} box-border overflow-visible`
+          : `${rowBaseClass} ${highlightClass}`;
         const deltaBadge = (u.delta || 0) === 0 ? (
           <span className="text-xs text-gray-300">-</span>
         ) : (u.delta || 0) < 0 ? (
@@ -159,7 +162,7 @@ export default function UnifiedRankList() {
         return (
           <div
             key={u.username}
-            className={`${rowClass} transition-all duration-500 ease-out ${motionClass}`}
+            className={`${rowClass} transition-opacity transition-transform duration-500 ease-out ${motionClass}`}
             style={{ transitionDelay: `${(u.rank - 1) * 60}ms` }}
           >
             {/* Left - Rank & Trophy & Username */}
