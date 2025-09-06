@@ -61,7 +61,8 @@ def user_tier(username):
             return data.get("tier")
         else:
             print(f"Error: Status {response.status_code}", flush=True)
-            return None
+            # solved.ac 미가입자는 티어를 마스터로 조정하여 계산한다.
+            return 31
             
     except Exception as e:
         print(f"Exception: {e}", flush=True)
