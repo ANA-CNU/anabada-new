@@ -11,6 +11,7 @@ import UserSearch from './components/UserSearch';
 import UserSearchGuide from './components/UserSearchGuide';
 import Footer from './components/Footer';
 import LastMonthRanking from './components/LastMonthRanking';
+import ContestPromo from '../contest/components/ContestPromo';
 
 const Home: React.FC = () => {
   return (
@@ -23,6 +24,8 @@ const Home: React.FC = () => {
             <UnifiedRankList />
           </div>
         </div>
+
+        <ContestPromo />
 
         <LastMonthRanking />
 

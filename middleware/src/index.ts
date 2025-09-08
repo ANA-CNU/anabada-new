@@ -25,13 +25,14 @@ if (isProduction) {
       directives: {
         defaultSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        scriptSrc: ["'self'"],
-        imgSrc: ["'self'", "data:", "https:"],
-        connectSrc: ["'self'"],
-        fontSrc: ["'self'"],
+        // Kakao Map 외부 스크립트 허용
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://dapi.kakao.com", "https://t1.daumcdn.net", "http://t1.daumcdn.net"],
+        imgSrc: ["'self'", "data:", "https:", "http://t1.daumcdn.net", "https://t1.daumcdn.net", "http://mts.daumcdn.net", "https://mts.daumcdn.net"],
+        connectSrc: ["'self'", "https://dapi.kakao.com", "https://t1.daumcdn.net", "http://t1.daumcdn.net"],
+        fontSrc: ["'self'", "https://t1.daumcdn.net", "http://t1.daumcdn.net"],
         objectSrc: ["'none'"],
         mediaSrc: ["'self'"],
-        frameSrc: ["'none'"]
+        frameSrc: ["'self'", "https://dapi.kakao.com", "https://t1.daumcdn.net", "http://t1.daumcdn.net"]
       }
     }
   }));

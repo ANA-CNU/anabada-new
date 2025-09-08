@@ -42,8 +42,8 @@
     <meta name="robots" content="index, follow" />
     <meta name="language" content="ko" />
     
-    <!-- CSP 메타 태그 추가 -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' http://localhost:* https://bada.anacnu.kr;">
+    <!-- CSP 메타 태그 (외부 스크립트: Kakao Map 허용) -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' https://t1.daumcdn.net http://t1.daumcdn.net; img-src 'self' data: https: http://t1.daumcdn.net https://t1.daumcdn.net http://mts.daumcdn.net https://mts.daumcdn.net; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://dapi.kakao.com https://t1.daumcdn.net http://t1.daumcdn.net; connect-src 'self' http://localhost:* https://bada.anacnu.kr https://dapi.kakao.com https://t1.daumcdn.net http://t1.daumcdn.net;">
     
     <!-- 시스템 폰트 대체 스타일 -->
     <style>

@@ -11,6 +11,7 @@ services:
     environment:
       - NODE_ENV=production
       - BACKEND_URL=https://bada.anacnu.kr/
+      - VITE_KAKAO_MAP_API_KEY=${VITE_KAKAO_MAP_API_KEY}
 
   anabada-middleware:
     container_name: anabada-middleware

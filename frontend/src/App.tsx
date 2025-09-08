@@ -1,6 +1,7 @@
 import './App.css';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Home from './home/Home';
+import ContestPage from './contest/ContestPage';
 import Admin from './admin/Admin';
 import Login from './login/Login';
 import Enter from './enter/Enter';
@@ -15,6 +16,7 @@ const App: React.FC = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/enter" element={<Enter />} />
         <Route path="/user/:id" element={<UserProfile />} />
+        <Route path="/contest" element={<ContestPage />} />
       </Routes>
     </Router>
   );
