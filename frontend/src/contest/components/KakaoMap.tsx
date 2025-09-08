@@ -19,7 +19,6 @@ const KakaoMap: React.FC<KakaoMapProps> = ({ lat, lng, level = 3, markerTitle, c
 
   useEffect(() => {
     const apiKey = (import.meta as any).env?.VITE_KAKAO_MAP_API || (process as any)?.env?.KAKAO_MAP_API;
-    console.log(apiKey);
     if (!apiKey) {
       // eslint-disable-next-line no-console
       console.warn("Kakao Map API key is missing. Set VITE_KAKAO_MAP_API or KAKAO_MAP_API.");
