@@ -43,12 +43,14 @@ const ContestEndNotice: React.FC = () => {
               <p className="text-white/70 text-sm mb-3">
                 대회 문제들의 정해 및 해설을 포함한 에디토리얼을 확인하실 수 있습니다.
               </p>
-              <button
-                disabled
-                className="inline-flex items-center px-4 py-2 bg-gray-600/20 border border-gray-400/40 rounded-lg text-gray-300 cursor-not-allowed opacity-50"
+              <a
+                href="/2025_SW-IT-Contest_edi.pdf"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center px-4 py-2 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-400/40 rounded-lg text-purple-300 hover:text-purple-200 transition-colors"
               >
-                준비중... 📄
-              </button>
+                에디토리얼 보러 가기 →
+              </a>
             </div>
           </div>
 
