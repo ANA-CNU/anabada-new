@@ -11,7 +11,7 @@ import UserSearch from './components/UserSearch';
 import UserSearchGuide from './components/UserSearchGuide';
 import Footer from './components/Footer';
 import LastMonthRanking from './components/LastMonthRanking';
-import ContestCountdown from '../contest/components/ContestCountdown';
+import ContestEndNotice from './components/ContestEndNotice';
 
 const Home: React.FC = () => {
   return (
@@ -25,7 +25,7 @@ const Home: React.FC = () => {
           </div>
         </div>
 
-        <ContestCountdown />
+        <ContestEndNotice />
 
         <LastMonthRanking />
 
