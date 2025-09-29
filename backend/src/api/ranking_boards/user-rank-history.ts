@@ -18,14 +18,21 @@ export const userRankHistory = new Elysia()
       const db = getDatabase();
       const sql = `
         SELECT 
-          rb.id AS board_id,
-          rb.created_at AS created_at,
-          ru.rank AS \`rank\`
-        FROM ranked_users ru
-        JOIN ranking_boards rb ON ru.board_id = rb.id
-        WHERE ru.user_id = ?
-        ORDER BY rb.created_at ASC
-        LIMIT 200
+          recent_data.board_id,
+          recent_data.created_at,
+          recent_data.rank
+        FROM (
+          SELECT 
+            rb.id AS board_id,
+            rb.created_at AS created_at,
+            ru.rank AS \`rank\`
+          FROM ranked_users ru
+          JOIN ranking_boards rb ON ru.board_id = rb.id
+          WHERE ru.user_id = ?
+          ORDER BY rb.created_at DESC
+          LIMIT 200
+        ) AS recent_data
+        ORDER BY recent_data.created_at ASC
       `;
 
       const [rows] = await db.execute<RowDataPacket[]>(sql, [userId]);
@@ -35,6 +42,6 @@ export const userRankHistory = new Elysia()
       return new Response(JSON.stringify({ error: '서버 오류가 발생했습니다.' }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' }
-      });
+      })
     }
   });
