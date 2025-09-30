@@ -25,10 +25,10 @@ const Home: React.FC = () => {
           </div>
         </div>
 
+        <LastMonthRanking />
         <ContestEndNotice />
 
         {/* 10.01자 부터 추첨판 고정 시키고 컴포넌트 언락 */}
-        {/* <LastMonthRanking /> */}
 
         <ActivitySection/>
         <StatsSection/>
