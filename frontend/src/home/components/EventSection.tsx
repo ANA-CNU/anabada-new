@@ -113,9 +113,19 @@ function EventSection() {
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-white text-xl">{event.event_title}</CardTitle>
-                        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-400/20 text-yellow-300 border border-yellow-400/30">
-                          진행중
-                        </span>
+                        <div className="flex items-center gap-3">
+                          {/* 문제 번호 목록 */}
+                          <div className="flex items-center gap-1 max-w-md overflow-x-auto scrollbar-thin scrollbar-thumb-blue-400/30 scrollbar-track-transparent">
+                            {event.problems.split(',').map((problem, idx) => (
+                              <span key={idx} className="text-xs text-blue-300 bg-blue-400/10 px-2 py-1 rounded border border-blue-400/20 whitespace-nowrap flex-shrink-0">
+                                {problem.trim()}
+                              </span>
+                            ))}
+                          </div>
+                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-400/20 text-yellow-300 border border-yellow-400/30 flex-shrink-0">
+                            진행중
+                          </span>
+                        </div>
                       </div>
                     </CardHeader>
                     <CardContent>
