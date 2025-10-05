@@ -55,7 +55,7 @@ services:
     build:
       context: ./crawling
       #ssh 터널링 으로 DB에 집어넣음. .env.bot.env를 활용합니다.
-      dockerfile: Dockerfile.ssh
+      dockerfile: Dockerfile
     # networks:
     #   - bada-network
 

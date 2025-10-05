@@ -1,0 +1,12 @@
+FROM public.ecr.aws/lambda/python:3.11
+
+# /var/task로 파일을 복사하도록 합니다.
+# WORKDIR /app
+
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+CMD ["main.lambda_handler"]

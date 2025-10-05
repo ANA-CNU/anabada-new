@@ -1,8 +1,8 @@
-import time, schedule, os, sys
 from info import group_rank, user_info, solvedac_api
 from repository import service
 from score import solvedac
 import broadcast, logger
+from ssh_tunnel import open_ssh_tunnel
 from logger import msg, warning, error, debug, LogLevel
 import datetime
 
@@ -51,23 +51,19 @@ def update_bias():
     service.close_db()
     msg("크롤링 완료!")
 
-init()
-msg("Hello, World!")
-update_bias()
-
-schedule.every().hour.at(":00").do(update_bias)
-schedule.every().hour.at(":05").do(update_bias)
-schedule.every().hour.at(":10").do(update_bias)
-schedule.every().hour.at(":15").do(update_bias)
-schedule.every().hour.at(":20").do(update_bias)
-schedule.every().hour.at(":25").do(update_bias)
-schedule.every().hour.at(":30").do(update_bias)
-schedule.every().hour.at(":35").do(update_bias)
-schedule.every().hour.at(":40").do(update_bias)
-schedule.every().hour.at(":45").do(update_bias)
-schedule.every().hour.at(":50").do(update_bias)
-schedule.every().hour.at(":55").do(update_bias)
-
-while True:
-    schedule.run_pending()
-    time.sleep(1)
+def lambda_handler(event, context):
+    try:
+        with open_ssh_tunnel():
+            init()
+            msg("Hello, World!")
+            update_bias()
+        return {
+            "statusCode": 200,
+            "body": "Success"
+        }
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        return {
+            "statusCode": 500,
+            "body": "error"
+        }
