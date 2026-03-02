@@ -68,10 +68,11 @@ def do_crawling(name, corrects, submissions):
 
         problems = user_info.solved_problems(name, "init")
         for problem in problems:
-            if not problem in problems_tier:
-                problems_tier[problem] = solvedac_api.problem_tier(problem)
-            level = problems_tier[problem] - user_tier
-            service.add_problem(name, problem, problems_tier[problem], datetime.datetime(1970,1,1), level)
+            #if not problem in problems_tier:
+            #    problems_tier[problem] = solvedac_api.problem_tier(problem)
+
+            level = -1 - user_tier
+            service.add_problem(name, problem, -1, datetime.datetime(1970,1,1), level)
 
         msg(f'{name}님 정보를 초기화 했습니다. (맞힌 문제 수: {corrects}, 제출 수: {submissions})')
     service.db_commit()
