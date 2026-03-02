@@ -1,0 +1,31 @@
+# 1단계: 빌드 환경 (awslambdaric 및 의존성 설치용)
+FROM python:3.11-slim AS build-image
+
+# C++ 컴파일러 및 awslambdaric용 빌드 도구 설치
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    g++ make cmake unzip libcurl4-openssl-dev
+
+WORKDIR /var/task
+
+# 의존성 패키지 목록 복사
+COPY requirements.txt .
+
+# 프로젝트 의존성 및 AWS Lambda Runtime Interface Client 설치
+RUN pip install --no-cache-dir -r requirements.txt awslambdaric
+
+# 소스 코드 복사
+COPY . .
+
+# 2단계: 실행 환경 (가벼운 최종 이미지 생성)
+FROM python:3.11-slim
+
+WORKDIR /var/task
+
+# 빌드된 패키지와 소스 코드만 복사
+COPY --from=build-image /var/task /var/task
+COPY --from=build-image /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+
+# 엔트리포인트를 awslambdaric으로 설정
+ENTRYPOINT [ "/usr/local/bin/python", "-m", "awslambdaric" ]
+CMD [ "main.lambda_handler" ]
