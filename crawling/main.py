@@ -67,3 +67,23 @@ def lambda_handler(event, context):
             "statusCode": 500,
             "body": "error"
         }
+
+def local_crawling () :
+    try:
+        with open_ssh_tunnel():
+            init()
+            msg("Hello, World!")
+            update_bias()
+        return {
+            "statusCode": 200,
+            "body": "Success"
+        }
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        return {
+            "statusCode": 500,
+            "body": "error"
+        }
+
+if __name__ == '__main__':
+    local_crawling()
