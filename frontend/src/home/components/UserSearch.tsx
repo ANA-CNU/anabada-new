@@ -68,7 +68,6 @@ const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect, wide = false }) =
 
   const goProfile = (user: User) => {
     if (onUserSelect) onUserSelect(user);
-    navigate(`/user/${user.id}`, { state: { user } });
   };
 
   return (
@@ -104,7 +103,7 @@ const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect, wide = false }) =
               <div
                 key={user.id}
                 onClick={() => goProfile(user)}
-                className="p-4 bg-white/10 rounded-lg border border-white/20 cursor-pointer hover:bg-white/20 transition-colors"
+                className="p-4 bg-white/10 rounded-lg border border-white/20 transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">

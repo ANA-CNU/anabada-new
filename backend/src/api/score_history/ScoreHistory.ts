@@ -51,11 +51,12 @@ export const scoreHistory = new Elysia()
 				if (uniqueUsernames.length > 0) {
 					const placeholders = uniqueUsernames.map(() => "?").join(",");
 					const [users] = await connection.query(
-						`SELECT id, name FROM user WHERE name IN (${placeholders})`,
-						uniqueUsernames
+						`SELECT id, name, kr_name FROM user WHERE name IN (${placeholders}) OR kr_name IN (${placeholders})`,
+						[...uniqueUsernames, ...uniqueUsernames]
 					);
 					for (const row of users as any[]) {
-						nameToUserId.set(row.name, row.id);
+						if (row.name) nameToUserId.set(row.name, row.id);
+						if (row.kr_name) nameToUserId.set(row.kr_name, row.id);
 					}
 				}
 
@@ -128,8 +129,8 @@ export const scoreHistory = new Elysia()
 			const offset = (page - 1) * limit;
 			const username = (query as any).username as string | undefined;
 
-			const whereSql = username ? "WHERE u.name = ?" : "";
-			const whereParams = username ? [username] : [];
+			const whereSql = username ? "WHERE u.name LIKE ? OR u.kr_name LIKE ?" : "";
+			const whereParams = username ? [`%${username}%`, `%${username}%`] : [];
 
             //injection 절
 			const countSql = `
@@ -138,13 +139,13 @@ export const scoreHistory = new Elysia()
 				JOIN user u ON sh.user_id = u.id
 				${whereSql}
 			`;
-			const [countRows] = await db.execute(countSql, whereParams);
+			const [countRows] = await db.query(countSql, whereParams);
 			const total = (countRows as any[])[0]?.total ?? 0;
 
 			const dataSql = `
 				SELECT 
 					sh.id,
-					u.name AS username,
+					COALESCE(u.kr_name, u.name) AS username,
 					sh.\`desc\`,
 					sh.bias,
 					sh.event_id,
@@ -154,9 +155,9 @@ export const scoreHistory = new Elysia()
 				JOIN user u ON sh.user_id = u.id
 				${whereSql}
 				ORDER BY sh.created_at DESC
-				LIMIT ${limit} OFFSET ${offset}
+				LIMIT ? OFFSET ?
 			`;
-			const [rows] = await db.execute(dataSql, [...whereParams, limit, offset]);
+			const [rows] = await db.query(dataSql, [...whereParams, limit, offset]);
 
 			return {
 				success: true,

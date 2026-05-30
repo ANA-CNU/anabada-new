@@ -41,7 +41,7 @@ export const userMonthly = new Elysia()
         `SELECT COUNT(*) AS solved_count
          FROM problem
          WHERE name = ? AND time >= DATE_FORMAT(CURRENT_DATE(), '%Y-%m-01')
-         AND repeatation = 0`,
+         AND repeatation = 0 AND verdict = 'accepted'`,
         [userName]
       );
 

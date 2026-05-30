@@ -11,6 +11,7 @@ import { CalendarIcon } from "lucide-react";
 type BiasRow = {
   user_id: number;
   username: string;
+  actual_name: string;
   total_point: number;
   updated_at: string | null;
 };
@@ -32,7 +33,10 @@ export default function BiasManagement() {
   const filtered = useMemo(() => {
     const f = filter.trim().toLowerCase();
     if (!f) return rows;
-    return rows.filter(r => r.username.toLowerCase().includes(f));
+    return rows.filter(r => 
+      r.username.toLowerCase().includes(f) || 
+      (r.actual_name && r.actual_name.toLowerCase().includes(f))
+    );
   }, [rows, filter]);
 
   const fetchRows = async () => {
@@ -202,7 +206,7 @@ export default function BiasManagement() {
                 )}
                 {!loading && filtered.map((r) => (
                   <tr key={r.user_id} className="border-t">
-                    <td className="px-4 py-2">{r.username}</td>
+                    <td className="px-4 py-2">{r.username} <span className="text-muted-foreground text-xs ml-1">({r.actual_name})</span></td>
                     <td className="px-4 py-2 font-medium">{r.total_point}</td>
                     <td className="px-4 py-2 text-muted-foreground">{r.updated_at ? new Date(r.updated_at).toLocaleString() : '-'}</td>
                   </tr>

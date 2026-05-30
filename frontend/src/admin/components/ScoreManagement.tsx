@@ -10,19 +10,20 @@ import { URL } from "@/resource/constant";
 
 interface ScoreEntry {
   id: string;
-  username: string;
+  displayUsername: string; // 화면 표시용 (예: 황현석 (hyensok))
+  actualUsername: string;  // 백엔드 전송용 영문 고유 ID
   weight: number;
   reason: string;
 }
 
 interface ScoreManagementProps {
-  nameList: string[];
+  userList: { id: number; kr_name: string | null; name: string }[];
 }
 
-function ScoreManagement({ nameList }: ScoreManagementProps) {
+function ScoreManagement({ userList }: ScoreManagementProps) {
   const [entries, setEntries] = useState<ScoreEntry[]>([]);
   const [currentInput, setCurrentInput] = useState("");
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<{ id: number; kr_name: string | null; name: string; display: string }[]>([]);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [bulkWeight, setBulkWeight] = useState("");
@@ -40,13 +41,17 @@ function ScoreManagement({ nameList }: ScoreManagementProps) {
       return;
     }
 
-    const filtered = nameList.filter(name =>
-      name.toLowerCase().includes(currentInput.toLowerCase())
+    const filtered = userList.map(u => ({
+      ...u,
+      display: `${u.kr_name || u.name} (${u.name})`
+    })).filter(u =>
+      u.display.toLowerCase().includes(currentInput.toLowerCase()) || 
+      (u.kr_name && u.kr_name.toLowerCase().includes(currentInput.toLowerCase()))
     );
     setSuggestions(filtered.slice(0, 5)); // 최대 5개 제안
     setShowSuggestions(filtered.length > 0);
     setSelectedSuggestionIndex(-1);
-  }, [currentInput, nameList]);
+  }, [currentInput, userList]);
 
   // 키보드 네비게이션
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -80,8 +85,8 @@ function ScoreManagement({ nameList }: ScoreManagementProps) {
     }
   };
 
-  const selectSuggestion = (username: string) => {
-    setCurrentInput(username);
+  const selectSuggestion = (user: { display: string; name: string }) => {
+    setCurrentInput(user.display);
     setShowSuggestions(false);
     setSelectedSuggestionIndex(-1);
   };
@@ -89,9 +94,27 @@ function ScoreManagement({ nameList }: ScoreManagementProps) {
   const addEntry = () => {
     if (!currentInput.trim()) return;
     
+    // 현재 입력값과 일치하는 유저 찾기 (자동완성 선택으로 입력된 경우 display와 일치)
+    const matchedUser = userList.find(u => `${u.kr_name || u.name} (${u.name})` === currentInput.trim()) || 
+                        userList.find(u => u.name === currentInput.trim() || u.kr_name === currentInput.trim());
+
+    if (!matchedUser) {
+      alert("존재하지 않는 유저입니다. 자동완성 목록에서 선택해주세요.");
+      return;
+    }
+
+    const displayUsername = `${matchedUser.kr_name || matchedUser.name} (${matchedUser.name})`;
+
+    // 이미 추가된 유저인지 확인
+    if (entries.some(e => e.actualUsername === matchedUser.name)) {
+      alert("이미 목록에 추가된 유저입니다.");
+      return;
+    }
+    
     const newEntry: ScoreEntry = {
       id: Date.now().toString(),
-      username: currentInput.trim(),
+      displayUsername,
+      actualUsername: matchedUser.name,
       weight: 0,
       reason: ""
     };
@@ -132,7 +155,7 @@ function ScoreManagement({ nameList }: ScoreManagementProps) {
   const handleSubmit = () => {
 
     const records = entries.map(e => ({
-      username: e.username,
+      username: e.actualUsername, // 백엔드에는 고유한 영문 ID를 보냄
       bias: Number(e.weight) || 0,
       desc: e.reason ?? ""
     }));
@@ -259,7 +282,7 @@ function ScoreManagement({ nameList }: ScoreManagementProps) {
                           }`}
                           onClick={() => selectSuggestion(suggestion)}
                         >
-                          {suggestion}
+                          {suggestion.display}
                         </div>
                       ))}
                     </div>
@@ -289,7 +312,7 @@ function ScoreManagement({ nameList }: ScoreManagementProps) {
                 <div key={entry.id} className="border rounded-lg p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <Badge variant="secondary" className="text-sm">
-                      {entry.username}
+                      {entry.displayUsername}
                     </Badge>
                     <Button
                       variant="ghost"

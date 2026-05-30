@@ -18,7 +18,7 @@ export const recentlySolve = new Elysia().get(
       // 페이지네이션된 데이터 조회 (KST 시간대 유지)
       const sql = `
         SELECT 
-          u.name AS username,
+          COALESCE(u.kr_name, u.name) AS username,
           p.problem AS problem,
           CONCAT(
             DATE_FORMAT(p.time, '%Y-%m-%dT%H:%i:%s'),
@@ -27,6 +27,7 @@ export const recentlySolve = new Elysia().get(
         FROM problem p
         JOIN user u ON p.name = u.name
         WHERE p.repeatation = 0
+          AND p.verdict = 'accepted'
         ORDER BY p.time DESC
         LIMIT ${limit} OFFSET ${offset}
       `;

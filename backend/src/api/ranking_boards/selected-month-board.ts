@@ -21,7 +21,7 @@ export const lastMonthBoard = new Elysia()
 
       const query = `
         SELECT 
-          u.name,
+          COALESCE(u.kr_name, u.name) AS name,
           ru.rank,
           COALESCE(p.lastMonthSolved, 0) AS lastMonthSolved,
           COALESCE(sh.lastMonthScore, 0) AS lastMonthScore
@@ -36,6 +36,7 @@ export const lastMonthBoard = new Elysia()
                  COUNT(*) AS lastMonthSolved
           FROM problem p
           WHERE p.repeatation = 0
+            AND p.verdict = 'accepted'
             AND p.time >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), '%Y-%m-01')
             AND p.time <= LAST_DAY(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
           GROUP BY p.name

@@ -9,7 +9,7 @@ export const board = new Elysia()
 
       const sql = `
         SELECT 
-          u.name AS username,
+          COALESCE(u.kr_name, u.name) AS username,
           u.tier,
           ub.total_point AS bias,
           ru.rank

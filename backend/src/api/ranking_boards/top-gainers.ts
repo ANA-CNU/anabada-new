@@ -20,7 +20,7 @@ export const topGainers = new Elysia()
       const sql = `
         SELECT 
           u.id AS user_id,
-          u.name AS username,
+          COALESCE(u.kr_name, u.name) AS username,
           u.tier AS tier,
           ru_latest.rank AS current_rank,
           ru_prev.rank AS prev_rank,

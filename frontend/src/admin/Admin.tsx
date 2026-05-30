@@ -59,8 +59,8 @@ function Admin() {
     navigate("/login");
   };
 
-  // 유저 이름 목록 상태
-  const [nameList, setNameList] = useState<string[]>([]);
+  // 유저 정보 목록 상태
+  const [userList, setUserList] = useState<{ id: number; kr_name: string | null; name: string }[]>([]);
 
   useEffect(() => {
     let mounted = true;
@@ -72,8 +72,12 @@ function Admin() {
         const json = await res.json();
         if (!mounted) return;
         if (json?.success && Array.isArray(json?.data)) {
-          const names = json.data.map((u: any) => u.name).filter((n: any) => typeof n === 'string');
-          setNameList(names);
+          const users = json.data.map((u: any) => ({
+            id: u.id,
+            kr_name: u.kr_name,
+            name: u.name
+          }));
+          setUserList(users);
         } else {
           console.warn('유저 목록 조회 실패:', json?.message);
         }
@@ -152,7 +156,7 @@ function Admin() {
       case "user-list":
         return <UserManagement />;
       case "score-status":
-        return <ScoreManagement nameList={nameList} />;
+        return <ScoreManagement userList={userList} />;
       case "log-management":
         return <LogManagement />;
       case "bias-management":

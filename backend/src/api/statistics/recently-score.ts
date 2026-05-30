@@ -17,7 +17,7 @@ export const recentlyScore = new Elysia()
       // 페이지네이션된 데이터 조회 (KST 시간대 유지)
       const sql = `
         SELECT
-          u.name AS username,
+          COALESCE(u.kr_name, u.name) AS username,
           sh.desc,
           sh.bias,
           CONCAT (DATE_FORMAT(sh.created_at, '%Y-%m-%dT%H:%i:%s'), '+09:00') AS createdAt
@@ -68,7 +68,7 @@ export const recentlyScore = new Elysia()
 
       const sql = `
         SELECT
-          u.name AS username,
+          COALESCE(u.kr_name, u.name) AS username,
           sh.desc,
           sh.bias,
           CONCAT(

@@ -1,17 +1,17 @@
-import React from 'react';
-import Header from './layout/Header';
-import LeftHeadWrapper from './layout/LeftHeadWrapper';
-import RightHeadWrapper from './layout/RightHeadWrapper';
-import UnifiedRankList from './components/UnifiedRankList';
-import ActivitySection from './components/ActivitySection';
-import StatsSection from './stats/StatsSection';
-import EventSection from './components/EventSection';
-import Background from './stats/Background';
-import UserSearch from './components/UserSearch';
-import UserSearchGuide from './components/UserSearchGuide';
-import Footer from './components/Footer';
-import LastMonthRanking from './components/LastMonthRanking';
-import ContestEndNotice from './components/ContestEndNotice';
+import React from "react";
+import Header from "./layout/Header";
+import LeftHeadWrapper from "./layout/LeftHeadWrapper";
+import RightHeadWrapper from "./layout/RightHeadWrapper";
+import UnifiedRankList from "./components/UnifiedRankList";
+import ActivitySection from "./components/ActivitySection";
+import StatsSection from "./stats/StatsSection";
+import EventSection from "./components/EventSection";
+import Background from "./stats/Background";
+import UserSearch from "./components/UserSearch";
+import UserSearchGuide from "./components/UserSearchGuide";
+import Footer from "./components/Footer";
+import LastMonthRanking from "./components/LastMonthRanking";
+import ContestEndNotice from "./components/ContestEndNotice";
 
 const Home: React.FC = () => {
   return (
@@ -30,13 +30,13 @@ const Home: React.FC = () => {
 
         {/* 10.01자 부터 추첨판 고정 시키고 컴포넌트 언락 */}
 
-        <ActivitySection/>
-        <StatsSection/>
-        
-        <EventSection/>
-        
+        <ActivitySection />
+        <StatsSection />
+
+        <EventSection />
+
         {/* 사용자 검색 섹션: 2-column */}
-        <section className="py-16 px-4 lg:px-6">
+        {/*<section className="py-16 px-4 lg:px-6">
           <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             <div className="order-2 lg:order-1">
               <UserSearch wide />
@@ -45,7 +45,7 @@ const Home: React.FC = () => {
               <UserSearchGuide />
             </div>
           </div>
-        </section>
+        </section>*/}
 
         <Footer />
       </Background>
@@ -53,4 +53,4 @@ const Home: React.FC = () => {
   );
 };
 
-export default Home; 
+export default Home;

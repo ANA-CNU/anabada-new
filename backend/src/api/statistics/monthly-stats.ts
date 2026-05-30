@@ -13,6 +13,7 @@ export const monthlyStats = new Elysia()
           COUNT(*) AS solved_problem
         FROM problem
         WHERE repeatation = 0
+          AND verdict = 'accepted'
           AND time >= DATE_FORMAT(DATE_SUB(CURDATE(), INTERVAL 1 YEAR), '%Y-01-01')
         GROUP BY DATE_FORMAT(time, '%Y-%m')
         ORDER BY date ASC
@@ -54,6 +55,7 @@ export const monthlyStats = new Elysia()
         SELECT COUNT(*) AS total_problems
         FROM problem
         WHERE repeatation = 0
+          AND verdict = 'accepted'
       `;
 
       logger.debug(`SQL QUERY: ${sql}`);

@@ -9,13 +9,14 @@ export const rank = new Elysia()
 
       const sql = `
         SELECT 
-          u.name AS username,
+          COALESCE(u.kr_name, u.name) AS username,
           u.tier,
           COUNT(p.id) AS solved
         FROM user u
         JOIN problem p ON p.name = u.name
         WHERE 
           p.repeatation = 0
+          AND p.verdict = 'accepted'
           AND p.time >= DATE_FORMAT(CURRENT_DATE, '%Y-%m-01')  -- 이번 달 1일부터
         GROUP BY u.id, u.name, u.tier
         HAVING solved > 0
@@ -49,7 +50,7 @@ export const rank = new Elysia()
 
       const sql = `
         SELECT 
-          u.name AS username,
+          COALESCE(u.kr_name, u.name) AS username,
           u.tier,
           COUNT(p.id) AS solved,
           u.corrects AS total_solved
@@ -57,6 +58,7 @@ export const rank = new Elysia()
         JOIN problem p ON p.name = u.name
         WHERE 
           p.repeatation = 0
+          AND p.verdict = 'accepted'
           AND p.time >= DATE_FORMAT(CURRENT_DATE, '%Y-%m-01')  -- 이번 달 1일부터
         GROUP BY u.id, u.name, u.tier
         HAVING solved > 0
@@ -90,7 +92,7 @@ export const rank = new Elysia()
 
       const sql = `
         SELECT 
-          u.name AS username,
+          COALESCE(u.kr_name, u.name) AS username,
           u.tier,
           ub.total_point AS bias
         FROM user u
@@ -151,11 +153,12 @@ export const rank = new Elysia()
             SELECT p.name AS username, COUNT(*) AS monthly_problem
             FROM problem p
             WHERE p.repeatation = 0
+              AND p.verdict = 'accepted'
               AND p.time >= DATE_FORMAT(CURRENT_DATE, '%Y-%m-01')
             GROUP BY p.name
         )
         SELECT 
-            u.name AS username,
+            COALESCE(u.kr_name, u.name) AS username,
             u.tier,
             lr.rank,
             COALESCE(pr.rank - lr.rank, 0) AS delta,

@@ -34,6 +34,7 @@ export const userProblems = new Elysia()
         FROM problem p
         WHERE p.name = ?
         AND p.repeatation = 0
+        AND p.verdict = 'accepted'
         ORDER BY p.time DESC
         LIMIT 50
       `;

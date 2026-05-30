@@ -101,12 +101,12 @@ export const bias = new Elysia()
       const sql = `
         SELECT 
           u.id AS user_id,
-          u.name AS username,
+          u.name AS actual_name,
+          COALESCE(u.kr_name, u.name) AS username,
           COALESCE(ubt.total_point, 0) AS total_point,
           ubt.updated_at
         FROM user u
         LEFT JOIN user_bias_total ubt ON ubt.user_id = u.id
-        WHERE u.ignored = 0
         ORDER BY total_point DESC, u.name ASC
       `;
       const [rows] = await db.execute(sql);
