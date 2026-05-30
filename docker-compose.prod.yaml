@@ -32,6 +32,10 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - FRONTEND_URL=${FRONTEND_URL}
       - ALLOWED_ORIGIN=https://bada.anacnu.kr
+
+    env_file:
+      - ./.env
+
     networks:
       - bada-network
 
@@ -78,7 +82,7 @@ services:
     depends_on:
       - anabada-backend
       - anabada-middleware
-  
+
   anabada-mysql:
     image: mysql:latest
     container_name: anabada-mysql
@@ -87,13 +91,13 @@ services:
       MYSQL_DATABASE: ${DB_NAME}
 
     ports:
-      - '20040:3306'
+      - "20040:3306"
 
     volumes:
       - ./database/mysql_data:/var/lib/mysql
       - ./database/my.cnf:/etc/mysql/conf.d/my.cnf:ro
       # dump 폴더안에, dump 파일들을 넣어놓으면, 컨테이너 실행시 최초 실행한다.
-      - ./database/dump:/docker-entrypoint-initdb.d  
+      - ./database/dump:/docker-entrypoint-initdb.d
 
     networks:
       - bada-network
@@ -114,4 +118,3 @@ networks:
     external: true
   bada-network:
     external: true
-  

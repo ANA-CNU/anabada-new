@@ -276,7 +276,7 @@ function ScoreManagement({ userList }: ScoreManagementProps) {
                     >
                       {suggestions.map((suggestion, index) => (
                         <div
-                          key={suggestion}
+                          key={suggestion.id}
                           className={`px-3 py-2 cursor-pointer hover:bg-gray-100 ${
                             index === selectedSuggestionIndex ? 'bg-gray-100' : ''
                           }`}
