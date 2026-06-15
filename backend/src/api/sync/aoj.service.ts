@@ -2,8 +2,21 @@ import { getDatabase } from "../../db/database.js";
 import { logger } from "../../index.js";
 
 const AOJ_API_URL = "https://aoj.anacnu.kr/api/v1/public";
+const SUBMISSION_PAGE_LIMIT = 20;
+const DEFAULT_SYNC_LOOKBACK_DAYS = 14;
+const MAX_SUBMISSION_PAGES = 100;
 
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
+function getSyncLookbackDays(): number {
+  const value = Number(process.env.AOJ_SYNC_LOOKBACK_DAYS);
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_SYNC_LOOKBACK_DAYS;
+}
+
+function normalizeSubmissionDate(createdAt: string | Date): Date {
+  const time = new Date(createdAt).getTime();
+  return new Date(Math.floor(time / 1000) * 1000);
+}
 
 /**
  * AOJ API 서버로 HTTP GET 요청을 보내는 공통 함수 (429 에러 방지용 재시도 로직 포함)
@@ -119,6 +132,129 @@ async function getProblemTier(problemId: number): Promise<number> {
   }
 }
 
+async function fetchRecentSubmissions(username: string, since: Date): Promise<any[]> {
+  const submissions: any[] = [];
+
+  for (let page = 1; page <= MAX_SUBMISSION_PAGES; page++) {
+    const data = await fetchFromAOJ(
+      `/submissions?username=${encodeURIComponent(username)}&limit=${SUBMISSION_PAGE_LIMIT}&page=${page}`,
+      2,
+    );
+    const subs = data.submissions;
+    if (!subs || subs.length === 0) break;
+
+    let reachedSince = false;
+    for (const sub of subs) {
+      const subDate = normalizeSubmissionDate(sub.createdAt);
+      if (subDate < since) {
+        reachedSince = true;
+        continue;
+      }
+      submissions.push(sub);
+    }
+
+    if (reachedSince || subs.length < SUBMISSION_PAGE_LIMIT) break;
+  }
+
+  return submissions;
+}
+
+async function ensureScoreForAcceptedFirstSolve(
+  connection: any,
+  user: any,
+  sub: any,
+  problemRowId: number,
+  pTier: number,
+  subDate: Date,
+) {
+  const [todayScoreCheck]: any = await connection.query(
+    `
+    SELECT id FROM score_history 
+    WHERE user_id = ? 
+    AND event_id IS NULL 
+    AND DATE(created_at) = DATE(?)
+    LIMIT 1
+  `,
+    [user.id, subDate],
+  );
+
+  const hasScoreToday = todayScoreCheck.length > 0;
+
+  if (
+    !hasScoreToday &&
+    (pTier === 0 || pTier >= user.tier - 5 || pTier >= 11)
+  ) {
+    await connection.query(
+      `
+      INSERT INTO score_history (user_id, \`desc\`, bias, problem_id, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `,
+      [
+        user.id,
+        `AOJ Daily First Solve: Problem ${sub.problemId}`,
+        1,
+        problemRowId,
+        subDate,
+      ],
+    );
+    logger.info(
+      `User ${user.name} earned +1 Daily point for problem ${sub.problemId}`,
+    );
+  }
+
+  const [ongoingEvents]: any = await connection.query(
+    `
+    SELECT id FROM event 
+    WHERE begin <= ? AND end >= ?
+  `,
+    [subDate, subDate],
+  );
+
+  for (const event of ongoingEvents) {
+    const [isEventProblem]: any = await connection.query(
+      `
+      SELECT problem FROM event_problem 
+      WHERE event_id = ? AND problem = ?
+    `,
+      [event.id, sub.problemId],
+    );
+
+    if (isEventProblem.length === 0) continue;
+
+    const [alreadyGotEventScore]: any = await connection.query(
+      `
+      SELECT sh.id 
+      FROM score_history sh
+      JOIN problem p ON sh.problem_id = p.id
+      WHERE sh.user_id = ? 
+      AND sh.event_id = ? 
+      AND p.problem = ?
+    `,
+      [user.id, event.id, sub.problemId],
+    );
+
+    if (alreadyGotEventScore.length > 0) continue;
+
+    await connection.query(
+      `
+      INSERT INTO score_history (user_id, \`desc\`, bias, event_id, problem_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `,
+      [
+        user.id,
+        `Event(#${event.id})의 ${sub.problemId}번 문제 해결`,
+        1,
+        event.id,
+        problemRowId,
+        subDate,
+      ],
+    );
+    logger.info(
+      `User ${user.name} earned +1 Event point for problem ${sub.problemId} in Event #${event.id}`,
+    );
+  }
+}
+
 /**
  * Step 2: 제출 기록 동기화 및 포인트(Event/Daily) 지급
  */
@@ -127,114 +263,81 @@ export async function syncSubmissions() {
   const [users]: any = await db.query(
     "SELECT id, name, tier FROM user WHERE ignored = 0",
   );
+  const lookbackDays = getSyncLookbackDays();
+  const since = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000);
 
   for (const user of users) {
     try {
-      // [Broad Search] 각 유저의 가장 최근 제출 1건 탐색
-      const latestData = await fetchFromAOJ(
-        `/submissions?username=${user.name}&limit=1`,
-        2,
-      );
-      if (!latestData.submissions || latestData.submissions.length === 0)
-        continue;
+      const submissions = await fetchRecentSubmissions(user.name, since);
+      if (submissions.length === 0) continue;
 
-      const latestSub = latestData.submissions[0];
+      await db.query("UPDATE user SET solution = ? WHERE id = ?", [
+        submissions[0].problemId,
+        user.id,
+      ]);
 
-      // 최근 제출한 문제의 problemId를 user 테이블의 solution 컬럼에 업데이트
-      await db.query(
-        'UPDATE user SET solution = ? WHERE id = ?',
-        [latestSub.problemId, user.id]
-      );
+      submissions.reverse();
 
-      const subDate = new Date(latestSub.createdAt);
-      const minTime = new Date(subDate.getTime() - 1000);
-      const maxTime = new Date(subDate.getTime() + 1000);
-
-      const [existingCheck]: any = await db.query(
-        'SELECT id FROM problem WHERE name = ? AND problem = ? AND time BETWEEN ? AND ?',
-        [user.name, latestSub.problemId, minTime, maxTime]
-      );
-
-      if (existingCheck.length > 0) continue;
-
-      // [Deep Search] 모르는 기록 긁어오기
-      let page = 1;
-      let fetching = true;
-      const newSubmissions = [];
-
-      while (fetching) {
-        const data = await fetchFromAOJ(
-          `/submissions?username=${user.name}&limit=10&page=${page}`,
-          2,
-        );
-        const subs = data.submissions;
-        if (!subs || subs.length === 0) break;
-
-        for (const sub of subs) {
-          const subDate = new Date(sub.createdAt);
-          const minTime = new Date(subDate.getTime() - 1000);
-          const maxTime = new Date(subDate.getTime() + 1000);
-
-          const [check]: any = await db.query(
-            'SELECT id FROM problem WHERE name = ? AND problem = ? AND time BETWEEN ? AND ?',
-            [user.name, sub.problemId, minTime, maxTime]
-          );
-          
-          if (check.length > 0) {
-            fetching = false;
-            break;
-          }
-
-          newSubmissions.push(sub);
-        }
-        if (subs.length < 20) fetching = false;
-        page++;
-      }
-
-      newSubmissions.reverse();
-
-      // 긁어온 "새로운 정답 기록"들 DB 저장 및 포인트 규칙 (원자성 보장을 위해 트랜잭션 사용)
       const connection = await db.getConnection();
       try {
         await connection.beginTransaction();
 
-        for (const sub of newSubmissions) {
+        for (const sub of submissions) {
           const pTier = await getProblemTier(sub.problemId);
-          const subDate = new Date(sub.createdAt);
+          const subDate = normalizeSubmissionDate(sub.createdAt);
 
-          // 유저가 이 문제를 예전에 푼 적이 있는지 (repeatation) 계산 - 'accepted' 기준
+          const [existingProblem]: any = await connection.query(
+            `
+            SELECT id, verdict FROM problem
+            WHERE name = ? AND time = ?
+            LIMIT 1
+          `,
+            [user.name, subDate],
+          );
+
           const [repeatCountRes]: any = await connection.query(
             `
-            SELECT COUNT(*) as count FROM problem WHERE name = ? AND problem = ? AND verdict = 'accepted'
+            SELECT COUNT(*) as count
+            FROM problem
+            WHERE name = ?
+            AND problem = ?
+            AND verdict = 'accepted'
+            AND time < ?
           `,
-            [user.name, sub.problemId],
+            [user.name, sub.problemId, subDate],
           );
 
-          const repeatation = repeatCountRes[0].count; // 이전에 푼 횟수 (0이면 처음 푼 것)
+          const repeatation = repeatCountRes[0].count;
           const isSolvedBefore = repeatation > 0;
+          let problemRowId: number;
+          let insertedProblem = false;
 
-          // 1. problem 테이블에 제출 기록 먼저 저장 (오답도 전부 저장)
-          const [insertRes]: any = await connection.query(
-            `
-            INSERT INTO problem (name, problem, problem_tier, time, level, repeatation, verdict)
-            VALUES (?, ?, ?, ?, 0, ?, ?)
-          `,
-            [
-              user.name,
-              sub.problemId,
-              pTier,
-              subDate,
-              repeatation,
-              sub.verdict,
-            ],
-          );
+          if (existingProblem.length > 0) {
+            problemRowId = existingProblem[0].id;
+          } else {
+            const [insertRes]: any = await connection.query(
+              `
+              INSERT INTO problem (name, problem, problem_tier, time, level, repeatation, verdict)
+              VALUES (?, ?, ?, ?, 0, ?, ?)
+            `,
+              [
+                user.name,
+                sub.problemId,
+                pTier,
+                subDate,
+                repeatation,
+                sub.verdict,
+              ],
+            );
 
-          const newProblemId = insertRes.insertId;
+            problemRowId = insertRes.insertId;
+            insertedProblem = true;
+            await connection.query(
+              "UPDATE user SET submissions = submissions + 1 WHERE id = ?",
+              [user.id],
+            );
+          }
 
-          // 전체 제출 횟수(submissions) 1 증가
-          await connection.query('UPDATE user SET submissions = submissions + 1 WHERE id = ?', [user.id]);
-
-          // 오답이거나, 이미 예전에 푼 적 있는 문제라면 어떠한 포인트도 지급하지 않고 건너뜀
           if (sub.verdict !== "accepted" || isSolvedBefore) {
             if (sub.verdict === "accepted" && isSolvedBefore) {
               logger.info(
@@ -244,104 +347,21 @@ export async function syncSubmissions() {
             continue;
           }
 
-          // 처음으로 맞춘 문제인 경우 정답 횟수(corrects) 1 증가
-          await connection.query('UPDATE user SET corrects = corrects + 1 WHERE id = ?', [user.id]);
-
-          // ----------------------------------------------------
-          // 1. 일일 기본 포인트 검사 로직
-          // 오늘 '일반 포인트(event_id가 NULL)'를 받은 적이 있는지 확인
-          const [todayScoreCheck]: any = await connection.query(
-            `
-            SELECT id FROM score_history 
-            WHERE user_id = ? 
-            AND event_id IS NULL 
-            AND DATE(created_at) = DATE(?)
-            LIMIT 1
-          `,
-            [user.id, subDate],
-          );
-
-          const hasScoreToday = todayScoreCheck.length > 0;
-
-          if (
-            !hasScoreToday &&
-            (pTier === 0 || pTier >= user.tier - 5 || pTier >= 11)
-          ) {
+          if (insertedProblem) {
             await connection.query(
-              `
-              INSERT INTO score_history (user_id, \`desc\`, bias, problem_id, created_at)
-              VALUES (?, ?, ?, ?, ?)
-            `,
-              [
-                user.id,
-                `AOJ Daily First Solve: Problem ${sub.problemId}`,
-                1,
-                newProblemId,
-                subDate,
-              ],
-            );
-            logger.info(
-              `User ${user.name} earned +1 Daily point for problem ${sub.problemId}`,
+              "UPDATE user SET corrects = corrects + 1 WHERE id = ?",
+              [user.id],
             );
           }
 
-          // ----------------------------------------------------
-          // 2. 이벤트 포인트 검사 로직
-          // 풀이 시간(subDate) 기준 진행 중인 이벤트 목록 조회
-          const [ongoingEvents]: any = await connection.query(
-            `
-            SELECT id FROM event 
-            WHERE begin <= ? AND end >= ?
-          `,
-            [subDate, subDate],
+          await ensureScoreForAcceptedFirstSolve(
+            connection,
+            user,
+            sub,
+            problemRowId,
+            pTier,
+            subDate,
           );
-
-          for (const event of ongoingEvents) {
-            // 이 문제가 해당 이벤트의 지정 문제인지 확인
-            const [isEventProblem]: any = await connection.query(
-              `
-              SELECT problem FROM event_problem 
-              WHERE event_id = ? AND problem = ?
-            `,
-              [event.id, sub.problemId],
-            );
-
-            if (isEventProblem.length > 0) {
-              // 해당 이벤트에서 이 "문제 번호"로 점수를 이미 받았는지 중복 검사
-              const [alreadyGotEventScore]: any = await connection.query(
-                `
-                SELECT sh.id 
-                FROM score_history sh
-                JOIN problem p ON sh.problem_id = p.id
-                WHERE sh.user_id = ? 
-                AND sh.event_id = ? 
-                AND p.problem = ?
-              `,
-                [user.id, event.id, sub.problemId],
-              );
-
-              // 받은 적이 없다면 추가 포인트(+1) 지급
-              if (alreadyGotEventScore.length === 0) {
-                await connection.query(
-                  `
-                  INSERT INTO score_history (user_id, \`desc\`, bias, event_id, problem_id, created_at)
-                  VALUES (?, ?, ?, ?, ?, ?)
-                `,
-                  [
-                    user.id,
-                    `Event(#${event.id})의 ${sub.problemId}번 문제 해결`,
-                    1,
-                    event.id,
-                    newProblemId,
-                    subDate,
-                  ],
-                );
-                logger.info(
-                  `User ${user.name} earned +1 Event point for problem ${sub.problemId} in Event #${event.id}`,
-                );
-              }
-            }
-          }
         }
         await connection.commit();
       } catch (err) {
