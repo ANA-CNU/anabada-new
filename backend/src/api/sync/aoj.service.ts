@@ -5,6 +5,7 @@ const AOJ_API_URL = "https://aoj.anacnu.kr/api/v1/public";
 const SUBMISSION_PAGE_LIMIT = 20;
 const DEFAULT_SYNC_LOOKBACK_DAYS = 14;
 const MAX_SUBMISSION_PAGES = 100;
+let syncInProgress = false;
 
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
@@ -528,10 +529,20 @@ export async function updateRankingBoard() {
  * 전체 동기화 사이클
  */
 export async function runFullSyncCycle() {
-  logger.info("Starting full AOJ sync cycle...");
-  await syncUsers(); // 1. 유저 동기화
-  await syncSubmissions(); // 2. 제출 기록 및 일일/이벤트 포인트 동기화
-  await updateBiasTotal(); // 3. 월간 누적 포인트 업데이트
-  await updateRankingBoard(); // 4. 랭킹 보드 스냅샷 (결정론적 난수 셔플 기반)
-  logger.info("Full AOJ sync cycle finished.");
+  if (syncInProgress) {
+    logger.warn("AOJ sync cycle is already running. Skipping overlapping run.");
+    return;
+  }
+
+  syncInProgress = true;
+  try {
+    logger.info("Starting full AOJ sync cycle...");
+    await syncUsers(); // 1. 유저 동기화
+    await syncSubmissions(); // 2. 제출 기록 및 일일/이벤트 포인트 동기화
+    await updateBiasTotal(); // 3. 월간 누적 포인트 업데이트
+    await updateRankingBoard(); // 4. 랭킹 보드 스냅샷 (결정론적 난수 셔플 기반)
+    logger.info("Full AOJ sync cycle finished.");
+  } finally {
+    syncInProgress = false;
+  }
 }
