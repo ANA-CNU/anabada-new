@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { SquircleSurface } from "@/components/ui/squircle";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -151,8 +152,9 @@ export default function LogManagement() {
             </div>
             <div className="flex items-center gap-2 md:ml-auto">
               <span className="text-sm text-muted-foreground">페이지당</span>
+              <SquircleSurface asChild radius="control">
               <select
-                className="border rounded px-2 py-1 text-sm bg-background"
+                className="border px-2 py-1 text-sm bg-background"
                 value={pagination.limit}
                 onChange={(e) => onChangePageSize(Number(e.target.value))}
               >
@@ -161,12 +163,13 @@ export default function LogManagement() {
                 <option value={50}>50</option>
                 <option value={100}>100</option>
               </select>
+              </SquircleSurface>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <div className="rounded-md border">
+      <SquircleSurface radius="surface" className="border">
         <div className="overflow-x-auto w-full">
           <table className="min-w-full text-sm">
             <thead className="bg-muted/40">
@@ -262,7 +265,7 @@ export default function LogManagement() {
             </tbody>
           </table>
         </div>
-      </div>
+      </SquircleSurface>
 
       <div className="flex items-center justify-between">
         <div className="text-sm text-muted-foreground">
@@ -287,4 +290,3 @@ export default function LogManagement() {
     </div>
   );
 }
-

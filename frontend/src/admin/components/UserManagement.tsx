@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { SquircleSurface } from "@/components/ui/squircle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -145,8 +146,9 @@ export default function UserManagement() {
         </CardContent>
       </Card>
 
-      <div className="rounded-md border overflow-x-auto">
-        <table className="min-w-full text-sm">
+      <SquircleSurface radius="surface" className="border">
+        <div className="overflow-x-auto">
+        <table className="min-w-full whitespace-nowrap text-sm">
           <thead className="bg-muted/40">
             <tr>
               <th className="text-left px-4 py-2">ID</th>
@@ -268,14 +270,16 @@ export default function UserManagement() {
                   </td>
                   <td className="px-4 py-2">
                     {isEditing ? (
+                      <SquircleSurface asChild radius="control">
                       <select
                         value={String(editForm.ignored ?? 0)}
                         onChange={(e) => setEditForm(prev => ({ ...prev, ignored: Number(e.target.value) }))}
-                        className="border rounded px-2 py-1 text-sm bg-background w-16"
+                        className="border px-2 py-1 text-sm bg-background w-16"
                       >
                         <option value={0}>No</option>
                         <option value={1}>Yes</option>
                       </select>
+                      </SquircleSurface>
                     ) : (
                       user.ignored ? "Yes" : "No"
                     )}
@@ -298,9 +302,10 @@ export default function UserManagement() {
             })}
           </tbody>
         </table>
-      </div>
+        </div>
+      </SquircleSurface>
 
       <Separator />
     </div>
   );
-} 
+}

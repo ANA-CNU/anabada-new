@@ -84,7 +84,7 @@ function Background({ children }: BackgroundProps) {
         </svg>
       </div>
       {/* 비네트 효과 */}
-      <div className="pointer-events-none absolute inset-0 bg-black opacity-50 rounded-2xl" style={{maskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, white 60%, transparent 100%)', WebkitMaskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, white 60%, transparent 100%)', zIndex: 3}} />
+      <div className="pointer-events-none absolute inset-0 bg-black opacity-50" style={{maskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, white 60%, transparent 100%)', WebkitMaskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, white 60%, transparent 100%)', zIndex: 3}} />
       {/* 애니메이션 keyframes 정의 - GPU 가속 최적화 */}
       <style>{`
         @keyframes glow1 {
@@ -182,4 +182,4 @@ function Background({ children }: BackgroundProps) {
   );
 }
 
-export default Background; 
+export default Background;

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { SquircleSurface } from "@/components/ui/squircle";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -328,9 +329,11 @@ const EventList: React.FC = () => {
           >
             이전
           </Button>
-          <span className="text-sm px-4 py-2 bg-gray-100 rounded-md">
+          <SquircleSurface asChild radius="control">
+          <span className="text-sm px-4 py-2 bg-gray-100">
             {pagination.page} / {pagination.total_pages}
           </span>
+          </SquircleSurface>
           <Button
             variant="outline"
             size="sm"

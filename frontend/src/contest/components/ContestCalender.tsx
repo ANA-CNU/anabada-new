@@ -1,3 +1,4 @@
+import { SquircleSurface } from "@/components/ui/squircle";
 import React from "react";
 
 type Props = {
@@ -58,7 +59,7 @@ const ContestCalender: React.FC<Props> = ({ anchorISO, weeks = 3 }) => {
           const isCurrentMonth = d.getMonth() === anchor.getMonth();
           const inApply = d >= applyStart && d <= applyEnd;
           const isPast = d < today; // KST 기준 오늘 이전
-          const base = "rounded-md px-0.5 py-2 text-center text-xs md:text-sm border";
+          const base = "px-0.5 py-2 text-center text-xs md:text-sm border";
           const tone = isAnchor
             ? "bg-amber-400/20 border-amber-300/50 text-amber-100"
             : isToday
@@ -71,9 +72,9 @@ const ContestCalender: React.FC<Props> = ({ anchorISO, weeks = 3 }) => {
             ? "bg-white/5 border-white/10 text-white/80"
             : "bg-white/[0.03] border-white/5 text-white/40";
           return (
-            <div key={d.toISOString()} className={`${base} ${tone}`}>
+            <SquircleSurface radius="compact" key={d.toISOString()} className={`${base} ${tone}`}>
               {d.getDate()}
-            </div>
+            </SquircleSurface>
           );
         })}
       </div>

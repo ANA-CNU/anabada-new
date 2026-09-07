@@ -1,3 +1,4 @@
+import { SquircleSurface } from "@/components/ui/squircle";
 import { URL } from "@/resource/constant";
 import React, { useMemo, useCallback, useState, useEffect } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
@@ -70,7 +71,7 @@ function MonthlyContributionChart() {
   const CustomTooltip = useCallback(({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-black/90 border border-gray-700 rounded-lg p-3 text-white">
+        <SquircleSurface radius="control" className="bg-black/90 border border-gray-700 p-3 text-white">
           <p className="font-semibold">{label}</p>
           <p className="text-sm text-gray-300">
             이번 달 해결: {formatNumber(payload[0].payload.contribution)}문제
@@ -78,7 +79,7 @@ function MonthlyContributionChart() {
           <p className="text-sm text-blue-400">
             누적 해결: {formatNumber(payload[0].payload.cumulative)}문제
           </p>
-        </div>
+        </SquircleSurface>
       );
     }
     return null;
@@ -143,4 +144,4 @@ function MonthlyContributionChart() {
   );
 }
 
-export default MonthlyContributionChart; 
+export default MonthlyContributionChart;

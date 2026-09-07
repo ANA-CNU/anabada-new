@@ -1,3 +1,5 @@
+import { ChartTooltip } from "./ChartTooltip";
+import { SquircleSurface } from "@/components/ui/squircle";
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -149,14 +151,14 @@ const UserProfile: React.FC = () => {
           <Card className="bg-white/5 border-white/20 text-white mb-8">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-2xl flex items-center gap-3">
-                    {user.name}
+                <div className="min-w-0 w-full">
+                  <CardTitle className="text-2xl flex flex-wrap items-center gap-3">
+                    <span className="min-w-0 [overflow-wrap:anywhere]">{user.name}</span>
                     {user.kr_name && (
-                      <span className="text-lg text-gray-300">({user.kr_name})</span>
+                      <span className="min-w-0 text-lg text-gray-300 break-keep [overflow-wrap:anywhere]">({user.kr_name})</span>
                     )}
                   </CardTitle>
-                  <div className="flex items-center gap-4 mt-2">
+                  <div className="flex flex-wrap items-center gap-4 mt-2">
                     <Badge className={`text-lg px-3 py-1 ${getTierColor(user.tier)} bg-transparent border-current`}>
                       {getTierName(user.tier)} (Tier {user.tier})
                     </Badge>
@@ -165,7 +167,7 @@ const UserProfile: React.FC = () => {
                         href={`https://atcoder.jp/users/${user.atcoder_handle}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-blue-400 hover:text-blue-300"
+                        className="flex shrink-0 items-center gap-2 text-blue-400 hover:text-blue-300"
                       >
                         <ExternalLink className="w-4 h-4" />
                         AtCoder
@@ -176,7 +178,7 @@ const UserProfile: React.FC = () => {
                         href={`https://codeforces.com/profile/${user.codeforces_handle}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-blue-400 hover:text-blue-300"
+                        className="flex shrink-0 items-center gap-2 text-blue-400 hover:text-blue-300"
                       >
                         <ExternalLink className="w-4 h-4" />
                         Codeforces
@@ -230,7 +232,7 @@ const UserProfile: React.FC = () => {
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* 이번 달 푼 문제 */}
-                  <div className="p-6 rounded-lg bg-white/5 border border-white/10">
+                  <SquircleSurface radius="surface" className="p-6 bg-white/5 border border-white/10">
                     <div className="flex items-center gap-4">
                       <Target className="w-12 h-12 text-green-400" />
                       <div>
@@ -238,10 +240,10 @@ const UserProfile: React.FC = () => {
                         <div className="text-3xl font-bold text-green-400">{monthly.total_solved || 0}문제</div>
                       </div>
                     </div>
-                  </div>
+                  </SquircleSurface>
 
                   {/* 이번 달 점수 합 */}
-                  <div className="p-6 rounded-lg bg-white/5 border border-white/10">
+                  <SquircleSurface radius="surface" className="p-6 bg-white/5 border border-white/10">
                     <div className="flex items-center gap-4">
                       <TrendingUp className="w-12 h-12 text-blue-400" />
                       <div>
@@ -249,7 +251,7 @@ const UserProfile: React.FC = () => {
                         <div className="text-3xl font-bold text-blue-400">{monthly.total_score || 0}</div>
                       </div>
                     </div>
-                  </div>
+                  </SquircleSurface>
                 </div>
               </CardContent>
             </Card>
@@ -269,7 +271,7 @@ const UserProfile: React.FC = () => {
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
                       <XAxis dataKey="label" tick={{ fill: '#94a3b8' }} tickLine={false} axisLine={{ stroke: 'rgba(255,255,255,0.2)' }} />
                       <YAxis allowDecimals={false} tick={{ fill: '#94a3b8' }} tickLine={false} axisLine={{ stroke: 'rgba(255,255,255,0.2)' }} />
-                      <Tooltip contentStyle={{ background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff' }} />
+                      <Tooltip content={<ChartTooltip />} />
                       <Bar dataKey="count" fill="#60a5fa" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -309,9 +311,9 @@ const UserProfile: React.FC = () => {
               <CardContent>
                 <div className="space-y-3 max-h-96 overflow-y-auto no-scrollbar">
                   {scoreHistory.slice(0, 10).map((record) => (
-                    <div
+                    <SquircleSurface radius="surface"
                       key={record.id}
-                      className="flex items-center justify-between p-3 bg-white/5 rounded-lg"
+                      className="flex items-center justify-between p-3 bg-white/5"
                     >
                       <div className="flex-1">
                         <div className="text-sm text-gray-300">{record.desc}</div>
@@ -325,7 +327,7 @@ const UserProfile: React.FC = () => {
                       >
                         {record.bias >= 0 ? '+' : ''}{record.bias}
                       </Badge>
-                    </div>
+                    </SquircleSurface>
                   ))}
                   {scoreHistory.length === 0 && (
                     <div className="text-center text-gray-400 py-8">
@@ -344,9 +346,9 @@ const UserProfile: React.FC = () => {
               <CardContent>
                 <div className="space-y-3 max-h-96 overflow-y-auto no-scrollbar">
                   {recentProblems.slice(0, 10).map((problem) => (
-                    <div
+                    <SquircleSurface radius="surface"
                       key={problem.id}
-                      className="p-3 bg-white/5 rounded-lg"
+                      className="p-3 bg-white/5"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
@@ -361,7 +363,7 @@ const UserProfile: React.FC = () => {
                           </div>
                         </div>
                       </div>
-                    </div>
+                    </SquircleSurface>
                   ))}
                   {recentProblems.length === 0 && (
                     <div className="text-center text-gray-400 py-8">

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from "react";
+import { createKakaoLabel } from "./kakao-squircle";
 
 type KakaoMapProps = {
   lat: number;
@@ -25,14 +26,14 @@ type KakaoMaps = {
     readonly level: number;
   }) => KakaoMapInstance;
   readonly Marker: new (options: { readonly position: KakaoLatLng }) => {
-    readonly setMap: (map: KakaoMapInstance) => void;
+    readonly setMap: (map: KakaoMapInstance | null) => void;
   };
   readonly CustomOverlay: new (options: {
     readonly content: HTMLElement;
     readonly position: KakaoLatLng;
     readonly yAnchor: number;
     readonly zIndex: number;
-  }) => { readonly setMap: (map: KakaoMapInstance) => void };
+  }) => { readonly setMap: (map: KakaoMapInstance | null) => void };
 };
 
 declare global {
@@ -45,9 +46,11 @@ const KakaoMap: React.FC<KakaoMapProps> = ({ lat, lng, level = 3, markerTitle, c
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    let active = true;
+    let releaseMap: (() => void) | undefined;
+    let ownedScript: HTMLScriptElement | undefined;
     const apiKey = import.meta.env.VITE_KAKAO_MAP_API_KEY;
     if (!apiKey) {
-      // eslint-disable-next-line no-console
       console.warn("Kakao Map API key is missing. Set VITE_KAKAO_MAP_API_KEY.");
       return;
     }
@@ -59,6 +62,7 @@ const KakaoMap: React.FC<KakaoMapProps> = ({ lat, lng, level = 3, markerTitle, c
           return;
         }
         const script = document.createElement("script");
+        ownedScript = script;
         script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(apiKey)}&autoload=false`;
         script.async = true;
         script.onload = () => resolve();
@@ -68,54 +72,63 @@ const KakaoMap: React.FC<KakaoMapProps> = ({ lat, lng, level = 3, markerTitle, c
 
     loadScript()
       .then(() => {
+        if (!active) return;
         const maps = window.kakao?.maps;
         if (!maps) return;
         maps.load(() => {
-          if (!containerRef.current) return;
+          if (!active || !containerRef.current) return;
           const container = containerRef.current;
           const options = {
             center: new maps.LatLng(lat, lng),
             level,
           };
           const map = new maps.Map(container, options);
+          // Safari 13.1에서도 정리가 중단되지 않도록 지원되는 DOM API로 자식을 제거한다.
+          const clearContainer = () => {
+            while (container.firstChild) container.removeChild(container.firstChild);
+          };
 
           const markerPosition = new maps.LatLng(lat, lng);
           const marker = new maps.Marker({ position: markerPosition });
           marker.setMap(map);
+          releaseMap = () => {
+            marker.setMap(null);
+            clearContainer();
+          };
           if (markerTitle) {
-            // 공백을 최소화한 커스텀 오버레이로 대체
-            const content = document.createElement('div');
-            content.style.cssText = [
-              'display:inline-block',
-              'background:rgba(255,255,255,0.95)',
-              'color:#111',
-              'font-size:12px',
-              'line-height:1',
-              'border:1px solid rgba(0,0,0,0.06)',
-              'border-radius:6px',
-              'padding:3px 6px',
-              'box-shadow:0 2px 6px rgba(0,0,0,0.08)'
-            ].join(';');
-            content.textContent = markerTitle;
-
+            const label = createKakaoLabel(markerTitle);
             const overlay = new maps.CustomOverlay({
-              content,
+              content: label.content,
               position: markerPosition,
               yAnchor: 1.4,
               zIndex: 3
             });
             overlay.setMap(map);
+            releaseMap = () => {
+              label.destroy();
+              overlay.setMap(null);
+              marker.setMap(null);
+              clearContainer();
+            };
           }
         });
       })
       .catch((e) => {
-        // eslint-disable-next-line no-console
+        if (!active) return;
         console.error(e);
       });
+    return () => {
+      active = false;
+      releaseMap?.();
+      if (ownedScript) {
+        ownedScript.onload = null;
+        ownedScript.onerror = null;
+        ownedScript.remove();
+      }
+    };
   }, [lat, lng, level, markerTitle]);
 
   return <div ref={containerRef} className={className} />;
 };
 
 export default KakaoMap;
-

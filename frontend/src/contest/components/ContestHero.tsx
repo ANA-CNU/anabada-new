@@ -1,3 +1,4 @@
+import { SquircleSurface } from "@/components/ui/squircle";
 import React from "react";
 
 type ContestHeroProps = {
@@ -7,7 +8,7 @@ type ContestHeroProps = {
 const ContestHero: React.FC<ContestHeroProps> = ({ onApplyHref = "https://forms.gle/rsReeLGpgHWntZtv8" }) => {
   return (
     <section className="mb-8">
-      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(1200px_500px_at_-10%_-20%,rgba(255,255,255,0.08),transparent_60%),radial-gradient(900px_400px_at_110%_10%,rgba(255,255,255,0.06),transparent_60%)] mt-10 px-5 py-8 md:px-8 md:py-12">
+      <SquircleSurface asChild radius="hero"><div className="relative overflow-hidden border border-white/10 bg-[radial-gradient(1200px_500px_at_-10%_-20%,rgba(255,255,255,0.08),transparent_60%),radial-gradient(900px_400px_at_110%_10%,rgba(255,255,255,0.06),transparent_60%)] mt-10 px-5 py-8 md:px-8 md:py-12">
         {/* accent badge */}
         <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1 text-sm text-white/80 backdrop-blur">
           2025 스위트콘
@@ -27,21 +28,21 @@ const ContestHero: React.FC<ContestHeroProps> = ({ onApplyHref = "https://forms.
 
         {/* CTA */}
         <div className="mt-7 flex flex-wrap items-center gap-3">
-          <a
+          <SquircleSurface asChild radius="control"><a
             href={onApplyHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-xl bg-amber-400/95 hover:bg-amber-400 text-black font-semibold px-6 py-3 text-base md:text-lg shadow-[0_8px_24px_rgba(251,191,36,0.25)] transition-colors"
+            className="inline-flex items-center gap-2 bg-amber-400/95 hover:bg-amber-400 text-black font-semibold px-6 py-3 text-base md:text-lg shadow-[0_8px_24px_rgba(251,191,36,0.25)] transition-colors"
           >
             참가 신청하기
-          </a>
+          </a></SquircleSurface>
           <span className="text-white/60 text-sm">9월 19일까지 접수</span>
         </div>
 
         {/* glow accents */}
         <div className="pointer-events-none absolute -left-10 -top-10 h-48 w-48 rounded-full bg-amber-400/20 blur-3xl" />
         <div className="pointer-events-none absolute right-0 -bottom-6 h-64 w-64 rounded-full bg-orange-400/10 blur-3xl" />
-      </div>
+      </div></SquircleSurface>
     </section>
   );
 };

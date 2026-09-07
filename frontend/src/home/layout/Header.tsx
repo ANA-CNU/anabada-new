@@ -2,7 +2,7 @@ import React from "react";
 
 function Header() {
   return (
-    <header className="w-full h-[12px] bg-transparent rounded-xl flex items-center justify-between px-20 mx-auto mt-6 mb-10">
+    <header className="w-full h-[12px] bg-transparent flex items-center justify-between px-20 mx-auto mt-6 mb-10">
       <a href="https://anacnu.kr" target="_blank" rel="noopener noreferrer">
         <span className="text-lg font-bold tracking-widest text-white cursor-pointer">ANA</span>
       </a>
@@ -20,4 +20,4 @@ function Header() {
   );
 }
 
-export default Header; 
+export default Header;

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { SquircleSurface } from "@/components/ui/squircle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -269,7 +270,7 @@ export default function WebhookManagement() {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+        <SquircleSurface radius="control" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3">
           {error}
           <Button
             variant="ghost"
@@ -279,7 +280,7 @@ export default function WebhookManagement() {
           >
             ✕
           </Button>
-        </div>
+        </SquircleSurface>
       )}
 
       <Card>

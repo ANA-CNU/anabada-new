@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { SquircleSurface } from "@/components/ui/squircle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -242,8 +243,9 @@ function ScoreManagement({ userList }: ScoreManagementProps) {
       </Card>
 
       {/* 사용자 추가 카드 */}
-      <Card>
-        <CardHeader>
+      <div data-slot="card" className="relative flex flex-col gap-6 overflow-visible border border-transparent py-6 text-card-foreground">
+        <SquircleSurface radius="surface" aria-hidden="true" className="pointer-events-none absolute -inset-px z-0 border bg-card shadow-sm" />
+        <CardHeader className="relative z-10">
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
             사용자 추가
@@ -252,7 +254,7 @@ function ScoreManagement({ userList }: ScoreManagementProps) {
             점수 관리를 적용할 사용자를 추가하세요.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="relative z-10">
           <div className="space-y-4">
             <div className="relative">
               <Label htmlFor="username">사용자 이름</Label>
@@ -270,10 +272,12 @@ function ScoreManagement({ userList }: ScoreManagementProps) {
                   
                   {/* 자동완성 드롭다운 */}
                   {showSuggestions && suggestions.length > 0 && (
+                    <SquircleSurface asChild radius="surface">
                     <div
                       ref={suggestionsRef}
-                      className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto"
+                      className="absolute z-10 w-full mt-1 bg-white border border-gray-200 shadow-lg"
                     >
+                      <div className="max-h-48 overflow-y-auto">
                       {suggestions.map((suggestion, index) => (
                         <div
                           key={suggestion.id}
@@ -285,7 +289,9 @@ function ScoreManagement({ userList }: ScoreManagementProps) {
                           {suggestion.display}
                         </div>
                       ))}
+                      </div>
                     </div>
+                    </SquircleSurface>
                   )}
                 </div>
                 <Button onClick={addEntry} disabled={!currentInput.trim()}>
@@ -295,7 +301,7 @@ function ScoreManagement({ userList }: ScoreManagementProps) {
             </div>
           </div>
         </CardContent>
-      </Card>
+      </div>
 
       {/* 점수 관리 목록 */}
       {entries.length > 0 && (
@@ -309,7 +315,7 @@ function ScoreManagement({ userList }: ScoreManagementProps) {
           <CardContent>
             <div className="space-y-4">
               {entries.map((entry) => (
-                <div key={entry.id} className="border rounded-lg p-4 space-y-3">
+                <SquircleSurface key={entry.id} radius="surface" className="border p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <Badge variant="secondary" className="text-sm">
                       {entry.displayUsername}
@@ -345,7 +351,7 @@ function ScoreManagement({ userList }: ScoreManagementProps) {
                       />
                     </div>
                   </div>
-                </div>
+                </SquircleSurface>
               ))}
             </div>
           </CardContent>
@@ -367,4 +373,4 @@ function ScoreManagement({ userList }: ScoreManagementProps) {
   );
 }
 
-export default ScoreManagement; 
+export default ScoreManagement;

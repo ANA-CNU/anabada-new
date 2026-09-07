@@ -1,3 +1,4 @@
+import { SquircleSurface } from "@/components/ui/squircle";
 import React, { useEffect, useState } from 'react';
 import { Trophy, TrendingUp, Calendar, Crown } from 'lucide-react';
 import { getProblemCountColor } from './activity/types';
@@ -57,23 +58,23 @@ const LastMonthRanking: React.FC = () => {
             </h2>
           </div>
           <div className="mx-auto w-20 h-1.5 rounded-full bg-gradient-to-r from-blue-400 via-cyan-300 to-blue-400 blur-[0.5px] mb-3" />
-          <p className="text-white/70 text-base max-w-2xl mx-auto">
+          <p className="text-white/70 text-base max-w-2xl mx-auto break-keep">
             지난 달 가중치를 고려하여 최종적으로 추첨된 사용자들입니다.
           </p>
         </div>
 
         {/* 랭킹 리스트 */}
-        <div className="relative bg-black/30 backdrop-blur-md border border-white/10 rounded-2xl p-4 sm:p-6 lg:p-8 overflow-hidden">
+        <div className="relative isolate p-4 sm:p-6 lg:p-8 border border-transparent">
           {/* 그라데이션 보더/글로우 */}
-          <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/10" />
-          <div className="pointer-events-none absolute -inset-px rounded-[1.1rem] bg-gradient-to-br from-blue-500/15 via-cyan-400/10 to-blue-500/15 blur-xl" />
+          <SquircleSurface radius="panel" className="pointer-events-none absolute inset-0 -z-10 bg-black/30 backdrop-blur-md border border-white/10 ring-1 ring-inset ring-white/10" />
+          <div className="pointer-events-none absolute -inset-px blur-xl"><SquircleSurface radius="panel" className="h-full w-full bg-gradient-to-br from-blue-500/15 via-cyan-400/10 to-blue-500/15" /></div>
           {isLoading ? (
             // 로딩 스켈레톤
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2 lg:gap-3">
               {Array.from({ length: 7 }).map((_, index) => (
-                <div
+                <SquircleSurface radius="surface"
                   key={index}
-                  className="group relative bg-white/5 rounded-lg p-4 sm:p-5 flex flex-col items-center justify-center min-h-[150px] sm:min-h-[170px] animate-pulse"
+                  className="group relative bg-white/5 p-4 sm:p-5 flex flex-col items-center justify-center min-h-[150px] sm:min-h-[170px] animate-pulse"
                 >
                   {/* 순위 배지 스켈레톤 */}
                   <div className="flex flex-col items-center gap-1 sm:gap-2 mb-1 sm:mb-2">
@@ -82,20 +83,20 @@ const LastMonthRanking: React.FC = () => {
 
                   {/* 사용자 이름 스켈레톤 */}
                   <div className="text-center w-full">
-                    <div className="h-3 sm:h-4 bg-white/20 rounded mb-1 sm:mb-2 mx-auto w-12 sm:w-16 animate-pulse"></div>
+                    <SquircleSurface radius="compact" className="h-3 sm:h-4 bg-white/20 mb-1 sm:mb-2 mx-auto w-12 sm:w-16 animate-pulse"></SquircleSurface>
                     {/* 추가 정보 스켈레톤 */}
                     <div className="space-y-1">
                       <div className="flex items-center justify-center gap-1">
                         <span className="text-white/40 text-xs">문제:</span>
-                        <div className="h-3 sm:h-4 bg-white/20 rounded w-6 sm:w-8 animate-pulse"></div>
+                        <SquircleSurface radius="compact" className="h-3 sm:h-4 bg-white/20 w-6 sm:w-8 animate-pulse"></SquircleSurface>
                       </div>
                       <div className="flex items-center justify-center gap-1">
                         <span className="text-white/40 text-xs">점수:</span>
-                        <div className="h-3 sm:h-4 bg-white/20 rounded w-8 sm:w-12 animate-pulse"></div>
+                        <SquircleSurface radius="compact" className="h-3 sm:h-4 bg-white/20 w-8 sm:w-12 animate-pulse"></SquircleSurface>
                       </div>
                     </div>
                   </div>
-                </div>
+                </SquircleSurface>
               ))}
             </div>
           ) : rankList.length === 0 ? (
@@ -121,7 +122,9 @@ const LastMonthRanking: React.FC = () => {
                   return (
                     <div
                       key={`top-${index}`}
-                      className={`group relative bg-white/5 hover:bg-white/10 rounded-lg p-3 sm:p-4 transition-all duration-300 hover:scale-105 flex flex-col items-center justify-center min-h-[140px] sm:min-h-[160px] w-full max-w-[220px] md:max-w-[240px] xl:max-w-[260px] ${
+                      className={`group relative isolate border-2 border-transparent p-3 sm:p-4 transition-all duration-300 hover:scale-105 flex flex-col items-center justify-center min-h-[140px] sm:min-h-[160px] w-full max-w-[220px] md:max-w-[240px] xl:max-w-[260px] `}
+                    >
+                      <SquircleSurface className={`pointer-events-none absolute -inset-0.5 -z-10 bg-white/5 group-hover:bg-white/10 transition-all duration-300 ${
                         rank === 1 
                           ? 'border-2 border-yellow-400 shadow-lg shadow-yellow-400/20' 
                           : rank === 2 
@@ -129,17 +132,16 @@ const LastMonthRanking: React.FC = () => {
                           : rank === 3 
                           ? 'border-2 border-amber-600 shadow-lg shadow-amber-600/20' 
                           : 'border-2 border-slate-500 shadow-lg shadow-slate-500/20'
-                      }`}
-                    >
+                      }`} />
                       {/* 상위 3명 프리미엄 오라/그라데이션 */}
                       {rank <= 3 && (
-                        <div className={`pointer-events-none absolute -inset-px rounded-[0.75rem] blur-md opacity-90 ${
+                        <div className="pointer-events-none absolute -inset-px blur-md"><SquircleSurface className={`h-full w-full opacity-90 ${
                           rank === 1
                             ? 'bg-gradient-to-r from-yellow-400/35 via-amber-300/25 to-yellow-400/35'
                             : rank === 2
                             ? 'bg-gradient-to-r from-zinc-100/35 via-slate-300/25 to-zinc-100/35'
                             : 'bg-gradient-to-r from-amber-600/35 via-orange-400/25 to-amber-600/35'
-                        }`} />
+                        }`} /></div>
                       )}
 
                       {/* 상위 3명 크라운 배지 */}
@@ -166,17 +168,17 @@ const LastMonthRanking: React.FC = () => {
                       </div>
 
                       {/* 사용자 이름 */}
-                      <div className="text-center">
-                        <h3 className={`text-xs sm:text-sm font-semibold mb-1 ${rank <= 3 ? 'bg-clip-text text-transparent ' + (rank === 1 ? 'bg-gradient-to-r from-yellow-200 via-white to-yellow-200' : rank === 2 ? 'bg-gradient-to-r from-slate-200 via-white to-slate-200' : 'bg-gradient-to-r from-amber-300 via-white to-amber-300') : getRankColor(rank)}`}>
+                      <div className="text-center min-w-0 w-full">
+                        <h3 className={`text-xs sm:text-sm font-semibold mb-1 [overflow-wrap:anywhere] ${rank <= 3 ? 'bg-clip-text text-transparent ' + (rank === 1 ? 'bg-gradient-to-r from-yellow-200 via-white to-yellow-200' : rank === 2 ? 'bg-gradient-to-r from-slate-200 via-white to-slate-200' : 'bg-gradient-to-r from-amber-300 via-white to-amber-300') : getRankColor(rank)}`}>
                           {item.name}
                         </h3>
                         {/* 추가 정보 */}
                         <div className="text-xs text-white/60 space-y-1">
                           <div className="flex items-center justify-center gap-1">
                             <span className="text-xs">문제:</span>
-                            <span className={`px-1 sm:px-2 py-1 rounded text-xs font-medium border ${getProblemCountColor(item.lastMonthSolved)}`}>
+                            <SquircleSurface radius="compact" asChild><span className={`px-1 sm:px-2 py-1 text-xs font-medium border ${getProblemCountColor(item.lastMonthSolved)}`}>
                               {item.lastMonthSolved}개
-                            </span>
+                            </span></SquircleSurface>
                           </div>
                           <div className="flex items-center justify-center gap-1">
                             <span className="text-xs">점수:</span>
@@ -190,13 +192,15 @@ const LastMonthRanking: React.FC = () => {
               </div>
 
               {/* 하단 4명 */}
-              <div className="grid grid-cols-4 gap-4 lg:gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 lg:gap-6">
                 {rankList.slice(3, 7).map((item, index) => {
                   const rank = item.rank;
                   return (
                     <div
                       key={`bottom-${index}`}
-                      className={`group relative bg-white/5 hover:bg-white/10 rounded-lg px-7 py-4 sm:px-8 sm:py-5 transition-all duration-300 hover:scale-105 flex flex-col items-center justify-center min-h-[150px] sm:min-h-[170px] w-full ${
+                      className={`group relative isolate border-2 border-transparent px-3 py-4 sm:px-8 sm:py-5 transition-all duration-300 hover:scale-105 flex flex-col items-center justify-center min-h-[150px] sm:min-h-[170px] w-full `}
+                    >
+                      <SquircleSurface className={`pointer-events-none absolute -inset-0.5 -z-10 bg-white/5 group-hover:bg-white/10 transition-all duration-300 ${
                         rank === 1 
                           ? 'border-2 border-yellow-400 shadow-lg shadow-yellow-400/20' 
                           : rank === 2 
@@ -204,11 +208,10 @@ const LastMonthRanking: React.FC = () => {
                           : rank === 3 
                           ? 'border-2 border-amber-600 shadow-lg shadow-amber-600/20' 
                           : 'border-2 border-slate-500 shadow-lg shadow-slate-500/20'
-                      }`}
-                    >
+                      }`} />
                       {/* 일반 카드도 약한 오라 */}
                       {rank > 3 && (
-                        <div className="pointer-events-none absolute -inset-px rounded-[0.75rem] blur-sm opacity-50 bg-gradient-to-br from-blue-400/10 via-cyan-300/10 to-blue-400/10" />
+                        <div className="pointer-events-none absolute -inset-px blur-sm"><SquircleSurface className="h-full w-full opacity-50 bg-gradient-to-br from-blue-400/10 via-cyan-300/10 to-blue-400/10" /></div>
                       )}
                       {/* 순위 배지 */}
                       <div className="flex flex-col items-center gap-1 sm:gap-2 mb-1 sm:mb-2">
@@ -222,17 +225,17 @@ const LastMonthRanking: React.FC = () => {
                       </div>
 
                       {/* 사용자 이름 */}
-                      <div className="text-center">
-                        <h3 className={`text-xs sm:text-sm font-semibold ${getRankColor(rank)} mb-1`}>
+                      <div className="text-center min-w-0 w-full">
+                        <h3 className={`text-xs sm:text-sm font-semibold [overflow-wrap:anywhere] ${getRankColor(rank)} mb-1`}>
                           {item.name}
                         </h3>
                         {/* 추가 정보 */}
-                        <div className="text-xs text-white/60 space-y-1">
+                        <div className="text-xs text-white/60 space-y-1 whitespace-nowrap">
                           <div className="flex items-center justify-center gap-1">
                             <span className="text-xs">문제:</span>
-                            <span className={`px-1 sm:px-2 py-1 rounded text-xs font-medium border ${getProblemCountColor(item.lastMonthSolved)}`}>
+                            <SquircleSurface radius="compact" asChild><span className={`px-1 sm:px-2 py-1 text-xs font-medium border ${getProblemCountColor(item.lastMonthSolved)}`}>
                               {item.lastMonthSolved}개
-                            </span>
+                            </span></SquircleSurface>
                           </div>
                           <div className="flex items-center justify-center gap-1">
                             <span className="text-xs">점수:</span>
@@ -249,7 +252,7 @@ const LastMonthRanking: React.FC = () => {
 
           {/* 하단 설명 */}
           <div className="mt-4 text-center">
-            <p className="text-white/50 text-xs">
+            <p className="text-white/50 text-xs break-keep">
                 랭킹은 그 달의 마지막 추첨기록을 기준으로 결정됩니다.
             </p>
           </div>

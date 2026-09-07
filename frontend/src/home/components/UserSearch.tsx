@@ -1,3 +1,4 @@
+import { SquircleSurface } from "@/components/ui/squircle";
 import React, { useState } from 'react';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
@@ -63,15 +64,15 @@ const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect, wide = false }) =
   };
 
   const containerClass = wide
-    ? 'w-full p-6 bg-white/5 backdrop-blur-sm rounded-lg border border-white/10'
-    : 'w-full max-w-2xl mx-auto p-6 bg-white/5 backdrop-blur-sm rounded-lg border border-white/10';
+    ? 'w-full p-6 bg-white/5 backdrop-blur-sm border border-white/10'
+    : 'w-full max-w-2xl mx-auto p-6 bg-white/5 backdrop-blur-sm border border-white/10';
 
   const goProfile = (user: User) => {
     if (onUserSelect) onUserSelect(user);
   };
 
   return (
-    <div className={containerClass}>
+    <SquircleSurface radius="panel" className={containerClass}>
       <h2 className="text-2xl font-bold text-white mb-6">사용자 검색</h2>
       
       <div className="flex gap-2 mb-6">
@@ -100,10 +101,10 @@ const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect, wide = false }) =
           <h3 className="text-lg font-semibold text-white mb-3">검색 결과</h3>
           <div className="space-y-3 max-h-96 overflow-y-auto no-scrollbar pr-1">
             {searchResults.map((user) => (
-              <div
+              <SquircleSurface radius="surface"
                 key={user.id}
                 onClick={() => goProfile(user)}
-                className="p-4 bg-white/10 rounded-lg border border-white/20 transition-colors"
+                className="p-4 bg-white/10 border border-white/20 transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -131,7 +132,7 @@ const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect, wide = false }) =
                     <div className="text-sm text-gray-400">Tier {user.tier}</div>
                   </div>
                 </div>
-              </div>
+              </SquircleSurface>
             ))}
           </div>
         </div>
@@ -142,7 +143,7 @@ const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect, wide = false }) =
           검색 결과가 없습니다.
         </div>
       )}
-    </div>
+    </SquircleSurface>
   );
 };
 

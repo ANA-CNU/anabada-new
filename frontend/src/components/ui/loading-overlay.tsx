@@ -1,5 +1,6 @@
 import React from "react";
 import LoadingSpinner from "./loading-spinner";
+import { SquircleSurface } from "./squircle";
 
 interface LoadingOverlayProps {
   isVisible: boolean;
@@ -8,9 +9,9 @@ interface LoadingOverlayProps {
   className?: string;
 }
 
-function LoadingOverlay({ 
-  isVisible, 
-  title = "처리 중...", 
+function LoadingOverlay({
+  isVisible,
+  title = "처리 중...",
   subtitle = "잠시만 기다려주세요",
   className = ""
 }: LoadingOverlayProps) {
@@ -18,7 +19,7 @@ function LoadingOverlay({
 
   return (
     <div className={`fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center ${className}`}>
-      <div className="bg-white/10 backdrop-blur-md rounded-lg p-6 border border-white/20">
+      <SquircleSurface radius="surface" className="bg-white/10 backdrop-blur-md p-6 border border-white/20">
         <div className="flex items-center gap-3">
           <LoadingSpinner size="lg" />
           <div className="text-white">
@@ -26,9 +27,9 @@ function LoadingOverlay({
             <div className="text-sm text-white/70">{subtitle}</div>
           </div>
         </div>
-      </div>
+      </SquircleSurface>
     </div>
   );
 }
 
-export default LoadingOverlay; 
+export default LoadingOverlay;

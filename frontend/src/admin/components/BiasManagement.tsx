@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { SquircleSurface } from "@/components/ui/squircle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -188,7 +189,8 @@ export default function BiasManagement() {
             <Button variant="outline" onClick={fetchRows}>새로고침</Button>
           </div>
 
-          <div className="rounded-md border overflow-x-auto">
+          <SquircleSurface radius="surface" className="border">
+            <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead className="bg-muted/40">
                 <tr>
@@ -213,10 +215,10 @@ export default function BiasManagement() {
                 ))}
               </tbody>
             </table>
-          </div>
+            </div>
+          </SquircleSurface>
         </CardContent>
       </Card>
     </div>
   );
 }
-

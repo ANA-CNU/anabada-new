@@ -1,3 +1,4 @@
+import { SquircleSurface } from "@/components/ui/squircle";
 import Background from "../home/stats/Background";
 import Header from "../home/layout/Header";
 import { Button } from "@/components/ui/button";
@@ -11,8 +12,8 @@ function Enter() {
         <div className="w-full min-h-screen flex flex-col">
           <Header />
 
-          <main className="flex-1 flex items-center justify-center py-8 px-4">
-            <div className="w-full max-w-[900px] rounded-3xl bg-gradient-to-br from-white/10 to-white/5 border border-white/20 shadow-2xl backdrop-blur-sm p-8 sm:p-12 text-white">
+          <main className="flex-1 flex items-center justify-center py-8 px-4 break-keep [overflow-wrap:anywhere]">
+            <SquircleSurface asChild radius="panel"><div className="w-full max-w-[900px] bg-gradient-to-br from-white/10 to-white/5 border border-white/20 shadow-2xl backdrop-blur-sm p-8 sm:p-12 text-white">
               {/* 헤더 섹션 */}
               <div className="text-center mb-10">
                 <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full mb-6 shadow-lg">
@@ -27,7 +28,7 @@ function Enter() {
               </div>
 
               {/* 참여 혜택 섹션 */}
-              <div className="mb-10 p-6 rounded-2xl bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-400/30">
+              <SquircleSurface asChild radius="surface"><div className="mb-10 p-6 bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-400/30">
                 <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
                   <Star className="w-6 h-6 text-yellow-400" />
                   참여 혜택
@@ -62,16 +63,16 @@ function Enter() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </div></SquircleSurface>
 
               {/* 상품 혜택 섹션 */}
-              <div className="mb-10 p-6 rounded-2xl bg-gradient-to-r from-yellow-500/20 to-red-500/20 border border-yellow-400/30">
+              <SquircleSurface asChild radius="surface"><div className="mb-10 p-6 bg-gradient-to-r from-yellow-500/20 to-red-500/20 border border-yellow-400/30">
                 <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
                   <Trophy className="w-6 h-6 text-yellow-400" />
                   상품 혜택
                 </h2>
                 <div className="space-y-4">
-                  <div className="flex items-center gap-4 p-4 rounded-xl bg-white/10 border border-white/20">
+                  <SquircleSurface asChild radius="control"><div className="flex items-center gap-4 p-4 bg-white/10 border border-white/20">
                     <div className="flex items-center gap-2">
                       <span className="text-2xl">🥇🥈🥉</span>
                       <div>
@@ -79,8 +80,8 @@ function Enter() {
                         <p className="text-white/80">배민 10,000원 상품권</p>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-4 p-4 rounded-xl bg-white/10 border border-white/20">
+                  </div></SquircleSurface>
+                  <SquircleSurface asChild radius="control"><div className="flex items-center gap-4 p-4 bg-white/10 border border-white/20">
                     <div className="flex items-center gap-2">
                       <span className="text-2xl">🏅</span>
                       <div>
@@ -88,14 +89,14 @@ function Enter() {
                         <p className="text-white/80">스타벅스 아이스 아메리카노 기프티콘</p>
                       </div>
                     </div>
-                  </div>
-                  <div className="mt-4 p-3 bg-yellow-500/20 rounded-lg border border-yellow-400/30">
+                  </div></SquircleSurface>
+                  <SquircleSurface asChild radius="compact"><div className="mt-4 p-3 bg-yellow-500/20 border border-yellow-400/30">
                     <p className="text-yellow-200 text-sm text-center">
                       💡 매월 말 랭킹에 따라 상품이 지급됩니다!
                     </p>
-                  </div>
+                  </div></SquircleSurface>
                 </div>
-              </div>
+              </div></SquircleSurface>
 
               {/* 참여 절차 섹션 */}
               <div className="mb-10">
@@ -104,7 +105,7 @@ function Enter() {
                   참여 절차
                 </h2>
                 <div className="space-y-6">
-                  <div className="flex items-start gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-300">
+                  <SquircleSurface asChild radius="surface"><div className="flex items-start gap-4 p-4 bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-300">
                     <div className="flex items-center justify-center w-10 h-10 bg-blue-500 rounded-full text-white font-bold text-lg flex-shrink-0">
                       1
                     </div>
@@ -115,9 +116,9 @@ function Enter() {
                         💡 연락처: 동아리실 또는 ANA 공식 채널을 통해 문의
                       </div>
                     </div>
-                  </div>
+                  </div></SquircleSurface>
 
-                  <div className="flex items-start gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-300">
+                  <SquircleSurface asChild radius="surface"><div className="flex items-start gap-4 p-4 bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-300">
                     <div className="flex items-center justify-center w-10 h-10 bg-green-500 rounded-full text-white font-bold text-lg flex-shrink-0">
                       2
                     </div>
@@ -128,9 +129,9 @@ function Enter() {
                         📋 참여 규칙과 운영 방침을 꼼꼼히 확인하세요
                       </div>
                     </div>
-                  </div>
+                  </div></SquircleSurface>
 
-                  <div className="flex items-start gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-300">
+                  <SquircleSurface asChild radius="surface"><div className="flex items-start gap-4 p-4 bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-300">
                     <div className="flex items-center justify-center w-10 h-10 bg-purple-500 rounded-full text-white font-bold text-lg flex-shrink-0">
                       3
                     </div>
@@ -141,9 +142,9 @@ function Enter() {
                         🔗 그룹 링크는 담당자로부터 받을 수 있습니다
                       </div>
                     </div>
-                  </div>
+                  </div></SquircleSurface>
 
-                  <div className="flex items-start gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-300">
+                  <SquircleSurface asChild radius="surface"><div className="flex items-start gap-4 p-4 bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-300">
                     <div className="flex items-center justify-center w-10 h-10 bg-orange-500 rounded-full text-white font-bold text-lg flex-shrink-0">
                       4
                     </div>
@@ -154,12 +155,12 @@ function Enter() {
                         📱 실시간 소통과 문제 풀이 인증을 위한 필수 단계
                       </div>
                     </div>
-                  </div>
+                  </div></SquircleSurface>
                 </div>
               </div>
 
               {/* 주의사항 섹션 */}
-              <div className="mb-10 p-6 rounded-2xl bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/30">
+              <SquircleSurface asChild radius="surface"><div className="mb-10 p-6 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/30">
                 <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
                   <MessageCircle className="w-6 h-6 text-yellow-400" />
                   주의사항
@@ -182,10 +183,10 @@ function Enter() {
                     <span>규칙을 위반할 경우 참여 자격이 제한될 수 있습니다.</span>
                   </li>
                 </ul>
-              </div>
+              </div></SquircleSurface>
 
               {/* 문의 섹션 */}
-              <div className="mb-10 p-6 rounded-2xl bg-gradient-to-r from-green-500/20 to-blue-500/20 border border-green-400/30">
+              <SquircleSurface asChild radius="surface"><div className="mb-10 p-6 bg-gradient-to-r from-green-500/20 to-blue-500/20 border border-green-400/30">
                 <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
                   <Users className="w-6 h-6 text-green-400" />
                   문의 및 연락처
@@ -202,16 +203,16 @@ function Enter() {
                     <p className="text-white/80 text-sm">이메일: hhs2003@o.cnu.ac.kr</p>
                   </div>
                 </div>
-              </div>
+              </div></SquircleSurface>
 
               {/* 액션 버튼 */}
               <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                 <Link to="/">
-                  <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-3 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300">
+                  <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300">
                     메인으로 돌아가기
                   </Button>
                 </Link>
-                {/* <Button className="bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white px-8 py-3 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300">
+                {/* <Button className="bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300">
                   참여 신청하기
                 </Button> */}
               </div>
@@ -224,7 +225,7 @@ function Enter() {
                   함께 성장하는 여정에 동참해주세요! 🚀
                 </p>
               </div>
-            </div>
+            </div></SquircleSurface>
           </main>
         </div>
       </Background>
@@ -233,4 +234,3 @@ function Enter() {
 }
 
 export default Enter;
-

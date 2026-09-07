@@ -1,8 +1,9 @@
+import { SquircleSurface } from "@/components/ui/squircle";
 import React from 'react';
 
 const UserSearchGuide: React.FC = () => {
   return (
-    <div className="w-full p-6 bg-white/5 rounded-lg border border-white/10 text-white">
+    <SquircleSurface radius="panel" className="w-full p-6 bg-white/5 border border-white/10 text-white">
       <h3 className="text-xl font-semibold mb-2">사용자 검색 가이드</h3>
       <p className="text-gray-300 mb-4">사용자 BOJ 핸들 또는 한국어 이름으로 검색 후 결과를 클릭하면 프로필 페이지로 이동합니다.</p>
       <div className="space-y-2 text-sm text-gray-300">
@@ -24,7 +25,7 @@ const UserSearchGuide: React.FC = () => {
           </ul>
         </div>
       </div>
-    </div>
+    </SquircleSurface>
   );
 };
 

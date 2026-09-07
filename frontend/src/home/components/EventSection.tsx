@@ -1,3 +1,4 @@
+import { SquircleSurface } from "@/components/ui/squircle";
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -92,7 +93,7 @@ function EventSection() {
 
   return (
     <TooltipProvider>
-      <div className="w-full px-8 py-6 mb-10">
+      <div className="w-full px-8 py-6 mb-10 break-keep [overflow-wrap:anywhere]">
         <div className="max-w-6xl mx-auto">
           {loading ? (
             <div className="flex items-center justify-center h-64">
@@ -111,15 +112,15 @@ function EventSection() {
                 {ongoingEvents.map((event, index) => (
                   <Card key={index} className="bg-white/10 backdrop-blur-md border-yellow-400/30 shadow-[0_0_20px_rgba(255,215,0,0.2)]">
                     <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-white text-xl">{event.event_title}</CardTitle>
-                        <div className="flex items-center gap-3">
+                      <div className="flex min-w-0 flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+                        <CardTitle className="min-w-0 text-white text-xl">{event.event_title}</CardTitle>
+                        <div className="flex w-full min-w-0 items-center gap-3 sm:w-auto sm:flex-1 sm:justify-end">
                           {/* 문제 번호 목록 */}
-                          <div className="flex items-center gap-1 max-w-md overflow-x-auto scrollbar-thin scrollbar-thumb-blue-400/30 scrollbar-track-transparent">
+                          <div tabIndex={0} aria-label="이벤트 문제 목록" className="flex min-w-0 flex-1 items-center gap-1 max-w-md overflow-x-auto scrollbar-thin scrollbar-thumb-blue-400/30 scrollbar-track-transparent">
                             {event.problems.split(',').map((problem, idx) => (
-                              <span key={idx} className="text-xs text-blue-300 bg-blue-400/10 px-2 py-1 rounded border border-blue-400/20 whitespace-nowrap flex-shrink-0">
+                              <SquircleSurface key={idx} radius="compact" asChild><span className="text-xs text-blue-300 bg-blue-400/10 px-2 py-1 border border-blue-400/20 whitespace-nowrap flex-shrink-0">
                                 {problem.trim()}
-                              </span>
+                              </span></SquircleSurface>
                             ))}
                           </div>
                           <span className="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-400/20 text-yellow-300 border border-yellow-400/30 flex-shrink-0">
@@ -222,4 +223,4 @@ function EventSection() {
   );
 }
 
-export default EventSection; 
+export default EventSection;
