@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { URL } from "@/resource/constant";
 import { 
   Calendar, 
   Clock, 
@@ -62,8 +63,6 @@ const EventList: React.FC = () => {
     end: '',
     problems: ''
   });
-
-  const URL = import.meta.env.MODE === 'production' ? '' : (import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000');
 
   // 이벤트 목록 조회
   const fetchEvents = async (page: number = 1) => {
@@ -449,4 +448,4 @@ const EventList: React.FC = () => {
   );
 };
 
-export default EventList; 
+export default EventList;

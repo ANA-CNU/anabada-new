@@ -1,5 +1,5 @@
 import mysql from 'mysql2/promise';
-import { logger } from '../index.js';
+import { backendEmergencyWebhook, logger } from '../logger.js';
 
 // MySQL 데이터베이스 설정
 const DB_CONFIG = {
@@ -7,7 +7,7 @@ const DB_CONFIG = {
   port: parseInt(process.env.DB_PORT || '3306'),
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'anabada',
+  database: process.env.DB_NAME || 'jungol_bada',
   charset: 'utf8mb4',
   timezone: '+09:00',
   connectionLimit: 10,
@@ -69,7 +69,14 @@ export function getDatabaseConfig() {
 }
 
 // 비동기 초기화 실행
-initDatabase().catch(error => {
-  logger.error('데이터베이스 초기화 실패:', error);
+initDatabase().catch(async error => {
+  await backendEmergencyWebhook.notify({
+    code: 'database_initialization_failed',
+    occurredAt: new Date(),
+  });
+  logger.error(
+    { code: 'database_initialization_failed', err: error },
+    '데이터베이스 초기화 실패',
+  );
   process.exit(1);
 });

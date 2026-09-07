@@ -8,9 +8,36 @@ type KakaoMapProps = {
   className?: string;
 };
 
+type KakaoLatLng = {
+  readonly getLat: () => number;
+  readonly getLng: () => number;
+};
+
+type KakaoMapInstance = {
+  readonly getCenter: () => KakaoLatLng;
+};
+
+type KakaoMaps = {
+  readonly load: (callback: () => void) => void;
+  readonly LatLng: new (lat: number, lng: number) => KakaoLatLng;
+  readonly Map: new (container: HTMLElement, options: {
+    readonly center: KakaoLatLng;
+    readonly level: number;
+  }) => KakaoMapInstance;
+  readonly Marker: new (options: { readonly position: KakaoLatLng }) => {
+    readonly setMap: (map: KakaoMapInstance) => void;
+  };
+  readonly CustomOverlay: new (options: {
+    readonly content: HTMLElement;
+    readonly position: KakaoLatLng;
+    readonly yAnchor: number;
+    readonly zIndex: number;
+  }) => { readonly setMap: (map: KakaoMapInstance) => void };
+};
+
 declare global {
   interface Window {
-    kakao?: any;
+    readonly kakao?: { readonly maps: KakaoMaps };
   }
 }
 
@@ -18,10 +45,10 @@ const KakaoMap: React.FC<KakaoMapProps> = ({ lat, lng, level = 3, markerTitle, c
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const apiKey = (import.meta as any).env?.VITE_KAKAO_MAP_API || (process as any)?.env?.KAKAO_MAP_API;
+    const apiKey = import.meta.env.VITE_KAKAO_MAP_API_KEY;
     if (!apiKey) {
       // eslint-disable-next-line no-console
-      console.warn("Kakao Map API key is missing. Set VITE_KAKAO_MAP_API or KAKAO_MAP_API.");
+      console.warn("Kakao Map API key is missing. Set VITE_KAKAO_MAP_API_KEY.");
       return;
     }
 
@@ -32,7 +59,7 @@ const KakaoMap: React.FC<KakaoMapProps> = ({ lat, lng, level = 3, markerTitle, c
           return;
         }
         const script = document.createElement("script");
-        script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${apiKey}&autoload=false`;
+        script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(apiKey)}&autoload=false`;
         script.async = true;
         script.onload = () => resolve();
         script.onerror = () => reject(new Error("Failed to load Kakao Map script"));
@@ -41,17 +68,19 @@ const KakaoMap: React.FC<KakaoMapProps> = ({ lat, lng, level = 3, markerTitle, c
 
     loadScript()
       .then(() => {
-        window.kakao.maps.load(() => {
+        const maps = window.kakao?.maps;
+        if (!maps) return;
+        maps.load(() => {
           if (!containerRef.current) return;
           const container = containerRef.current;
           const options = {
-            center: new window.kakao.maps.LatLng(lat, lng),
+            center: new maps.LatLng(lat, lng),
             level,
           };
-          const map = new window.kakao.maps.Map(container, options);
+          const map = new maps.Map(container, options);
 
-          const markerPosition = new window.kakao.maps.LatLng(lat, lng);
-          const marker = new window.kakao.maps.Marker({ position: markerPosition });
+          const markerPosition = new maps.LatLng(lat, lng);
+          const marker = new maps.Marker({ position: markerPosition });
           marker.setMap(map);
           if (markerTitle) {
             // 공백을 최소화한 커스텀 오버레이로 대체
@@ -69,7 +98,7 @@ const KakaoMap: React.FC<KakaoMapProps> = ({ lat, lng, level = 3, markerTitle, c
             ].join(';');
             content.textContent = markerTitle;
 
-            const overlay = new window.kakao.maps.CustomOverlay({
+            const overlay = new maps.CustomOverlay({
               content,
               position: markerPosition,
               yAnchor: 1.4,
@@ -89,5 +118,4 @@ const KakaoMap: React.FC<KakaoMapProps> = ({ lat, lng, level = 3, markerTitle, c
 };
 
 export default KakaoMap;
-
 

@@ -4,20 +4,21 @@ FROM node:22.15.0-alpine AS builder
 WORKDIR /app
 
 # package.json과 package-lock.json 복사
-COPY package.json ./
+COPY package.json package-lock.json ./
 
 # 의존성 설치
-RUN npm install
+RUN npm ci
 
 # 소스 코드 복사
 COPY . .
 
 # 프로덕션 빌드
+ARG VITE_KAKAO_MAP_API_KEY
+ENV VITE_KAKAO_MAP_API_KEY=${VITE_KAKAO_MAP_API_KEY}
 RUN npm run build
 
 # 환경변수 설정
 ENV NODE_ENV=production
-ENV VITE_KAKAO_MAP_API_KEY=${VITE_KAKAO_MAP_API_KEY}
 
 # 다단계 빌드.
 FROM node:22.15.0-alpine AS runner

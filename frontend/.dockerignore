@@ -54,8 +54,7 @@ coverage
 Dockerfile*
 docker-compose*
 .dockerignore
-package-lock.json
 
 # 기타
 .eslintcache
-.stylelintcache 
+.stylelintcache

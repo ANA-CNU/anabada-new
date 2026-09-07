@@ -1,0 +1,169 @@
+name: Verify Jungol
+# main 배포와 분리하여 feature branch push와 pull request만 검증한다.
+on:
+  push:
+    branches-ignore: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # 운영 DB나 실제 계정을 사용하지 않고 스키마·트랜잭션을 검증하는 일회용 MySQL이다.
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=5s --health-timeout=5s --health-retries=30
+    steps:
+      - uses: actions/checkout@v4
+      # 배포 전에 생성할 .env의 형식, 권한, 누락값 처리와 workflow 안전장치를 가짜 값으로 검증한다.
+      - name: Validate deployment environment contract
+        run: |
+          bash -n scripts/deploy/render-production-env.sh scripts/deploy/test-render-production-env.sh
+          bash scripts/deploy/test-render-production-env.sh
+          ruby scripts/deploy/test-workflow-contract.rb
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: collector/package-lock.json
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.10"
+      # 브라우저 테스트가 설치 단계 누락으로 조용히 약화되지 않도록 CI 명령 순서를 계약으로 고정한다.
+      - name: Assert collector browser gate cannot be omitted
+        run: |
+          node <<'NODE'
+          const assert = require("node:assert/strict");
+          const fs = require("node:fs");
+          const workflow = fs.readFileSync(".github/workflows/ci.yaml", "utf8");
+          const block = workflow.split("- name: Collector checks and disposable MySQL integration\n")[1].split("- name: Backend tests")[0];
+          const commands = block.split("\n").map(line => line.trim());
+          const required = [
+            "npm ci --ignore-scripts --no-audit --no-fund",
+            "./node_modules/.bin/playwright install --with-deps chromium",
+            commands.find(line => line.startsWith("node --input-type=module -e ") && line.includes("await access(chromium.executablePath())") && line.includes("await chromium.launch()")),
+            "npm test"
+          ];
+          function verify(lines) {
+            let previous = -1;
+            for (const command of required) {
+              assert.ok(command, "Missing browser execution smoke check");
+              const index = lines.indexOf(command);
+              assert.ok(index > previous, "Missing or reordered browser install/execution/test command");
+              previous = index;
+            }
+          }
+          verify(commands);
+          for (const command of required.slice(1)) {
+            assert.throws(() => verify(commands.filter(line => line !== command)));
+          }
+          const pkg = JSON.parse(fs.readFileSync("collector/package.json", "utf8"));
+          assert.equal(pkg.dependencies.playwright, "1.63.0");
+          assert.ok(pkg.scripts.test.includes("test/*.test.ts"));
+          NODE
+      - name: Collector checks and disposable MySQL integration
+        working-directory: collector
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          ./node_modules/.bin/playwright install --with-deps chromium
+          node --input-type=module -e 'import { access } from "node:fs/promises"; import { chromium } from "playwright"; await access(chromium.executablePath()); const browser = await chromium.launch(); await browser.close();'
+          npm test
+          npm run typecheck
+          npm run lint
+          npm run build
+          npm run test:mysql
+      - name: Backend tests, types, build
+        working-directory: backend
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: "3306"
+          DB_USER: root
+          DB_NAME: jungol_bada
+          DB_PASSWORD: ""
+          TEST_DATABASE_URL: mysql://root@127.0.0.1:3306/backend_qa
+          JWT_SECRET: ci-placeholder-not-a-live-secret
+        run: |
+          mysql -h127.0.0.1 -uroot -e 'CREATE DATABASE backend_qa'
+          bun install --frozen-lockfile
+          bun test
+          bun run typecheck
+          bun run build
+      # 실제 Secret은 pull request에 제공하지 않는다. 아래 값은 Compose 배선만 검증하는 폐기 가능한 fixture다.
+      - name: Compose topology and build without live credentials
+        env:
+          DB_PASSWORD: ci-placeholder-not-a-live-secret
+          JWT_SECRET: ci-placeholder-not-a-live-secret
+          ADMIN_USERNAME: ci-placeholder
+          ADMIN_PASSWORD: ci-placeholder-not-a-live-secret
+          JUNGOL_USERNAME: ci-placeholder
+          JUNGOL_PASSWORD: ci-placeholder-not-a-live-secret
+          VITE_KAKAO_MAP_API_KEY: ci-map-build-placeholder
+          WEBHOOK_URL: https://discord.com/api/webhooks/ci-placeholder/not-live
+        run: |
+          set -euo pipefail
+          secret_dir=$(mktemp -d)
+          trap 'rm -f "$secret_dir/.env"; rmdir "$secret_dir"' EXIT
+          umask 077
+          bash scripts/deploy/render-production-env.sh "$secret_dir/.env"
+          # 세 환경이 같은 Secret 분리·고정 topology 계약을 유지하는지 실제 Compose JSON으로 확인한다.
+          for mode in dev stage prod; do
+            docker compose --env-file "$secret_dir/.env" -f "docker-compose.$mode.yaml" config --quiet
+            docker compose --env-file "$secret_dir/.env" -f "docker-compose.$mode.yaml" config --format json |
+              jq -e --arg mode "$mode" '
+                . as $root | .services["jungol-collector"] as $c |
+                ($c != null) and
+                ($root.services | has("anabada-crawling") | not) and
+                ($root.services["anabada-frontend"].build.args | has("VITE_KAKAO_MAP_API_KEY")) and
+                ($c.build.context | endswith("/collector")) and
+                ($c.build.dockerfile == "Dockerfile") and
+                ($c.command == null) and ($c.entrypoint == null) and
+                ($c.ports == null) and ($c.init == true) and
+                ($c.restart == "unless-stopped") and ($c.shm_size == "1073741824") and
+                ($c.cap_drop == ["ALL"]) and
+                ($c.security_opt == ["no-new-privileges:true"]) and
+                ($c.depends_on["anabada-mysql"].condition == "service_healthy") and
+                ($c.networks | has("bada-network")) and
+                ($c.environment | keys == ["DB_PASSWORD", "JUNGOL_PASSWORD", "JUNGOL_USERNAME", "WEBHOOK_URL"]) and
+                ($root.services["anabada-backend"].environment.WEBHOOK_URL == $c.environment.WEBHOOK_URL) and
+                ($root.secrets == null) and
+                ($root.services | all(.[]; .secrets == null and .env_file == null)) and
+                ($c.environment.DB_PASSWORD == $root.services["anabada-mysql"].environment.MYSQL_ROOT_PASSWORD) and
+                ($c.environment.DB_PASSWORD == $root.services["anabada-backend"].environment.DB_PASSWORD) and
+                ($root.services["anabada-backend"].environment.DB_USER == "root") and
+                ($root.services["anabada-backend"].environment.JWT_SECRET == $root.services["anabada-middleware"].environment.JWT_SECRET) and
+                ($c.volumes | length == 1) and
+                ($c.volumes[0].type == "volume") and
+                ($c.volumes[0].source == "jungol-profile") and
+                ($c.volumes[0].target == "/var/lib/jungol/profile") and
+                ($root.volumes | has("jungol-profile")) and
+                ($root.services["anabada-backend"].environment.DB_NAME == "jungol_bada") and
+                ($root.services["anabada-backend"].depends_on["anabada-mysql"].condition == "service_healthy") and
+                ($root.services["anabada-mysql"].healthcheck.test | join(" ") | contains("mysqladmin")) and
+                ($root.services["anabada-mysql"].volumes | any(.[]; .type == "bind" and (.source | endswith("/database/my.cnf")) and .target == "/etc/mysql/conf.d/my.cnf" and .read_only == true)) and
+                (if $mode == "prod" then
+                  $root.services["anabada-mysql"].ports | any(.[]; .published == "20040" and .target == 3306 and .protocol == "tcp")
+                elif $mode == "stage" then
+                  $root.services["anabada-backend"].ports | any(.[]; .published == "20031" and .target == 3000 and .protocol == "tcp")
+                else true end) and
+                ($root.services["anabada-mysql"].volumes | all(.[]; (.target | startswith("/docker-entrypoint-initdb.d") | not))) and
+                ($root.services["anabada-mysql"].volumes |
+                  if $mode == "dev" then
+                    any(.[]; .type == "volume" and .source == "mysql-data" and .target == "/var/lib/mysql")
+                  else
+                    any(.[]; .type == "bind" and (.source | endswith("/database/mysql_data")) and .target == "/var/lib/mysql")
+                  end
+                )'
+          done
+          # 설정 파싱뿐 아니라 최종 image가 빌드되고 non-root collector 계약을 유지하는지도 확인한다.
+          timeout 900 docker compose --env-file "$secret_dir/.env" -p "jungol-ci-$GITHUB_RUN_ID" -f docker-compose.dev.yaml build jungol-collector anabada-backend anabada-frontend anabada-middleware
+          docker run --rm --entrypoint sh "jungol-ci-$GITHUB_RUN_ID-anabada-frontend" -ec 'grep -Rq ci-map-build-placeholder /app/dist'
+          docker image inspect "jungol-ci-$GITHUB_RUN_ID-jungol-collector" |
+            jq -e '.[0].Config | .User == "pwuser" and .Cmd == ["start"] and .Entrypoint == ["node", "dist/cli.js"] and (.Healthcheck.Test | index("healthcheck") != null)'
+          docker run --rm --entrypoint sh "jungol-ci-$GITHUB_RUN_ID-jungol-collector" -ec 'test "$(id -u)" = 1001; test "$(id -g)" = 1001'

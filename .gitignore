@@ -24,6 +24,7 @@ dist-ssr
 *.sw?
  
 .env*
+!.env.example
 
 database/mysql_data/*
 !database/mysql_data/.gitkeep
@@ -33,3 +34,5 @@ querys/main.py
 querys/*
 
 TODO
+
+.omo

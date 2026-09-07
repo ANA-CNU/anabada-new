@@ -4,6 +4,7 @@
 이벤트 관리(문제 세트/기간/설명)와 관리자 기능(유저/점수/로그/가중치)을 제공하는 풀스택 프로젝트입니다.
 
 ### 구성
+
 - backend: Bun + Elysia + MySQL2 (API 서버)
 - middleware: Proxy/Auth 미들웨어 (선택)
 - frontend: React + Vite + Tailwind (웹 UI)
@@ -13,81 +14,48 @@
 
 ## 1) 환경 변수 (.env) 설정
 
-실행 전에 프로젝트 루트 또는 각 서비스 디렉토리에 `.env` 파일을 생성하고 다음 값을 채워주세요.
+프로젝트 루트의 [.env.example](./.env.example)을 같은 위치의 `.env`로 복사한 뒤 아래 필수 여섯 값을 채웁니다. 서비스별 환경 파일은 만들지 않습니다. 실제 값은 커밋하지 않고 파일 권한을 0600으로 제한합니다.
 
-```env
-MYSQL_ROOT_PASSWORD=
-DB_HOST=
-DB_PORT=
-DB_USER=
+```dotenv
 DB_PASSWORD=
-DB_NAME=
-
-ADMIN_ID=
-ADMIN_PASSWORD=
-
-PORT=
-NODE_ENV=
 JWT_SECRET=
-JWT_EXPIRES_IN=
 ADMIN_USERNAME=
 ADMIN_PASSWORD=
-FRONTEND_URL=
+JUNGOL_USERNAME=
+JUNGOL_PASSWORD=
+
+# 선택: 프런트엔드 빌드에 사용하는 공개 Kakao JavaScript 앱 키
+VITE_KAKAO_MAP_API_KEY=
+
+# 선택: backend/collector 긴급 Discord 장애 알림 주소
+WEBHOOK_URL=
 ```
 
-권장 예시 (로컬 개발):
+MySQL, backend, collector는 root 계정과 동일한 `DB_PASSWORD`를 사용합니다. DB 주소·이름, 서비스 URL·포트·모드와 수집 설정은 코드/Compose에 고정되어 있습니다. Compose는 각 서비스에 필요한 값만 전달합니다. 기존 MySQL 데이터가 있으면 `DB_PASSWORD` 변경만으로 실제 root 비밀번호가 바뀌지 않으므로 운영자가 계정 비밀번호와 배포 값을 맞춰야 합니다.
 
-SSH를 통해 포트 터널링을 통해, DB와 연결된 채로 하는 것을 추천합니다.
+## 2) 실행과 배포
 
-```env
-MYSQL_ROOT_PASSWORD=ASK-ME
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=ASK-ME
-DB_PASSWORD=ASK-ME
-DB_NAME=ASK-ME
+아래 명령은 저장소 루트에서 실행합니다. 개발 환경도 루트 `.env`를 명시적으로 읽습니다.
 
-ADMIN_ID=ASK
-ADMIN_PASSWORD=ASK-ME
-
-PORT=3000
-NODE_ENV=development
-JWT_SECRET=please-change-me
-JWT_EXPIRES_IN=30m
-ADMIN_USERNAME=ASK
-FRONTEND_URL=http://anabada-frontend:5173
+```sh
+docker compose --env-file .env -f docker-compose.dev.yaml config --quiet
+docker compose --env-file .env -f docker-compose.dev.yaml up -d anabada-mysql
 ```
 
-프론트엔드의 API 기본 URL은 `frontend/src/resource/constant.ts`에서
-개발 모드일 때 `import.meta.env.VITE_BACKEND_URL`(없으면 `http://localhost:3000`)을 사용합니다.
-필요 시 다음을 `frontend/.env`에 추가하세요:
+처음 실행할 때 운영자가 [002 SQL](./migrations/002_create_jungol_bada.sql)을 수동으로 적용하고 새 DB를 확인한 뒤 전체 서비스를 시작합니다. SQL은 기존 `jungol_bada`가 있으면 실패하므로 반복 적용하지 않습니다. 상세 SQL 확인 절차는 [운영·개발 가이드](./docs/jungol-ingestion/README.md)를 따릅니다.
 
-```env
-VITE_BACKEND_URL=http://localhost:3000
+```sh
+docker compose --env-file .env -f docker-compose.dev.yaml exec -T anabada-mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot --batch' < migrations/002_create_jungol_bada.sql
+docker compose --env-file .env -f docker-compose.dev.yaml up -d --build --wait
 ```
 
----
+개발 접속 주소는 `http://localhost:20050`입니다. stage는 `docker-compose.stage.yaml`, 운영은 `docker-compose.prod.yaml`을 선택하며 동일하게 `--env-file .env`를 사용합니다.
 
-접속:
-- 백엔드 API: `http://localhost:3000`
-- 프론트엔드: `http://localhost:5173`
+운영 배포는 GitHub `production` Environment의 Secrets에서 필수 여섯 값과 선택 Kakao 키·`WEBHOOK_URL`을 받아 서버 루트 `.env` 하나를 생성합니다. SSH 배포 Secrets는 `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PORT`, `DEPLOY_KEY`입니다. GitHub Actions의 일회성 runner는 첫 SSH 연결에서 서버 host key를 자동 수락합니다. SQL 적용은 배포 workflow가 수행하지 않습니다. 배포 후 확인도 루트에서 실행합니다.
 
-### 방법 B) 로컬(호스트)에서 직접 실행
-
-사전 준비: MySQL 실행 및 위 .env 설정
-
-1) 백엔드
-```bash
-cd backend
-bun install
-bun run dev
-```
-
-2) 프론트엔드
-```bash
-cd frontend
-npm install
-npm run dev
+```sh
+docker compose --env-file .env -f docker-compose.prod.yaml config --quiet
+docker compose --env-file .env -f docker-compose.prod.yaml ps
 ```
 
 ---
@@ -114,13 +82,13 @@ npm run dev
 ## 5) 문제 해결 팁
 
 - 데이터가 보이지 않을 때
-  - DB 접속 정보(.env) 확인, 테이블 존재/권한 확인
+  - 루트 `.env`의 `DB_PASSWORD`와 실제 MySQL root 비밀번호, 새 DB 테이블 존재 확인
   - 백엔드 로그 확인 (Bun/Elysia)
-  - 백엔드 DB 서버와 포트 터널링 확인
+  - Compose MySQL health와 backend/collector의 내부 네트워크 연결 확인
 - CORS/프록시 이슈
-  - `FRONTEND_URL`, `VITE_BACKEND_URL` 확인
-  - 개발 환경에서는 프론트가 직접 백엔드 URL로 호출하도록 설정
+  - 해당 환경 Compose에 고정된 origin과 nginx 프록시 경로 확인
+  - 개발 환경은 `http://localhost:20050`으로 접속
 - 관리자 로그인 문제
-  - `ADMIN_ID`, `ADMIN_PASSWORD`, `JWT_SECRET` 재확인
- 
+  - `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `JWT_SECRET` 재확인
+
 <img width="801" height="526" alt="image" src="https://github.com/user-attachments/assets/32cf44ae-acd7-4b07-8afd-66008a07a23f" />

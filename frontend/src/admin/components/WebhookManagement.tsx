@@ -185,7 +185,7 @@ export default function WebhookManagement() {
   // URL 검증
   const isValidUrl = (url: string) => {
     try {
-      new URL(url);
+      new globalThis.URL(url);
       return true;
     } catch {
       return false;

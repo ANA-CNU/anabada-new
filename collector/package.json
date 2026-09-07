@@ -1,0 +1,33 @@
+{
+  "name": "jungol-collector",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22 <25"
+  },
+  "scripts": {
+    "start": "node dist/cli.js start",
+    "run-once": "node dist/cli.js run-once",
+    "healthcheck": "node dist/cli.js healthcheck",
+    "test": "node --import tsx --test test/*.test.ts",
+    "test:mysql": "node test/mysql-integration.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "build": "tsc -p tsconfig.build.json",
+    "check-config": "node dist/cli.js check-config"
+  },
+  "dependencies": {
+    "bson": "7.3.2",
+    "mysql2": "3.14.3",
+    "pino": "9.9.0",
+    "playwright": "1.63.0",
+    "zod": "4.1.5"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.2.2",
+    "@types/node": "22.18.0",
+    "tsx": "4.20.5",
+    "typescript": "5.9.2"
+  }
+}

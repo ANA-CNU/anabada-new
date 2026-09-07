@@ -1,10 +1,12 @@
 import { Elysia } from "elysia";
 import { swagger } from "@elysiajs/swagger";
 import { cors } from "@elysiajs/cors";
-import dotenv from "dotenv";
-import pino from "pino";
-import { cron } from "@elysiajs/cron";
-import { runFullSyncCycle } from "./api/sync/aoj.service.js";
+import { getDatabase } from "./db/database.js";
+import { createHealthRoute } from "./api/health.js";
+import { isEmergencyServerError } from "./emergency-webhook.js";
+import { logger } from "./logger.js";
+
+export { logger };
 
 // API 플러그인들
 import { monthlyStats } from "./api/statistics/monthly-stats.js";
@@ -25,20 +27,10 @@ import { lastMonthBoard } from "./api/ranking_boards/selected-month-board.js";
 import { userMonthly } from "./api/user/monthly.js";
 import { hook } from "./api/hook/hook.js";
 
-// 설정
-dotenv.config();
 const isProduction = process.env.NODE_ENV === "production";
 
 // 허용된 Origin 설정
 const allowedOrigins: string[] = [process.env.ALLOWED_ORIGIN!];
-// 로거 설정
-export const logger = pino({
-  level: isProduction ? "info" : "debug",
-  transport: {
-    target: "pino-pretty",
-    options: { colorize: true },
-  },
-});
 
 // CORS 설정
 const corsConfig = isProduction
@@ -119,8 +111,16 @@ const app = new Elysia()
     logger.debug(`Origin: ${request.headers.get("origin")}`);
     logger.debug(`User-Agent: ${request.headers.get("user-agent")}`);
   })
-  .onError(({ error, request }) => {
-    logger.error(`에러 발생: ${request.method} ${request.url}`, error as any);
+  .onError(({ code, error, request }) => {
+    const context = {
+      err: error,
+      method: request.method,
+      path: new URL(request.url).pathname,
+      code,
+    };
+    if (isEmergencyServerError(code))
+      logger.error(context, "backend.request_failed");
+    else logger.warn(context, "backend.request_rejected");
   })
   .use(
     swagger({
@@ -145,28 +145,12 @@ const app = new Elysia()
     timestamp: new Date().toISOString(),
     status: "running",
   }))
-  .get("/health", async () => ({
-    status: "healthy",
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  }))
+  .use(createHealthRoute(getDatabase))
   .get("/api/version", () => ({
     version: "1.0.0",
     framework: "Elysia",
     runtime: "Bun",
-  }))
-  .use(
-    cron({
-      name: "aoj-sync",
-      pattern: "*/5 * * * *",
-      run() {
-        logger.info("[CRON] 5분 주기 동기화 잡(AOJ-Sync) 시작");
-        runFullSyncCycle().catch((err) => {
-          logger.error("[CRON] 동기화 중 에러 발생:", err);
-        });
-      },
-    }),
-  );
+  }));
 
 // API 플러그인들 등록
 apiPlugins.forEach((plugin) => app.use(plugin));
