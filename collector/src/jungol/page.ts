@@ -5,7 +5,6 @@ import { JungolError } from "./errors.js";
 export type BrowserSettings = {
   readonly baseUrl: string;
   readonly pageTimeoutMs: number;
-  readonly requestDelayMs: number;
 };
 /** AbortSignal을 Playwright page 종료로 연결하고 외부 예외를 안전한 코드로 변환한다. */
 export class PageOperation {

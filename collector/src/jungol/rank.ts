@@ -2,8 +2,9 @@ import type { Page } from "playwright";
 import { z } from "zod";
 import { type RankMember, rankMemberSchema } from "../domain/sync.js";
 import { AcRatingTierMapper } from "../scoring/tier.js";
-import { JungolError } from "./errors.js";
+import { JungolError, rejectJungolHttpStatus } from "./errors.js";
 import { type BrowserSettings, PageOperation } from "./page.js";
+import type { JungolRequestCoordinator } from "./request-coordinator.js";
 
 const countSchema = z
   .string()
@@ -28,6 +29,7 @@ const headersSchema = z.tuple([
 export class RankCollector {
   constructor(
     private readonly settings: BrowserSettings,
+    private readonly requests: JungolRequestCoordinator,
     private readonly tiers = new AcRatingTierMapper(),
     private readonly pages = new PageOperation(),
   ) {}
@@ -37,10 +39,19 @@ export class RankCollector {
     signal?: AbortSignal,
   ): Promise<readonly RankMember[]> {
     return this.pages.run(page, signal, async () => {
-      await page.goto(
-        new URL(`/group/${groupId}/rank`, this.settings.baseUrl).href,
-        { waitUntil: "domcontentloaded", timeout: this.settings.pageTimeoutMs },
+      const response = await this.requests.schedule(
+        "rank_page",
+        signal,
+        async () =>
+          page.goto(
+            new URL(`/group/${groupId}/rank`, this.settings.baseUrl).href,
+            {
+              waitUntil: "domcontentloaded",
+              timeout: this.settings.pageTimeoutMs,
+            },
+          ),
       );
+      rejectJungolHttpStatus(response?.status());
       const table = page.getByRole("table").first();
       await table
         .locator("tr")

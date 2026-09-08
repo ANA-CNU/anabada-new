@@ -38,7 +38,6 @@ export type CollectorSettings = {
   readonly maxPages: number;
   readonly initialBackfillMaxPages: number;
   readonly headless: boolean;
-  readonly requestDelayMs: number;
   readonly loginTimeoutMs: number;
   readonly pageTimeoutMs: number;
   readonly randomSeed: string;
@@ -60,7 +59,6 @@ const productionSettings: CollectorSettings = Object.freeze({
   maxPages: 100,
   initialBackfillMaxPages: 1000,
   headless: true,
-  requestDelayMs: 1000,
   loginTimeoutMs: 60000,
   pageTimeoutMs: 30000,
   randomSeed: "anabada",

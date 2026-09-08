@@ -8,6 +8,7 @@ import { AccountSyncPlan, rankMemberSchema } from "../src/domain/sync.js";
 import { problemIdSchema } from "../src/domain.js";
 import { ProblemMetadataResolver } from "../src/jungol/metadata.js";
 import { RankCollector } from "../src/jungol/rank.js";
+import { JungolRequestCoordinator } from "../src/jungol/request-coordinator.js";
 import { SubmissionCollector } from "../src/jungol/submission.js";
 
 test("Given a local Jungol fixture When browsing Then rank, raw pagination and fallback are observed", async (t) => {
@@ -55,15 +56,18 @@ test("Given a local Jungol fixture When browsing Then rank, raw pagination and f
   const settings = {
     baseUrl: `http://127.0.0.1:${address.port}`,
     pageTimeoutMs: 3000,
-    requestDelayMs: 0,
   };
   const browser = await chromium.launch({
     headless: true,
     ...(existsSync(chromium.executablePath()) ? {} : { channel: "chrome" }),
   });
+  const requests = new JungolRequestCoordinator({ delay: async () => {} });
   try {
     const page = await browser.newPage();
-    const members = await new RankCollector(settings).collect(page, 1125);
+    const members = await new RankCollector(settings, requests).collect(
+      page,
+      1125,
+    );
     assert.equal(members[0]?.solvedCount, 1234);
     assert.equal(members[0]?.acRating, 45);
     assert.equal(members[0]?.tier, 1);
@@ -83,7 +87,7 @@ test("Given a local Jungol fixture When browsing Then rank, raw pagination and f
         cursorBefore === 0n ? member.solvedCount : 1,
         maxPages,
       );
-    const collector = new SubmissionCollector(settings);
+    const collector = new SubmissionCollector(settings, requests);
     const result = await collector.collect(page, plan(0n, 2));
     assert.deepEqual(
       result.attempts.map((attempt) => attempt.verdict),
@@ -99,10 +103,10 @@ test("Given a local Jungol fixture When browsing Then rank, raw pagination and f
       cursorResult.attempts.map((attempt) => attempt.submissionId),
       ["10"],
     );
-    const metadata = await new ProblemMetadataResolver(settings).resolve(
-      page,
-      problemIdSchema.parse(1339),
-    );
+    const metadata = await new ProblemMetadataResolver(
+      settings,
+      requests,
+    ).resolve(page, problemIdSchema.parse(1339));
     assert.deepEqual(metadata, {
       problemId: 1339,
       title: null,
@@ -140,9 +144,12 @@ test("Given a local Jungol fixture When browsing Then rank, raw pagination and f
         body: '<table><tr><th>rank</th></tr><tr><td>1</td><td><a href="/account/42">member</a></td><td>?</td><td>0</td><td>0</td><td>0</td></tr></table>',
       }),
     );
-    await assert.rejects(new RankCollector(settings).collect(page, 1125), {
-      code: "invalid_rank",
-    });
+    await assert.rejects(
+      new RankCollector(settings, requests).collect(page, 1125),
+      {
+        code: "invalid_rank",
+      },
+    );
     await assert.rejects(
       collector.collect(page, plan(0n, 2), AbortSignal.abort()),
       { code: "cancelled" },

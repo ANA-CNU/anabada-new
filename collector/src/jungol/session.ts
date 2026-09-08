@@ -1,25 +1,37 @@
-import { type BrowserContext, chromium, errors, type Page } from "playwright";
+import {
+  type BrowserContext,
+  chromium,
+  errors,
+  type Page,
+  type Response,
+} from "playwright";
 import { LoginStateDetector } from "../auth-state.js";
 import type { CollectorConfig, Credentials } from "../config.js";
-import { JungolError } from "./errors.js";
+import { JungolError, rejectJungolHttpStatus } from "./errors.js";
 import { PageOperation } from "./page.js";
+import type { JungolRequestCoordinator } from "./request-coordinator.js";
 
 /** secure HttpOnly cookie를 읽지 않고 persistent Chromium context의 인증 상태만 소유한다. */
 export class JungolSession {
   private constructor(
     readonly context: BrowserContext,
     private readonly config: CollectorConfig,
+    private readonly requests: JungolRequestCoordinator,
     private readonly loginState = new LoginStateDetector(),
     private readonly pages = new PageOperation(),
   ) {}
-  static async launch(config: CollectorConfig): Promise<JungolSession> {
+  static async launch(
+    config: CollectorConfig,
+    requests: JungolRequestCoordinator,
+  ): Promise<JungolSession> {
     try {
       const context = await chromium.launchPersistentContext(
         config.profileDir,
         { headless: config.headless, timeout: config.loginTimeoutMs },
       );
       context.setDefaultTimeout(config.pageTimeoutMs);
-      return new JungolSession(context, config);
+      await requests.configureContext(context, config.baseUrl);
+      return new JungolSession(context, config, requests);
     } catch (error) {
       if (error instanceof Error) throw new JungolError("browser_failed");
       throw error;
@@ -42,10 +54,16 @@ export class JungolSession {
           `/group/${this.config.groupId}/submission`,
           this.config.baseUrl,
         );
-        await page.goto(target.href, {
-          waitUntil: "domcontentloaded",
-          timeout: this.config.loginTimeoutMs,
-        });
+        const probe = await this.requests.schedule(
+          "auth_probe",
+          signal,
+          async () =>
+            page.goto(target.href, {
+              waitUntil: "domcontentloaded",
+              timeout: this.config.loginTimeoutMs,
+            }),
+        );
+        this.requireOpenResponse(probe);
         await this.requireChallengeRecovery(page);
         const loginRequiredVisible = await page
           .getByText(/로그인이 필요해요|그룹에 가입해야 해요/)
@@ -67,10 +85,16 @@ export class JungolSession {
             "next",
             Buffer.from(target.pathname).toString("base64"),
           );
-          await page.goto(signin.href, {
-            waitUntil: "domcontentloaded",
-            timeout: this.config.loginTimeoutMs,
-          });
+          const signinResponse = await this.requests.schedule(
+            "auth_probe",
+            signal,
+            async () =>
+              page.goto(signin.href, {
+                waitUntil: "domcontentloaded",
+                timeout: this.config.loginTimeoutMs,
+              }),
+          );
+          this.requireOpenResponse(signinResponse);
         }
         await this.requireChallengeRecovery(page);
         await page
@@ -89,12 +113,14 @@ export class JungolSession {
           if (response.status() >= 500) transportFailed = true;
         });
         try {
-          await Promise.all([
-            page.waitForURL((url) => url.pathname === target.pathname, {
-              timeout: this.config.loginTimeoutMs,
-            }),
-            page.getByRole("button", { name: "로그인", exact: true }).click(),
-          ]);
+          await this.requests.schedule("auth_submit", signal, async () =>
+            Promise.all([
+              page.waitForURL((url) => url.pathname === target.pathname, {
+                timeout: this.config.loginTimeoutMs,
+              }),
+              page.getByRole("button", { name: "로그인", exact: true }).click(),
+            ]),
+          );
         } catch (error) {
           if (signal?.aborted) throw error;
           await this.requireChallengeRecovery(page);
@@ -163,5 +189,9 @@ export class JungolSession {
     }
     if (challengeUrl || challengeVisible || challengeText)
       throw new JungolError("manual_recovery_required");
+  }
+
+  private requireOpenResponse(response: Response | null): void {
+    rejectJungolHttpStatus(response?.status());
   }
 }

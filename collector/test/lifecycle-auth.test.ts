@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { chromium } from "playwright";
 import { CollectorConfigLoader } from "../src/config.js";
+import { JungolRequestCoordinator } from "../src/jungol/request-coordinator.js";
 import { JungolSession } from "../src/jungol/session.js";
 
 const login =
@@ -82,7 +83,10 @@ for (const scenario of [
         ...(existsSync(chromium.executablePath()) ? {} : { channel: "chrome" }),
       }),
     );
-    session = await JungolSession.launch(config);
+    session = await JungolSession.launch(
+      config,
+      new JungolRequestCoordinator(),
+    );
     await session.context.route("**/*", (route) => {
       const url = new URL(route.request().url());
       if (scenario.before === "network") return route.abort("connectionfailed");

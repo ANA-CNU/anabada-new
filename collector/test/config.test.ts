@@ -25,7 +25,6 @@ test("Given only three secrets When parsing Then production settings are fixed",
   assert.equal(result.maxPages, 100);
   assert.equal(result.initialBackfillMaxPages, 1000);
   assert.equal(result.headless, true);
-  assert.equal(result.requestDelayMs, 1000);
   assert.equal(result.loginTimeoutMs, 60000);
   assert.equal(result.pageTimeoutMs, 30000);
   assert.equal(result.randomSeed, "anabada");

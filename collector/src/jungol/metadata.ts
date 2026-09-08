@@ -1,8 +1,9 @@
 import type { Page } from "playwright";
 import { z } from "zod";
 import type { ProblemId } from "../domain.js";
-import { JungolError } from "./errors.js";
+import { JungolError, rejectJungolHttpStatus } from "./errors.js";
 import { type BrowserSettings, PageOperation } from "./page.js";
+import type { JungolRequestCoordinator } from "./request-coordinator.js";
 
 export type ProblemMetadata = {
   readonly problemId: ProblemId;
@@ -20,6 +21,7 @@ export class ProblemMetadataResolver {
   private readonly cache = new Map<ProblemId, ProblemMetadata>();
   constructor(
     private readonly settings: BrowserSettings,
+    private readonly requests: JungolRequestCoordinator,
     private readonly pages = new PageOperation(),
   ) {}
   clearCycle(): void {
@@ -37,13 +39,19 @@ export class ProblemMetadataResolver {
     let result: ProblemMetadata;
     try {
       result = await this.pages.run(page, signal, async () => {
-        const response = await page.goto(
-          new URL(`/problem/${problemId}`, this.settings.baseUrl).href,
-          {
-            waitUntil: "domcontentloaded",
-            timeout: this.settings.pageTimeoutMs,
-          },
+        const response = await this.requests.schedule(
+          "problem_metadata",
+          signal,
+          async () =>
+            page.goto(
+              new URL(`/problem/${problemId}`, this.settings.baseUrl).href,
+              {
+                waitUntil: "domcontentloaded",
+                timeout: this.settings.pageTimeoutMs,
+              },
+            ),
         );
+        rejectJungolHttpStatus(response?.status());
         if (!response?.ok()) return fallback;
         const raw = await page.evaluate(() => ({
           title: document.querySelector("[data-problem-title], h1")

@@ -7,6 +7,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { chromium } from "playwright";
 import { CollectorConfigLoader } from "../src/config.js";
+import { JungolRequestCoordinator } from "../src/jungol/request-coordinator.js";
 import { JungolSession } from "../src/jungol/session.js";
 
 test(
@@ -75,10 +76,16 @@ test(
         ...(existsSync(chromium.executablePath()) ? {} : { channel: "chrome" }),
       }),
     );
-    const first = await JungolSession.launch(config);
+    const first = await JungolSession.launch(
+      config,
+      new JungolRequestCoordinator(),
+    );
     await first.ensureLogin(credentials);
     await first.close();
-    const second = await JungolSession.launch(config);
+    const second = await JungolSession.launch(
+      config,
+      new JungolRequestCoordinator(),
+    );
     await second.ensureLogin(credentials);
     await second.close();
     assert.equal(loginCount, 1);

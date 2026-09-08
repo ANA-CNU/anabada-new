@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { test } from "node:test";
 import { chromium } from "playwright";
 import { RankCollector } from "../src/jungol/rank.js";
+import { JungolRequestCoordinator } from "../src/jungol/request-coordinator.js";
 
 const headers =
   "<tr><th>등수</th><th>계정</th><th>푼 문제</th><th>틀린 문제</th><th>스트릭</th><th>AC 레이팅</th></tr>";
@@ -16,11 +17,13 @@ test("Given ambiguous counts When collecting rank Then malformed grouping is rej
   });
   try {
     const page = await browser.newPage();
-    const collector = new RankCollector({
-      baseUrl: "https://rank.test",
-      pageTimeoutMs: 2000,
-      requestDelayMs: 0,
-    });
+    const collector = new RankCollector(
+      {
+        baseUrl: "https://rank.test",
+        pageTimeoutMs: 2000,
+      },
+      new JungolRequestCoordinator({ delay: async () => {} }),
+    );
     for (const value of [
       "1,,234문제",
       "12,34문제",
@@ -57,11 +60,13 @@ test("Given duplicate accounts or changed columns When collecting rank Then sche
   });
   try {
     const page = await browser.newPage();
-    const collector = new RankCollector({
-      baseUrl: "https://rank.test",
-      pageTimeoutMs: 2000,
-      requestDelayMs: 0,
-    });
+    const collector = new RankCollector(
+      {
+        baseUrl: "https://rank.test",
+        pageTimeoutMs: 2000,
+      },
+      new JungolRequestCoordinator({ delay: async () => {} }),
+    );
     for (const fixture of [
       {
         html: `<table>${headers}${row}${row}</table>`,

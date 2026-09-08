@@ -8,6 +8,7 @@ import {
   ProblemMetadataResolver,
 } from "../jungol/metadata.js";
 import { RankCollector } from "../jungol/rank.js";
+import { JungolRequestCoordinator } from "../jungol/request-coordinator.js";
 import { JungolSession } from "../jungol/session.js";
 import { SubmissionCollector } from "../jungol/submission.js";
 import { HookRepository } from "../mysql/hooks.js";
@@ -38,11 +39,13 @@ type Runtime = {
 /** 브라우저 세션과 cycle 의존성을 조립하되 사용자 transaction에는 직접 관여하지 않는다. */
 export class SyncCycle {
   private session: JungolSession | undefined;
+  private readonly requests = new JungolRequestCoordinator();
   private readonly metadata: ProblemMetadataResolver;
   constructor(private readonly runtime: Runtime) {
-    this.metadata = new ProblemMetadataResolver(runtime.config);
+    this.metadata = new ProblemMetadataResolver(runtime.config, this.requests);
   }
   async close(): Promise<void> {
+    this.requests.close();
     await this.session?.close();
     this.session = undefined;
   }
@@ -50,7 +53,7 @@ export class SyncCycle {
     this.metadata.clearCycle();
     const { config, credentials, pool, logger, randomSeed } = this.runtime;
     const session = async () => {
-      this.session ??= await JungolSession.launch(config);
+      this.session ??= await JungolSession.launch(config, this.requests);
       return this.session;
     };
     const calendar = new KstCalendar();
@@ -81,8 +84,8 @@ export class SyncCycle {
         logger,
       ),
     );
-    const rank = new RankCollector(config, ratingTierMapper);
-    const submissions = new SubmissionCollector(config);
+    const rank = new RankCollector(config, this.requests, ratingTierMapper);
+    const submissions = new SubmissionCollector(config, this.requests);
     const metadata = new Map<ProblemId, Promise<ProblemMetadata>>();
     const adapters: CycleAdapters = {
       lease: () => lease.acquire(),

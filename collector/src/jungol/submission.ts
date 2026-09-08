@@ -1,10 +1,10 @@
-import { setTimeout } from "node:timers/promises";
 import type { Page, Response } from "playwright";
 import type { AccountSyncPlan } from "../domain/sync.js";
 import type { SubmissionAttempt } from "../domain.js";
 import { SubmissionWireDecoder } from "../wire.js";
 import { JungolError } from "./errors.js";
 import { type BrowserSettings, PageOperation } from "./page.js";
+import type { JungolRequestCoordinator } from "./request-coordinator.js";
 
 export type CollectedSubmissions = {
   readonly attempts: readonly SubmissionAttempt[];
@@ -16,6 +16,7 @@ export type CollectedSubmissions = {
 export class SubmissionCollector {
   constructor(
     private readonly settings: BrowserSettings,
+    private readonly requests: JungolRequestCoordinator,
     private readonly decoder = new SubmissionWireDecoder(),
     private readonly pages = new PageOperation(),
   ) {}
@@ -38,19 +39,26 @@ export class SubmissionCollector {
           url.pathname === "/api/submission"
         );
       };
-      const [initial] = await Promise.all([
-        page.waitForResponse(matches, { timeout: this.settings.pageTimeoutMs }),
-        page.goto(
-          new URL(
-            `/account/${plan.member.accountId}/submission`,
-            this.settings.baseUrl,
-          ).href,
-          {
-            waitUntil: "domcontentloaded",
-            timeout: this.settings.pageTimeoutMs,
-          },
-        ),
-      ]);
+      const initial = await this.requests.schedule(
+        "submission_page",
+        signal,
+        async () =>
+          Promise.all([
+            page.waitForResponse(matches, {
+              timeout: this.settings.pageTimeoutMs,
+            }),
+            page.goto(
+              new URL(
+                `/account/${plan.member.accountId}/submission`,
+                this.settings.baseUrl,
+              ).href,
+              {
+                waitUntil: "domcontentloaded",
+                timeout: this.settings.pageTimeoutMs,
+              },
+            ),
+          ]).then(([response]) => response),
+      );
       let response = initial;
       let previousId: bigint | null = null;
       let highestInspectedId = plan.cursorBefore;
@@ -87,19 +95,21 @@ export class SubmissionCollector {
           throw new JungolError("submission_cursor_stale");
         if (pageCount === plan.maxPages)
           throw new JungolError("max_pages_reached_before_cursor");
-        if (this.settings.requestDelayMs > 0)
-          await setTimeout(this.settings.requestDelayMs, undefined, { signal });
         const button = page.getByRole("button", {
           name: "더 불러오기",
           exact: true,
         });
-        const [next] = await Promise.all([
-          page.waitForResponse(matches, {
-            timeout: this.settings.pageTimeoutMs,
-          }),
-          button.click({ timeout: this.settings.pageTimeoutMs }),
-        ]);
-        response = next;
+        response = await this.requests.schedule(
+          "submission_next_page",
+          signal,
+          async () =>
+            Promise.all([
+              page.waitForResponse(matches, {
+                timeout: this.settings.pageTimeoutMs,
+              }),
+              button.click({ timeout: this.settings.pageTimeoutMs }),
+            ]).then(([next]) => next),
+        );
       }
       throw new JungolError("max_pages_reached_before_cursor");
     });
