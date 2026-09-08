@@ -100,7 +100,8 @@ test("Given a Discord endpoint When notifying Then posts the Markdown payload ov
   try {
     const address = server.address();
     expect(address && typeof address !== "string").toBe(true);
-    if (!address || typeof address === "string") throw new Error("fixture failed");
+    if (!address || typeof address === "string")
+      throw new Error("fixture failed");
     const notifier = new BackendEmergencyWebhook(
       `http://127.0.0.1:${address.port}/incident`,
     );
@@ -112,60 +113,6 @@ test("Given a Discord endpoint When notifying Then posts the Markdown payload ov
       content: new BackendEmergencyAlertFormatter().format(incident),
     });
   } finally {
-    await new Promise<void>((resolve) => server.close(() => resolve()));
-  }
-});
-
-test("Given a backend error log When emitted Then sends one emergency alert", async () => {
-  let resolveMessage: (value: string) => void = () => {};
-  const received = new Promise<string>((resolve) => {
-    resolveMessage = resolve;
-  });
-  const server = createServer((request, response) => {
-    let body = "";
-    request.setEncoding("utf8");
-    request.on("data", (chunk: string) => {
-      body += chunk;
-    });
-    request.on("end", () => {
-      resolveMessage(body);
-      response.writeHead(204).end();
-    });
-  });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const previous = process.env.WEBHOOK_URL;
-  try {
-    const address = server.address();
-    expect(address && typeof address !== "string").toBe(true);
-    if (!address || typeof address === "string") throw new Error("fixture failed");
-    process.env.WEBHOOK_URL = `http://127.0.0.1:${address.port}/incident`;
-    const { logger } = await import(`../src/logger.js?test=${Date.now()}`);
-
-    logger.error(
-      { code: "fixture_error", err: new Error("sensitive fixture details") },
-      "backend.fixture_failed",
-    );
-
-    const payload: unknown = JSON.parse(await received);
-    expect(
-      typeof payload === "object" &&
-        payload !== null &&
-        "content" in payload &&
-        typeof payload.content === "string",
-    ).toBe(true);
-    if (
-      typeof payload !== "object" ||
-      payload === null ||
-      !("content" in payload) ||
-      typeof payload.content !== "string"
-    )
-      throw new Error("fixture payload failed");
-    expect(payload.content).toContain("**서비스:** `anabada-backend`");
-    expect(payload.content).toContain("`fixture_error`");
-    expect(payload.content).not.toContain("sensitive fixture details");
-  } finally {
-    if (previous === undefined) delete process.env.WEBHOOK_URL;
-    else process.env.WEBHOOK_URL = previous;
     await new Promise<void>((resolve) => server.close(() => resolve()));
   }
 });

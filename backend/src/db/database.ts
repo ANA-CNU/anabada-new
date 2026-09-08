@@ -1,82 +1,41 @@
-import mysql from 'mysql2/promise';
-import { backendEmergencyWebhook, logger } from '../logger.js';
+import mysql from "mysql2/promise";
+import type { Pool } from "mysql2/promise";
+import type { BackendConfig } from "../config/backend-config.js";
 
-// MySQL 데이터베이스 설정
-const DB_CONFIG = {
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '3306'),
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'jungol_bada',
-  charset: 'utf8mb4',
-  timezone: '+09:00',
-  connectionLimit: 10,
-};
+let connectionPool: Pool | undefined;
 
-// 데이터베이스 연결 풀
-let connectionPool: mysql.Pool | null = null;
-
-// 데이터베이스 초기화
-async function initDatabase(): Promise<mysql.Pool> {
-  try {
-    // 연결 풀 생성
-    connectionPool = mysql.createPool(DB_CONFIG);
-    
-    // 연결 테스트
-    const connection = await connectionPool.getConnection();
-    await connection.ping();
-    connection.release();
-    
-    logger.info(`MySQL 데이터베이스 연결 성공: ${DB_CONFIG.host}:${DB_CONFIG.port}/${DB_CONFIG.database}`);
-    logger.info(`사용자: ${DB_CONFIG.user}`);
-    
-    return connectionPool;
-  } catch (error: any) {
-    logger.error('MySQL 데이터베이스 연결 실패:', error);
-    throw error;
-  }
-}
-
-// 데이터베이스 연결 풀 반환
-export function getDatabase(): mysql.Pool {
-  if (!connectionPool) {
-    logger.error('데이터베이스 연결 풀이 초기화되지 않았습니다.');
-    throw new Error('데이터베이스가 초기화되지 않았습니다. initDatabase()를 먼저 호출하세요.');
-  }
-  return connectionPool;
-}
-
-// 데이터베이스 연결 종료
-export async function closeDatabase(): Promise<void> {
-  if (connectionPool) {
-    await connectionPool.end();
-    logger.info('MySQL 데이터베이스 연결 종료');
-    connectionPool = null;
-  }
-}
-
-
-// 데이터베이스 설정 정보 반환
-export function getDatabaseConfig() {
-  return {
-    host: DB_CONFIG.host,
-    port: DB_CONFIG.port,
-    database: DB_CONFIG.database,
-    user: DB_CONFIG.user,
-    charset: DB_CONFIG.charset,
-    timezone: DB_CONFIG.timezone
-  };
-}
-
-// 비동기 초기화 실행
-initDatabase().catch(async error => {
-  await backendEmergencyWebhook.notify({
-    code: 'database_initialization_failed',
-    occurredAt: new Date(),
+/** 연결 생성은 import가 아닌 bootstrap에서 실행해 테스트와 CLI의 외부 I/O를 분리한다. */
+export async function initializeDatabase(config: BackendConfig): Promise<Pool> {
+  const pool = mysql.createPool({
+    host: config.DB_HOST,
+    port: config.DB_PORT,
+    user: config.DB_USER,
+    password: config.DB_PASSWORD,
+    database: config.DB_NAME,
+    charset: "utf8mb4",
+    timezone: "Z",
+    connectionLimit: 10,
   });
-  logger.error(
-    { code: 'database_initialization_failed', err: error },
-    '데이터베이스 초기화 실패',
-  );
-  process.exit(1);
-});
+  const connection = await pool.getConnection();
+  try {
+    await connection.ping();
+    connectionPool = pool;
+    return pool;
+  } catch (error) {
+    await pool.end();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+/** 기존 route가 단계적으로 새 세션 경계로 이동할 때까지 유지하는 최소 호환 accessor다. */
+export function getDatabase(): Pool {
+  if (connectionPool) return connectionPool;
+  throw new Error("Database has not been initialized");
+}
+export async function closeDatabase(): Promise<void> {
+  const pool = connectionPool;
+  connectionPool = undefined;
+  if (pool) await pool.end();
+}

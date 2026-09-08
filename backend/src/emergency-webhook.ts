@@ -4,6 +4,8 @@ import { request as httpsRequest } from "node:https";
 export type BackendEmergencyIncident = {
   readonly code: string;
   readonly occurredAt: Date;
+  readonly operationId?: string;
+  readonly routeTemplate?: string;
 };
 
 export interface BackendEmergencyWebhookTransport {
@@ -15,6 +17,10 @@ export type BackendEmergencyResult =
   | "delivered"
   | "failed"
   | "suppressed";
+
+export interface InternalIncidentReporter {
+  report(incident: BackendEmergencyIncident): Promise<BackendEmergencyResult>;
+}
 
 export function isEmergencyServerError(code: string | number): boolean {
   return typeof code === "number"
@@ -31,6 +37,12 @@ export class BackendEmergencyAlertFormatter {
       "> **서비스:** `anabada-backend`",
       `> **발생 시각:** \`${this.kst(incident.occurredAt)}\``,
       `> **오류 코드:** \`${incident.code}\``,
+      ...(incident.operationId
+        ? [`> **작업 ID:** \`${incident.operationId}\``]
+        : []),
+      ...(incident.routeTemplate
+        ? [`> **경로:** \`${incident.routeTemplate}\``]
+        : []),
       "",
       "## 영향",
       "backend가 요청을 정상 처리하지 못했습니다.",
@@ -73,11 +85,15 @@ export class BackendEmergencyWebhook {
   ): Promise<BackendEmergencyResult> {
     if (!this.url) return "disabled";
     const now = incident.occurredAt.getTime();
-    const nextAttempt = this.nextAttemptAt.get(incident.code);
-    if (nextAttempt !== undefined && now < nextAttempt)
-      return "suppressed";
-    if (this.inFlight.has(incident.code)) return "suppressed";
-    this.inFlight.add(incident.code);
+    const key = [
+      "anabada-backend",
+      incident.code,
+      incident.operationId ?? "request",
+    ].join(":");
+    const nextAttempt = this.nextAttemptAt.get(key);
+    if (nextAttempt !== undefined && now < nextAttempt) return "suppressed";
+    if (this.inFlight.has(key)) return "suppressed";
+    this.inFlight.add(key);
     let delivered: boolean;
     try {
       delivered = await this.transport.send(
@@ -88,14 +104,24 @@ export class BackendEmergencyWebhook {
       if (!(error instanceof Error)) throw error;
       return "failed";
     } finally {
-      this.inFlight.delete(incident.code);
+      this.inFlight.delete(key);
     }
     if (!delivered) {
-      this.nextAttemptAt.set(incident.code, now + 60_000);
+      this.nextAttemptAt.set(key, now + 60_000);
       return "failed";
     }
-    this.nextAttemptAt.set(incident.code, now + 1_800_000);
+    this.nextAttemptAt.set(key, now + 1_800_000);
     return "delivered";
+  }
+}
+
+/** 내부 장애만 비재귀적으로 전달해 클라이언트 입력 오류가 운영 경보를 오염시키지 않게 한다. */
+export class EmergencyIncidentReporter implements InternalIncidentReporter {
+  constructor(private readonly webhook: BackendEmergencyWebhook) {}
+  async report(
+    incident: BackendEmergencyIncident,
+  ): Promise<BackendEmergencyResult> {
+    return this.webhook.notify(incident);
   }
 }
 

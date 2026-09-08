@@ -4,7 +4,11 @@ import pino from 'pino';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const pool = mysql.createPool(databaseUrl || 'mysql://root:qa@127.0.0.1/backend_qa');
-mock.module('../src/index.js', () => ({ logger: pino({ level: 'silent' }) }));
+const { createApplication } = await import('../src/index.js');
+mock.module('../src/index.js', () => ({
+  createApplication,
+  logger: pino({ level: 'silent' }),
+}));
 mock.module('../src/db/database.js', () => ({ getDatabase: () => pool }));
 mock.module('../src/auth.js', () => ({
   checkAdminAuth: (request: Request) => ({
