@@ -1,0 +1,259 @@
+.section {
+  width: 100%;
+padding: 5rem 1.5rem;
+}
+.wrap {
+  width: min(1120px, 100%);
+margin: 0 auto;
+}
+.header {
+  margin-bottom: clamp(2rem, 4vw, 3rem);
+}
+.header h2 {
+  max-width: 760px;
+margin: 0;
+color: #f6f7fb;
+font-size: clamp(1.5rem, 3vw, 2rem);
+font-weight: 700;
+line-height: 1.25;
+letter-spacing: -.055em;
+}
+.podium, .loadingGrid {
+  display: grid;
+grid-template-columns: repeat(3, minmax(0, 1fr));
+align-items: end;
+gap: clamp(.75rem, 2.2vw, 1.5rem);
+padding-inline: clamp(1.5rem, 5vw, 5rem);
+}
+.others {
+  display: grid;
+grid-template-columns: repeat(4, minmax(0, 1fr));
+gap: clamp(.75rem, 2vw, 1.375rem);
+padding-inline: clamp(1rem, 2vw, 1.5rem);
+margin-top: clamp(1.75rem, 4vw, 2.625rem);
+}
+.card, .loadingCard {
+  min-width: 0;
+border: 1px solid rgba(181, 204, 240, .2);
+background: rgba(255, 255, 255, .035);
+box-shadow: 0 .875rem 2.125rem rgba(0, 0, 0, .16);
+}
+.card {
+  -webkit-backdrop-filter: brightness(1.06);
+backdrop-filter: brightness(1.06);
+}
+.podiumCard, .loadingCard {
+  min-height: 16.875rem;
+padding: 1.75rem 1.25rem 1.5rem;
+text-align: center;
+}
+.podiumCard.rank1, .loadingCard:nth-child(2) {
+  min-height: 18.75rem;
+}
+.podiumCard.rank1 {
+  border-color: rgba(247, 208, 103, .88);
+box-shadow: 0 0 1.5625rem rgba(239, 190, 65, .18), 0 1.25rem 2.625rem rgba(0, 0, 0, .22);
+}
+.podiumCard.rank2 {
+  border-color: rgba(194, 211, 234, .56);
+} .podiumCard.rank3 {
+  border-color: rgba(208, 132, 79, .58);
+}
+.crown {
+  display: block;
+width: 3.5rem;
+height: 3.5rem;
+margin: 0 auto .5rem;
+object-fit: contain;
+filter: drop-shadow(0 .3125rem .75rem rgba(255, 197, 55, .26));
+}
+.rank1 .crown {
+  width: 4rem;
+height: 4rem;
+} .rank2 .crown {
+  filter: grayscale(1) brightness(1.75) contrast(.75) drop-shadow(0 .3125rem .625rem rgba(210, 221, 241, .22));
+} .rank3 .crown {
+  filter: sepia(.86) saturate(1.48) hue-rotate(336deg) brightness(.91) drop-shadow(0 .3125rem .625rem rgba(214, 125, 69, .2));
+}
+.rank {
+  margin: 0;
+color: #dce6f8;
+font-size: clamp(1.5rem, 2.4vw, 1.75rem);
+font-weight: 400;
+letter-spacing: -.065em;
+} .rank1 .rank {
+  color: #f6ce5b;
+font-size: clamp(1.75rem, 2.8vw, 2rem);
+} .rank3 .rank {
+  color: #ffd29b;
+}
+.rule {
+  height: 1px;
+margin: 1rem 0 1.125rem;
+background: rgba(214, 226, 247, .31);
+} .rank1 .rule {
+  background: rgba(249, 213, 113, .42);
+} .rank3 .rule {
+  background: rgba(238, 164, 112, .38);
+}
+.name {
+  overflow-wrap: anywhere;
+margin: 0 0 1rem;
+color: #f6f7fb;
+font-size: 1.25rem;
+font-weight: 400;
+line-height: 1.25;
+letter-spacing: -.055em;
+}
+.stats {
+  display: grid;
+justify-content: center;
+gap: .375rem;
+margin: 0;
+color: #dce5f5;
+font-size: .9375rem;
+font-weight: 400;
+letter-spacing: -.045em;
+} .stats div {
+  display: flex;
+justify-content: center;
+gap: .5rem;
+text-align: center;
+} .stats dt, .stats dd {
+  margin: 0;
+} .count {
+  min-width: 0;
+padding: 0;
+background: transparent;
+} .score {
+  color: #8ff0bb;
+font-weight: 400;
+}
+.compactCard {
+  min-height: 10.625rem;
+padding: 1.25rem 1rem;
+border-color: rgba(117, 147, 195, .25);
+text-align: center;
+} .compactCard .rank {
+  font-size: 1.25rem;
+text-align: center;
+} .compactCard .name {
+  margin: .75rem 0;
+font-size: 1.125rem;
+} .compactCard .stats {
+  justify-content: center;
+gap: .375rem;
+font-size: .875rem;
+} .compactCard .stats div {
+  justify-content: center;
+}
+.note {
+  display: flex;
+align-items: center;
+justify-content: center;
+gap: 1.25rem;
+margin: clamp(3rem, 7vw, 4.625rem) 0 0;
+color: rgba(198, 211, 234, .7);
+font-size: clamp(.8125rem, 1.7vw, 1.0625rem);
+letter-spacing: -.035em;
+text-align: center;
+}
+.note::before, .note::after {
+  width: 4.75rem;
+height: 1px;
+background: #6c7f9e;
+content: "";
+opacity: .72;
+}
+.state {
+  display: grid;
+justify-items: center;
+gap: .75rem;
+min-height: 15rem;
+padding: 3rem 1.5rem;
+color: rgba(220, 228, 242, .84);
+text-align: center;
+} .state p {
+  margin: 0;
+font-size: 1.125rem;
+  font-weight: 400;
+} .state span {
+  color: rgba(198, 211, 234, .65);
+font-size: .9375rem;
+} .stateIcon {
+  width: 2.5rem;
+height: 2.5rem;
+color: rgba(198, 211, 234, .65);
+} .retryButton {
+  display: inline-flex;
+align-items: center;
+gap: .5rem;
+border: 1px solid rgba(181, 204, 240, .32);
+background: rgba(255, 255, 255, .045);
+color: #f6f7fb;
+padding: .625rem .875rem;
+font: inherit;
+}
+@media (min-width: 701px) {
+  .podium, .loadingGrid, .others {
+  width: 100%;
+max-width: 900px;
+margin-inline: auto;
+box-sizing: border-box;
+} .podium, .loadingGrid {
+  padding-inline: 1.5rem;
+} .others {
+  padding-inline: 0;
+}
+  .podiumCard {
+  grid-row: 1;
+} .podiumCard.rank1 {
+  grid-column: 2;
+} .podiumCard.rank2 {
+  grid-column: 1;
+} .podiumCard.rank3 {
+  grid-column: 3;
+}
+}
+@media (max-width: 700px) {
+  .section {
+  padding: 3.75rem 1rem;
+} .header {
+  margin-bottom: 2rem;
+} .podium, .loadingGrid, .others {
+  width: 100%;
+max-width: none;
+box-sizing: border-box;
+} .podium, .loadingGrid {
+  grid-template-columns: 1fr;
+gap: .75rem;
+padding-inline: 0;
+} .podiumCard, .podiumCard.rank1, .loadingCard, .loadingCard:nth-child(2) {
+  min-height: 0;
+  padding: 1.5rem 1.25rem;
+} .podiumCard.rank1 {
+  grid-column: 1;
+grid-row: 1;
+} .podiumCard.rank2 {
+  grid-column: 1;
+grid-row: 2;
+} .podiumCard.rank3 {
+  grid-column: 1;
+grid-row: 3;
+} .others {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+gap: .75rem;
+padding-inline: 0;
+margin-top: 1rem;
+} .compactCard {
+  min-height: 10.625rem;
+padding: 1.125rem .875rem;
+} .compactCard .name {
+  font-size: 1.125rem;
+} .note {
+  gap: .75rem;
+} .note::before, .note::after {
+  width: 2rem;
+flex: 0 0 2rem;
+}
+}

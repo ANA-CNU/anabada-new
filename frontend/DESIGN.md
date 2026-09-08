@@ -10,7 +10,7 @@ Preserve the existing community dashboard: bright surfaces, blue accents, compac
 
 ## 3. Typography
 
-Preserve the existing system font stack and Tailwind type scale. Body, metadata, headings, and ranking numerals retain their current sizes, weights, line heights, and Korean wrapping behavior.
+Preserve the existing system font stack and Tailwind type scale. Body, metadata, headings, and ranking numerals retain their current sizes, weights, line heights, and Korean wrapping behavior, except for the compact monthly-draw hierarchy: its title is 32px desktop / 24px mobile at weight 400; podium rank/name/stats are 28px (32px for first), 20px, and 14–15px at weight 400; compact rank/name/stats are 20px, 18px, and 14px at weight 400. Winner-card content is center-aligned, and names retain overflow wrapping.
 
 ## 4. Spacing and layout
 
@@ -43,6 +43,8 @@ Page code must not import Lisse or write ordinary rounded utilities / inline bor
 Keep existing hover, pressed, disabled, loading, and Radix open/closed states. Geometry never overwrites `data-state`. Resize updates are shared and frame-batched by Lisse. No decorative animation is added. Respect the application's reduced-motion behavior.
 
 ## 7. Depth and surface effects
+
+The monthly draw keeps the page background unboxed: its ranking cards sit directly on the existing atmosphere rather than inside a second panel. Those cards use the established `surface` squircle geometry and one `rgba(255,255,255,.045)` fill; medal distinction is limited to border and shadow. The shared flat gold crown raster is the only crown source, with CSS filters for silver and bronze variants.
 
 Native borders, shadows, and focus rings remain CSS-owned. In fallback mode the element owns content and its clip path; Lisse draws borders and shadows in an unclipped SVG sibling on its parent. Border width is retained for layout, while only border paint and box-shadow are transferred. The adapter refreshes effects on focus, hover, state/class/style changes, and completed transitions.
 
