@@ -135,7 +135,7 @@ function ScoreRecordsTable({ records }: ScoreRecordsTableProps) {
                     <TableCell className="text-white font-medium">{record.user}</TableCell>
                     <TableCell>
                       <Badge className={getScoreColor(record.score, record.user)}>
-                        +{record.score}
+                        {record.score > 0 ? "+" : ""}{record.score}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-white/60 text-xs">
