@@ -12,7 +12,10 @@ export type JungolErrorCode =
   | "max_pages_reached_before_cursor"
   | "invalid_plan"
   | "closed"
-  | "jungol_http_rejected";
+  | "jungol_http_rejected"
+  | "account_summary_invalid"
+  | "account_summary_http_failed"
+  | "account_summary_mismatch";
 export class JungolError extends Error {
   override readonly name = "JungolError";
   constructor(readonly code: JungolErrorCode) {

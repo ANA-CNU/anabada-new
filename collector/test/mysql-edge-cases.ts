@@ -49,7 +49,7 @@ const makeInput = (
     readonly solvedCount: number;
     readonly expectedSolvedDelta: number;
   } = {
-    mode: "initial_backfill",
+    mode: "incremental",
     cursorBefore: 0n,
     solvedCount: 1,
     expectedSolvedDelta: 1,

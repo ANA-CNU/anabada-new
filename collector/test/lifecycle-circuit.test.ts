@@ -25,13 +25,13 @@ for (const code of [
       stored: async () => new Map(),
       browser: async () => assert.fail("unexpected browser"),
       persist: async () => assert.fail("unexpected persist"),
+      initialize: async () => assert.fail("unexpected initialization"),
       refreshMetadata: async () => assert.fail("unexpected metadata"),
       project: async () => assert.fail("unexpected projection"),
     };
     const result = await new SyncCycleExecutor(adapters, {
       concurrency: 1,
       maxPages: 1,
-      initialBackfillMaxPages: 1,
     }).run(new AbortController().signal);
     assert.equal(result.status, status);
   });

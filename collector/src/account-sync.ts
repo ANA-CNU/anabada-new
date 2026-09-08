@@ -26,6 +26,8 @@ export class AccountSyncService {
 
   async persist(input: PersistAccountInput): Promise<PersistResult> {
     input.signal?.throwIfAborted();
+    if (input.plan.mode !== "incremental")
+      throw new PersistenceError("account_conflict");
     return this.unitOfWork.execute(async (repositories) => {
       const { plan } = input;
       const { member } = plan;

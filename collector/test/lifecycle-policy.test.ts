@@ -14,7 +14,7 @@ const member = rankMemberSchema.parse({
   acRating: 0,
   tier: 0,
 });
-const options = { concurrency: 2, maxPages: 10, initialBackfillMaxPages: 100 };
+const options = { concurrency: 2, maxPages: 10 };
 function fixture() {
   const events: string[] = [];
   const adapters: CycleAdapters = {
@@ -28,8 +28,11 @@ function fixture() {
       events.push("rank");
       return [member];
     },
-    stored: async () => new Map(),
+    stored: async () =>
+      new Map([["1", { solvedCount: 0, lastSubmissionId: 0n }]]),
     browser: async () => ({
+      summary: async () => assert.fail("unexpected initial summary"),
+      cursor: async () => assert.fail("unexpected initial cursor"),
       collect: async () => ({
         attempts: [],
         highestInspectedId: 0n,
@@ -49,6 +52,7 @@ function fixture() {
         newSolvedCount: 0,
       };
     },
+    initialize: async () => assert.fail("unexpected initial initialization"),
     refreshMetadata: async () => {
       events.push("metadata");
     },

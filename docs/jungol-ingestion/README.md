@@ -16,7 +16,7 @@ backend와 collector는 새 `jungol_bada`를 사용합니다. 기존 `anabada`�
 |---|---|
 | 조립·CLI·생명주기 | `CollectorBootstrap`, `CollectorApplication`, `CollectorRuntime`, `CollectorService` |
 | cycle 조정 | `SyncCycle`, `SyncCycleExecutor`, `SyncPlanner`, `AccountWorkerPool` |
-| 세션·랭킹·제출 | `JungolSession`, `RankCollector`, `SubmissionCollector`, `SubmissionWireDecoder` |
+| 세션·랭킹·제출 | `JungolSession`, `RankCollector`, `AccountSummaryCollector`, `SubmissionCursorCollector`, `SubmissionCollector`, `SubmissionWireDecoder` |
 | 사용자 작업·메타 갱신 | `AccountSyncWorker`, `MetadataRefreshService` |
 | 사용자 transaction | `AccountSyncService`, `AccountUnitOfWork`, transaction-bound repository classes |
 | 점수와 projection | `DailyScorePolicy`, `EventManager`, `ProjectionService` |
@@ -26,12 +26,12 @@ backend와 collector는 새 `jungol_bada`를 사용합니다. 기존 `anabada`�
 
 1. `CollectorService`는 시작 즉시 cycle을 실행하고 완료 후 고정 600000ms만큼 기다립니다. 따라서 기본은 **완료 후 10분 간격**이고 벽시계 cron의 매 10분 정각이 아닙니다. 단일 프로세스 cycle은 겹치지 않습니다.
 2. DB advisory lease `jungol_bada:collector`를 얻습니다. 충돌하면 외부 요청 없이 이번 cycle을 끝냅니다. profile도 한 프로세스만 사용해야 합니다.
-3. persistent Chromium에서 그룹 접근을 확인하고 필요한 경우 로그인한 뒤 rank 전체를 읽습니다. 신규 account 또는 `rank.solvedCount > stored.corrects`만 submission worker에 배정합니다. 해결 수가 같은 사용자는 submission 페이지를 열지 않고 `jungol_name`, `rank_wrong_count`, `ac_rating`, 변환된 `tier`만 사용자별 짧은 transaction으로 갱신합니다. 감소는 `rank_regression` 오류이며 어떤 사용자 값도 수정하지 않습니다.
-4. 계정별 제출 페이지를 최신에서 과거로 순회합니다. 첫 수집은 최대 1000페이지, 증분은 최대 100페이지를 사용합니다. DB cursor `user.solution`을 만나거나 초기 이력을 완전히 읽어야 성공합니다. 중단 경계 누락, 순서 오류, 페이지 제한, 응답 해석 실패는 불완전한 이력을 commit하지 않습니다.
+3. persistent Chromium에서 그룹 접근을 확인하고 필요한 경우 로그인한 뒤 rank 전체를 읽습니다. 신규 account는 `/account/{id}`의 해결 목록과 `/account/{id}/submission` 첫 API 페이지의 최신 제출 번호만 읽습니다. 해결 목록 전체와 rank의 푼 문제 수가 일치해야 하며, 목록에는 synthetic baseline 행을 만들고 첫 제출 번호는 다음 증분 수집의 `user.solution`으로 저장합니다. 전체 제출 이력 pagination과 문제 metadata 요청은 하지 않습니다.
+4. 기존 account 중 `rank.solvedCount > stored.corrects`인 사용자만 제출 페이지를 최신에서 과거로 순회합니다. DB cursor `user.solution`을 만날 때까지 최대 100페이지를 읽습니다. 중단 경계 누락, 순서 오류, 페이지 제한, 응답 해석 실패는 불완전한 이력을 commit하지 않습니다. 해결 수가 같은 사용자는 submission 페이지를 열지 않고 `jungol_name`, `rank_wrong_count`, `ac_rating`, 변환된 `tier`만 사용자별 짧은 transaction으로 갱신합니다. 감소는 `rank_regression` 오류이며 어떤 사용자 값도 수정하지 않습니다.
 5. 네트워크 응답의 원본 시도를 복원하여 AC만 고르고 문제 메타데이터를 조회합니다. cursor 후보는 **검사한 모든 결과의 최고 제출 ID**이므로 rejected 행도 cursor 전진에 포함됩니다. 원본 payload나 쿠키를 저장하지 않습니다.
 6. 네트워크 작업 종료 후 사용자 한 명의 transaction을 시작합니다. user row를 잠그고 기존 cursor, 이번 구간에서 새로 발견한 distinct 문제 수와 rank 증가분을 확인합니다. 기존 사용자의 전체 과거 distinct 수와 `corrects`가 같다고 강제하지 않습니다. 불일치는 rank 재조회와 최대 한 번의 재수집 후에도 남으면 실패합니다.
 7. 제출 시각 순으로 중복 없는 AC를 저장하고 최초 해결 여부를 계산합니다. 일일 점수는 KST 날짜당 1회이며 최초 해결과 tier 조건을 만족해야 합니다. 현재 조건은 tier 미상(0), 문제 tier ≥11 또는 문제 tier ≥ 변환된 사용자 tier−5입니다. 원본 `ac_rating`은 이 계산에 사용하지 않습니다.
-8. 초기 backfill은 과거 AC에 일일 점수를 날짜별로 계산하지만 이벤트 점수는 지급하지 않습니다. 증분에서만 `EventManager`가 문제 번호, `[begin,end)` 기간, 제출 시각 ≥ `event.created_at`, 제출 시각 ≥ `event_problem.added_at`을 모두 확인합니다. 반복 AC도 이벤트 조건을 만족할 수 있지만 사용자·이벤트·문제별 한 번만 지급합니다. unique `award_key`는 daily 및 event 재지급을 막습니다.
+8. 초기 기준선은 각 해결 문제를 `1970-01-01T00:00:01Z`, `external_submission_id=NULL`, `accepted`, `problem_name=NULL`, tier 0, `repeatation=0`의 synthetic 행으로만 저장하며 일일·이벤트 점수와 `score_history`를 전혀 만들지 않습니다. 이 값은 실제 제출 시각이 아니라 과거 이력을 재생하지 않는 기준선 표식입니다. 증분에서만 `EventManager`가 문제 번호, `[begin,end)` 기간, 제출 시각 ≥ `event.created_at`, 제출 시각 ≥ `event_problem.added_at`을 모두 확인합니다. 반복 AC도 이벤트 조건을 만족할 수 있지만 사용자·이벤트·문제별 한 번만 지급합니다. unique `award_key`는 daily 및 event 재지급을 막습니다.
 9. AC 행, 점수, 사용자 통계와 cursor, 월간 합계를 같은 사용자 transaction에서 commit합니다. 실패한 사용자는 rollback하고 다른 성공 사용자는 유지합니다.
 10. worker 완료 후 별도 transaction으로 월간 `user_bias_total`, 가중 추첨 `ranking_boards`/`ranked_users` projection을 갱신합니다. 양수 점수·비제외 사용자가 없으면 새 board를 만들지 않습니다. projection 실패가 이미 성공한 사용자 commit을 되돌리지는 않으며 다음 cycle에서 다시 계산합니다.
 11. projection transaction이 새 내부 순위 snapshot을 commit한 경우에만 `hook.ignored=0`인 Discord webhook 전체에 결과를 보냅니다. 메시지는 서비스 링크와 최대 상위 10명의 `jungol_name`, 점수를 포함합니다. 2xx가 아닌 응답, 10초 timeout, 연결 실패와 기존 Discord 영구 오류 코드는 해당 hook을 `ignored=1`로 바꿔 다음 cycle부터 제외합니다. 전송과 비활성화 실패는 이미 commit한 사용자·점수·순위를 rollback하지 않으며 webhook URL과 응답 본문을 로그에 기록하지 않습니다.
@@ -97,7 +97,7 @@ docker run --rm --init --ipc=host anabada-jungol-collector-test:local
 | collector | `DB_PASSWORD`, `JUNGOL_USERNAME`, `JUNGOL_PASSWORD`, 선택 `WEBHOOK_URL` |
 | frontend 빌드 | 선택 `VITE_KAKAO_MAP_API_KEY` |
 
-DB topology, Jungol HTTPS URL/그룹 1125, profile 경로 `/var/lib/jungol/profile`, 완료 후 10분 주기, worker 2개, 초기/증분 페이지 상한 1000/100, 요청 지연 1000ms, 로그인/페이지 timeout 60000/30000ms, headless 실행과 랭킹 seed `anabada`는 코드에 고정합니다. 운영 환경 변수로 조정하지 않습니다. CLI의 `run-once` 명령으로 단일 cycle을 실행합니다.
+DB topology, Jungol HTTPS URL/그룹 1125, profile 경로 `/var/lib/jungol/profile`, 완료 후 10분 주기, worker 2개, 증분 페이지 상한 100, Jungol 업무 요청 완료 후 3초 간격, 로그인/페이지 timeout 60000/30000ms, headless 실행과 랭킹 seed `anabada`는 코드에 고정합니다. 운영 환경 변수로 조정하지 않습니다. CLI의 `run-once` 명령으로 단일 cycle을 실행합니다.
 
 ## 개발 Compose POC
 

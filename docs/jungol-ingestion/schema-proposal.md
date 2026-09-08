@@ -65,7 +65,7 @@ erDiagram
 | problem | level | 기존 레벨 값, 기본 0; 의미/필요성 다음 검토 가능 |
 | problem | repeatation | 동일 계정·문제의 선행 AC 수, 최초 0, 재시도≥1; CHECK≥0 |
 | problem | verdict | 결과 상태, 바이너리 비교로 정확히 accepted만 허용 |
-| problem | external_submission_id | 외부 제출 BIGINT UNSIGNED ID, 전역 UNIQUE |
+| problem | external_submission_id | 실제 증분 AC의 외부 제출 BIGINT UNSIGNED ID, NULL 허용 전역 UNIQUE. 신규 기준선 synthetic 행은 NULL |
 | problem | score | 원문 채점 점수 DECIMAL(10,6), NULL 가능; 서비스 지급 bias와 별개 |
 | event | id | 이벤트 INT PK |
 | event | begin, end | 적용 구간 [begin,end), TIMESTAMP; CHECK begin&lt;end |
@@ -118,7 +118,7 @@ FK는 8개이며 UPDATE는 전부 CASCADE다. 사용자 삭제는 제출·지급
 
 일일 키는 사용자·KST 날짜, 이벤트 키는 이벤트·사용자·외부 문제 번호를 포함한 결정적 문자열이다. 중복 키는 추가 지급하지 않으며 중첩 이벤트는 각각 +1이다. 이벤트 제출은 [begin,end) 안이고 created_at 및 added_at 이후여야 한다. 이벤트 API는 이벤트와 매핑을 한 트랜잭션에 넣고 남긴 매핑의 added_at을 보존한다. 내부 보드·순위 행·활성 전환도 한 트랜잭션이다. 수동 지급은 원장과 월 캐시를 함께 갱신한다. FK는 키 의미, 지급 자격, cursor 단조성, 집계 일치를 대신 계산하지 않는다.
 
-기존 일일 조건은 최초 해결이며 난이도 0, ≥11, 또는 문제 난이도≥정규화 사용자 tier−5다. **Jungol 원시 rating을 여기에 넣지 않는다.** 문제 난이도를 읽지 못하면 0으로 저장하고 현재 정책에서는 일반 점수 후보로 인정한다. 초기 backfill은 과거 일일 점수를 계산하지만 이벤트 점수는 제외하고, 증분 AC부터 이벤트 점수를 계산한다.
+기존 일일 조건은 최초 해결이며 난이도 0, ≥11, 또는 문제 난이도≥정규화 사용자 tier−5다. **Jungol 원시 rating을 여기에 넣지 않는다.** 문제 난이도를 읽지 못하면 0으로 저장하고 현재 정책에서는 일반 점수 후보로 인정한다. 신규 사용자는 해결 목록을 `1970-01-01T00:00:01Z` synthetic AC 행으로만 기준선 적재하고 daily/event 점수는 만들지 않는다. 실제 증분 AC부터 일일·이벤트 점수를 계산한다.
 
 모든 연결은 `time_zone='+00:00'`이다. submitted_at은 UTC 벽시계 DATETIME(3), 나머지 TIMESTAMP는 인스턴트를 저장하고 연결 timezone으로 표시한다. score_day와 월 경계만 Asia/Seoul 달력 기준으로 계산한다. KST 월 시작/다음 달 시작을 UTC로 변환한 반개방 구간으로 집계한다. TIMESTAMP는 MySQL 2038 범위 제한이 있다.
 

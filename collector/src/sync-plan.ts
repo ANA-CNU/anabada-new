@@ -5,7 +5,7 @@ import {
 } from "./domain/sync.js";
 
 export type SyncSelection =
-  | { readonly kind: "initial_backfill"; readonly plan: AccountSyncPlan }
+  | { readonly kind: "initial_summary"; readonly plan: AccountSyncPlan }
   | { readonly kind: "incremental"; readonly plan: AccountSyncPlan }
   | { readonly kind: "metadata_refresh"; readonly member: RankMember }
   | {
@@ -15,23 +15,18 @@ export type SyncSelection =
     };
 /** 랭킹과 저장 상태의 차이만 판단하며 브라우저나 DB를 직접 호출하지 않는다. */
 export class SyncPlanner {
-  constructor(
-    private readonly limits: {
-      readonly maxPages: number;
-      readonly initialBackfillMaxPages: number;
-    },
-  ) {}
+  constructor(private readonly limits: { readonly maxPages: number }) {}
 
   plan(member: RankMember, previous: AccountSyncState | null): SyncSelection {
     if (previous === null)
       return {
-        kind: "initial_backfill",
+        kind: "initial_summary",
         plan: new AccountSyncPlan(
-          "initial_backfill",
+          "initial_summary",
           member,
           0n,
           member.solvedCount,
-          this.limits.initialBackfillMaxPages,
+          1,
         ),
       };
     if (member.solvedCount < previous.solvedCount)

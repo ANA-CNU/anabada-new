@@ -41,9 +41,14 @@ export const rankMemberSchema = rawRankMemberSchema.transform(
     ),
 );
 export type RankMember = z.infer<typeof rankMemberSchema>;
-export type SyncMode = "initial_backfill" | "incremental";
+export type SyncMode = "initial_summary" | "incremental";
 
-/** 사용자 한 명의 증분 범위와 정합성 기대값을 함께 전달하는 실행 계획이다. */
+/**
+ * 사용자 한 명의 동기화 경계와 정합성 기대값을 전달하는 실행 계획이다.
+ *
+ * `initial_summary`는 첫 submission API page만 cursor로 읽으므로 `maxPages`가 항상 1이고,
+ * `incremental`만 cursor 이후 이력 pagination의 상한을 사용한다.
+ */
 export class AccountSyncPlan {
   constructor(
     readonly mode: SyncMode,
@@ -79,6 +84,31 @@ export class AccountCrawlResult {
     readonly highestInspectedSubmissionId: bigint,
     readonly scannedAttemptCount: number,
     readonly pageCount: number,
+  ) {}
+}
+
+/** 처음 가입한 계정은 과거 제출을 재생하지 않고 해결 목록만 기준선으로 저장한다. */
+export class InitialSolvedProblem {
+  constructor(readonly problemId: ProblemId) {}
+}
+
+/**
+ * 초기화가 첫 submission API page에서 실제로 검사한 행 수와 다음 증분 시작점을 함께
+ * 보존한다. page 1회와 attempt 수를 혼동하면 cycle 관측 수치가 왜곡되기 때문이다.
+ */
+export class InitialSubmissionCursor {
+  constructor(
+    readonly highestInspectedSubmissionId: bigint,
+    readonly scannedAttemptCount: number,
+  ) {}
+}
+
+/** 계정 화면과 첫 제출 페이지가 함께 확정한 초기 기준선이다. */
+export class AccountInitialSnapshot {
+  constructor(
+    readonly plan: AccountSyncPlan,
+    readonly solved: readonly InitialSolvedProblem[],
+    readonly highestInspectedSubmissionId: bigint,
   ) {}
 }
 

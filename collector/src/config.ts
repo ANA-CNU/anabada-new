@@ -36,7 +36,6 @@ export type CollectorSettings = {
   readonly intervalMs: number;
   readonly concurrency: number;
   readonly maxPages: number;
-  readonly initialBackfillMaxPages: number;
   readonly headless: boolean;
   readonly loginTimeoutMs: number;
   readonly pageTimeoutMs: number;
@@ -57,7 +56,6 @@ const productionSettings: CollectorSettings = Object.freeze({
   intervalMs: 600000,
   concurrency: 2,
   maxPages: 100,
-  initialBackfillMaxPages: 1000,
   headless: true,
   loginTimeoutMs: 60000,
   pageTimeoutMs: 30000,

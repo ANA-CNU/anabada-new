@@ -99,8 +99,8 @@ CREATE TABLE `problem` (
   `repeatation` int NOT NULL DEFAULT 0,
   -- 제출 판정이다. 현재 AC만 저장하므로 accepted만 허용한다.
   `verdict` varchar(50) NOT NULL,
-  -- Jungol의 제출 번호다. UNIQUE 제약으로 같은 제출이 두 번 저장되는 것을 막는다.
-  `external_submission_id` bigint unsigned NOT NULL,
+  -- 실제 Jungol 제출 번호다. 초기 요약 기준선 행에는 제출 번호가 없어서 NULL이며, 실제 제출 번호의 UNIQUE 보장은 그대로 유지한다.
+  `external_submission_id` bigint unsigned NULL,
   -- Jungol 응답에 원문 채점 점수가 있는 경우 보존한다. 서비스에서 지급하는 bias와는 별개다.
   `score` decimal(10,6) DEFAULT NULL,
   PRIMARY KEY (`id`),

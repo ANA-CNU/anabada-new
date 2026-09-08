@@ -86,7 +86,7 @@ test("overlapping events award individually with exclusive end and no retroactiv
   );
   const detect = (
     submittedAt: Date,
-    syncMode: "initial_backfill" | "incremental" = "incremental",
+    syncMode: "initial_summary" | "incremental" = "incremental",
   ) =>
     manager.detect({
       syncMode,
@@ -98,5 +98,5 @@ test("overlapping events award individually with exclusive end and no retroactiv
   assert.equal(detect(new Date("2026-09-04Z")).length, 2);
   assert.equal(detect(new Date("2026-09-03Z")).length, 0);
   assert.equal(detect(new Date("2026-10-01Z")).length, 0);
-  assert.equal(detect(new Date("2026-09-04Z"), "initial_backfill").length, 0);
+  assert.equal(detect(new Date("2026-09-04Z"), "initial_summary").length, 0);
 });

@@ -17,6 +17,7 @@ export interface LockedUser extends RowDataPacket {
   readonly id: number;
   readonly solution: string;
   readonly corrects: number;
+  readonly submissions: number;
   readonly tier: number;
 }
 
@@ -41,7 +42,7 @@ export class UserRepository {
 
   async lockExisting(accountId: string): Promise<LockedUser> {
     const [rows] = await this.connection.execute<LockedUser[]>(
-      "SELECT id,solution,corrects,tier FROM user WHERE jungol_account_id=? FOR UPDATE",
+      "SELECT id,solution,corrects,submissions,tier FROM user WHERE jungol_account_id=? FOR UPDATE",
       [accountId],
     );
     const user = rows[0];

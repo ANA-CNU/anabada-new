@@ -1,11 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createPool, type RowDataPacket } from "mysql2/promise";
+import { AccountInitializationService } from "../src/account-initialization.js";
 import {
   AccountSyncService,
   type PersistAccountInput,
 } from "../src/account-sync.js";
-import { AccountSyncPlan, rankMemberSchema } from "../src/domain/sync.js";
+import {
+  AccountInitialSnapshot,
+  AccountSyncPlan,
+  InitialSolvedProblem,
+  rankMemberSchema,
+} from "../src/domain/sync.js";
 import { problemIdSchema, submissionIdSchema } from "../src/domain.js";
 import { HookRepository } from "../src/mysql/hooks.js";
 import { CycleLeaseManager } from "../src/mysql/lease.js";
@@ -65,7 +71,7 @@ function input(
     tier: 0,
   });
   return {
-    plan: new AccountSyncPlan("initial_backfill", member, 0n, 1, 1000),
+    plan: new AccountSyncPlan("incremental", member, 0n, 1, 1000),
     acceptedAttempts: attempts,
     highestInspectedSubmissionId: BigInt(account * 100 + 99),
     scannedAttemptCount: attempts.length,
@@ -94,6 +100,39 @@ test(
       new AccountUnitOfWork(pool, calendar),
       calendar,
     );
+    const initialization = new AccountInitializationService(
+      new AccountUnitOfWork(pool, calendar),
+    );
+    const initial = (
+      account: number,
+      problems: readonly number[],
+      highestInspectedSubmissionId = 0n,
+    ) => {
+      const member = rankMemberSchema.parse({
+        accountId: String(account),
+        jungolName: `user${account}`,
+        solvedCount: problems.length,
+        wrongCount: 2,
+        acRating: 20,
+        tier: 0,
+      });
+      return initialization.initialize(
+        new AccountInitialSnapshot(
+          new AccountSyncPlan(
+            "initial_summary",
+            member,
+            0n,
+            problems.length,
+            1,
+          ),
+          problems.map(
+            (problem) =>
+              new InitialSolvedProblem(problemIdSchema.parse(problem)),
+          ),
+          highestInspectedSubmissionId,
+        ),
+      );
+    };
     const leases = new CycleLeaseManager(pool, "integration-cycle");
     const projection = new ProjectionService(
       pool,
@@ -113,7 +152,182 @@ test(
         "INSERT INTO event (id,begin,end,title,created_at) VALUES (1,'2026-09-01','2026-10-01','A','2026-09-01'),(2,'2026-09-01','2026-10-01','B','2026-09-01')",
       );
       await pool.query(
-        "INSERT INTO event_problem (event_id,problem,added_at) VALUES (1,1,'2026-09-01'),(2,1,'2026-09-01')",
+        "INSERT INTO event_problem (event_id,problem,added_at) VALUES (1,99,'2026-09-01'),(2,99,'2026-09-01')",
+      );
+      await t.test(
+        "initial summary stores one epoch baseline per solved problem without scores",
+        async () => {
+          await initial(12, [12, 13], 1199n);
+          assert.deepEqual(await state(12), {
+            corrects: 2,
+            submissions: 2,
+            solution: "1199",
+            attempts: "2",
+            scores: "0",
+            points: null,
+          });
+          const [rows] = await pool.query<
+            (RepetitionRow &
+              RowDataPacket & {
+                readonly problem_name: string | null;
+                readonly problem_tier: number;
+                readonly submitted_at: Date;
+                readonly level: number;
+                readonly external_submission_id: string | null;
+                readonly score: string | null;
+              })[]
+          >(
+            "SELECT problem_name,problem_tier,submitted_at,level,repeatation,external_submission_id,score FROM problem WHERE user_id=(SELECT id FROM user WHERE jungol_account_id=12) ORDER BY problem",
+          );
+          assert.deepEqual(
+            rows.map((row) => ({
+              ...row,
+              submitted_at: row.submitted_at.toISOString(),
+            })),
+            [
+              {
+                problem_name: null,
+                problem_tier: 0,
+                submitted_at: "1970-01-01T00:00:01.000Z",
+                level: 0,
+                repeatation: 0,
+                external_submission_id: null,
+                score: null,
+              },
+              {
+                problem_name: null,
+                problem_tier: 0,
+                submitted_at: "1970-01-01T00:00:01.000Z",
+                level: 0,
+                repeatation: 0,
+                external_submission_id: null,
+                score: null,
+              },
+            ],
+          );
+          await assert.rejects(initial(12, [12, 13], 1199n), {
+            code: "account_conflict",
+          });
+        },
+      );
+      await t.test(
+        "initial summary rolls back inserted user and problems, then retries",
+        async () => {
+          await pool.query(
+            "CREATE TRIGGER reject_initial_completion BEFORE UPDATE ON user FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='test rejection'",
+          );
+          try {
+            await assert.rejects(initial(14, [14], 1399n));
+            assert.equal(await state(14), undefined);
+          } finally {
+            await pool.query("DROP TRIGGER reject_initial_completion");
+          }
+          await initial(14, [14], 1399n);
+          assert.equal((await state(14))?.attempts, "1");
+        },
+      );
+      await t.test(
+        "initial summary rejects a plan whose expected solved delta disagrees",
+        async () => {
+          const member = rankMemberSchema.parse({
+            accountId: "16",
+            jungolName: "user16",
+            solvedCount: 1,
+            wrongCount: 0,
+            acRating: 20,
+            tier: 0,
+          });
+          await assert.rejects(
+            initialization.initialize(
+              new AccountInitialSnapshot(
+                new AccountSyncPlan("initial_summary", member, 0n, 0, 1),
+                [new InitialSolvedProblem(problemIdSchema.parse(16))],
+                0n,
+              ),
+            ),
+            { code: "account_conflict" },
+          );
+          assert.equal(await state(16), undefined);
+        },
+      );
+      await t.test(
+        "zero-solved initial summary completes without a problem row",
+        async () => {
+          await initial(17, []);
+          assert.deepEqual(await state(17), {
+            corrects: 0,
+            submissions: 0,
+            solution: "0",
+            attempts: "0",
+            scores: "0",
+            points: null,
+          });
+        },
+      );
+      await t.test(
+        "real AC after baseline is a repeat and new incremental solve earns normally",
+        async () => {
+          const repeat = await service.persist({
+            ...input(12, [attempt(1200, 12)]),
+            highestInspectedSubmissionId: 1200n,
+            plan: new AccountSyncPlan(
+              "incremental",
+              rankMemberSchema.parse({
+                accountId: "12",
+                jungolName: "user12",
+                solvedCount: 2,
+                wrongCount: 2,
+                acRating: 20,
+                tier: 0,
+              }),
+              1199n,
+              0,
+              1000,
+            ),
+          });
+          assert.deepEqual(repeat, {
+            insertedAttemptCount: 1,
+            duplicateAttemptCount: 0,
+            newSolvedCount: 0,
+          });
+          await pool.query(
+            "INSERT INTO event (id,begin,end,title,created_at) VALUES (6,'2026-09-01','2026-10-01','baseline follow-up','2026-09-01')",
+          );
+          await pool.query(
+            "INSERT INTO event_problem (event_id,problem,added_at) VALUES (6,15,'2026-09-01')",
+          );
+          const newSolve = await service.persist({
+            ...input(12, [attempt(1201, 15, "2026-09-08T01:00:00Z")]),
+            highestInspectedSubmissionId: 1201n,
+            plan: new AccountSyncPlan(
+              "incremental",
+              rankMemberSchema.parse({
+                accountId: "12",
+                jungolName: "user12",
+                solvedCount: 3,
+                wrongCount: 2,
+                acRating: 20,
+                tier: 0,
+              }),
+              1200n,
+              1,
+              1000,
+            ),
+          });
+          assert.equal(newSolve.newSolvedCount, 1);
+          const [rows] = await pool.query<RepetitionRow[]>(
+            "SELECT repeatation FROM problem WHERE external_submission_id=1200",
+          );
+          assert.equal(rows[0]?.repeatation, 1);
+          assert.deepEqual(await state(12), {
+            corrects: 3,
+            submissions: 4,
+            solution: "1201",
+            attempts: "4",
+            scores: "2",
+            points: 2,
+          });
+        },
       );
       await t.test(
         "webhook repository reads active endpoints and disables rejected ones",
@@ -132,7 +346,7 @@ test(
         },
       );
       await t.test(
-        "fresh account stores repeated AC oldest first without event backfill",
+        "incremental account stores repeated AC oldest first",
         async () => {
           const value = input(1, [
             attempt(101, 1, "2026-09-07T02:00:00Z"),
@@ -157,7 +371,7 @@ test(
         },
       );
       await t.test(
-        "initial backfill awards each historical KST day using submission time",
+        "incremental history awards each historical KST day using submission time",
         async () => {
           const base = input(10, [
             attempt(1000, 100, "2026-09-06T14:00:00Z"),
@@ -167,7 +381,7 @@ test(
           await service.persist({
             ...base,
             plan: new AccountSyncPlan(
-              "initial_backfill",
+              "incremental",
               rankMemberSchema.parse({ ...base.plan.member, solvedCount: 3 }),
               0n,
               3,
@@ -194,7 +408,7 @@ test(
             service.persist({
               ...base,
               plan: new AccountSyncPlan(
-                "initial_backfill",
+                "incremental",
                 rankMemberSchema.parse({ ...base.plan.member, tier: 1 }),
                 0n,
                 1,
@@ -204,6 +418,26 @@ test(
             { code: "rating_tier_mismatch" },
           );
           assert.equal(await state(11), undefined);
+        },
+      );
+      await t.test(
+        "incremental persistence rejects an initial-summary plan",
+        async () => {
+          const value = input(16);
+          await assert.rejects(
+            service.persist({
+              ...value,
+              plan: new AccountSyncPlan(
+                "initial_summary",
+                value.plan.member,
+                0n,
+                1,
+                1,
+              ),
+            }),
+            { code: "account_conflict" },
+          );
+          assert.equal(await state(16), undefined);
         },
       );
       await t.test(
@@ -235,7 +469,7 @@ test(
           const value = {
             ...base,
             plan: new AccountSyncPlan(
-              "initial_backfill",
+              "incremental",
               rankMemberSchema.parse({
                 ...base.plan.member,
                 solvedCount: 3,
@@ -273,7 +507,7 @@ test(
           const result = await service.persist({
             ...base,
             plan: new AccountSyncPlan(
-              "initial_backfill",
+              "incremental",
               rankMemberSchema.parse({ ...base.plan.member, solvedCount: 3 }),
               0n,
               3,

@@ -1,8 +1,10 @@
 import type { Pool } from "mysql2/promise";
 import type { Logger } from "pino";
+import { AccountInitializationService } from "../account-initialization.js";
 import { AccountSyncService } from "../account-sync.js";
 import type { CollectorConfig, Credentials } from "../config.js";
 import type { ProblemId } from "../domain.js";
+import { AccountSummaryCollector } from "../jungol/account-summary.js";
 import {
   type ProblemMetadata,
   ProblemMetadataResolver,
@@ -11,6 +13,7 @@ import { RankCollector } from "../jungol/rank.js";
 import { JungolRequestCoordinator } from "../jungol/request-coordinator.js";
 import { JungolSession } from "../jungol/session.js";
 import { SubmissionCollector } from "../jungol/submission.js";
+import { SubmissionCursorCollector } from "../jungol/submission-cursor.js";
 import { HookRepository } from "../mysql/hooks.js";
 import { CycleLeaseManager } from "../mysql/lease.js";
 import { AccountUnitOfWork } from "../mysql/unit-of-work.js";
@@ -64,6 +67,10 @@ export class SyncCycle {
       calendar,
       ratingTierMapper,
     );
+    const initialize = new AccountInitializationService(
+      unitOfWork,
+      ratingTierMapper,
+    );
     const metadataRefresh = new MetadataRefreshService(
       unitOfWork,
       ratingTierMapper,
@@ -86,6 +93,11 @@ export class SyncCycle {
     );
     const rank = new RankCollector(config, this.requests, ratingTierMapper);
     const submissions = new SubmissionCollector(config, this.requests);
+    const submissionCursor = new SubmissionCursorCollector(
+      config,
+      this.requests,
+    );
+    const summary = new AccountSummaryCollector(config, this.requests);
     const metadata = new Map<ProblemId, Promise<ProblemMetadata>>();
     const adapters: CycleAdapters = {
       lease: () => lease.acquire(),
@@ -119,6 +131,9 @@ export class SyncCycle {
       browser: async () => {
         const page = await (await session()).newPage();
         return {
+          summary: (plan, signal) => summary.collect(page, plan, signal),
+          cursor: (plan, signal) =>
+            submissionCursor.collect(page, plan, signal),
           collect: (plan, signal) => submissions.collect(page, plan, signal),
           metadata: (id, signal) => {
             const pending = metadata.get(id);
@@ -131,6 +146,7 @@ export class SyncCycle {
         };
       },
       persist: (input) => persist.persist(input),
+      initialize: (snapshot) => initialize.initialize(snapshot),
       refreshMetadata: (member) => metadataRefresh.refresh(member),
       project: async (signal) => {
         await projectionNotification.run(signal);

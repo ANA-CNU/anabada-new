@@ -22,7 +22,7 @@ export class EventManager {
     readonly problemNumber: number;
     readonly submittedAt: Date;
   }): readonly ScoreAward[] {
-    if (input.syncMode === "initial_backfill") return [];
+    if (input.syncMode === "initial_summary") return [];
     const time = input.submittedAt.getTime();
     return this.events
       .filter(

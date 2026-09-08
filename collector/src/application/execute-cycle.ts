@@ -9,7 +9,6 @@ import { type AccountJob, AccountSyncWorker } from "./sync-account.js";
 export type CycleOptions = {
   readonly concurrency: number;
   readonly maxPages: number;
-  readonly initialBackfillMaxPages: number;
   readonly targetAccountId?: string | undefined;
   readonly logger?: Logger;
 };
@@ -56,7 +55,7 @@ export class SyncCycleExecutor {
         const previous = stored.get(member.accountId) ?? null;
         const selection = this.planner.plan(member, previous);
         if (
-          selection.kind === "initial_backfill" ||
+          selection.kind === "initial_summary" ||
           selection.kind === "incremental"
         )
           jobs.push({ plan: selection.plan, previous });

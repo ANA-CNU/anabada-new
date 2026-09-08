@@ -1,6 +1,7 @@
 import {
   AcceptedAttempt,
   AccountCrawlResult,
+  AccountInitialSnapshot,
   type AccountSyncPlan,
   type AccountSyncState,
 } from "../domain/sync.js";
@@ -30,6 +31,49 @@ export class AccountSyncWorker {
   ) {}
 
   async run() {
+    switch (this.job.plan.mode) {
+      case "initial_summary":
+        return this.initialize();
+      case "incremental":
+        return this.incremental();
+    }
+  }
+
+  /**
+   * 첫 적재는 제출 이력 pagination을 하지 않는다. 해결 목록과 첫 API page만
+   * 브라우저에서 확정한 뒤 page를 닫고 transaction을 시작해 장시간 DB lock을 피한다.
+   */
+  private async initialize() {
+    const { adapters, signal } = this.context;
+    signal.throwIfAborted();
+    const browser = await adapters.browser();
+    let snapshot: AccountInitialSnapshot;
+    let scannedCount: number;
+    try {
+      const solved = await browser.summary(this.job.plan, signal);
+      const cursor = await browser.cursor(this.job.plan, signal);
+      snapshot = new AccountInitialSnapshot(
+        this.job.plan,
+        solved,
+        cursor.highestInspectedSubmissionId,
+      );
+      scannedCount = cursor.scannedAttemptCount;
+    } finally {
+      await browser.close();
+    }
+    await adapters.initialize(snapshot);
+    return {
+      insertedAttemptCount: snapshot.solved.length,
+      duplicateAttemptCount: 0,
+      newSolvedCount: snapshot.solved.length,
+      scannedCount,
+      pageCount: 1,
+      acceptedCount: 0,
+    };
+  }
+
+  /** 증분 경로만 rank mismatch 재조회·재수집을 수행한다. */
+  private async incremental() {
     const { adapters, signal } = this.context;
     let current = this.job;
     for (let retry = 0; retry < 2; retry++) {
@@ -97,13 +141,8 @@ export class AccountSyncWorker {
           (await adapters.stored()).get(member.accountId) ?? null;
         const selection = new SyncPlanner({
           maxPages: this.job.plan.maxPages,
-          initialBackfillMaxPages: this.job.plan.maxPages,
         }).plan(member, previous);
-        if (
-          selection.kind !== "initial_backfill" &&
-          selection.kind !== "incremental"
-        )
-          throw error;
+        if (selection.kind !== "incremental") throw error;
         current = { plan: selection.plan, previous };
       }
     }

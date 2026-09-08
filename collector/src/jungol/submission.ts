@@ -27,6 +27,7 @@ export class SubmissionCollector {
   ): Promise<CollectedSubmissions> {
     return this.pages.run(page, signal, async () => {
       if (
+        plan.mode !== "incremental" ||
         plan.cursorBefore < 0n ||
         !Number.isSafeInteger(plan.maxPages) ||
         plan.maxPages < 1

@@ -5,6 +5,7 @@ export const jungolOperationKinds = [
   "auth_probe",
   "auth_submit",
   "rank_page",
+  "account_summary",
   "submission_page",
   "submission_next_page",
   "problem_metadata",

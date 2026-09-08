@@ -18,7 +18,7 @@
 MySQL 검증에는 다음 경계가 포함된다.
 
 - 확정된 9테이블 SQL 적용
-- 초기 backfill의 과거 KST 날짜별 daily 점수와 이벤트 0점
+- 신규 계정 해결 목록의 synthetic baseline(`1970-01-01T00:00:01Z`, `external_submission_id=NULL`)과 초기 daily/event 점수 0점
 - 증분 반복 AC 두 건 저장과 이벤트 점수 1건
 - 외부 submission ID 및 award key 충돌 검증
 - 동일 입력 재처리 멱등성

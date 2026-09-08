@@ -2,10 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createPool, type RowDataPacket } from "mysql2/promise";
 import { z } from "zod";
+import { AccountInitializationService } from "../src/account-initialization.js";
 import { AccountSyncService } from "../src/account-sync.js";
 import type { CycleAdapters } from "../src/application/cycle-types.js";
 import { SyncCycleExecutor } from "../src/application/execute-cycle.js";
-import { rankMemberSchema } from "../src/domain/sync.js";
+import {
+  InitialSubmissionCursor,
+  rankMemberSchema,
+} from "../src/domain/sync.js";
 import { problemIdSchema, submissionIdSchema } from "../src/domain.js";
 import { JungolError } from "../src/jungol/errors.js";
 import { CycleLeaseManager } from "../src/mysql/lease.js";
@@ -51,6 +55,9 @@ test(
       new AccountUnitOfWork(pool, calendar),
       calendar,
     );
+    const initialization = new AccountInitializationService(
+      new AccountUnitOfWork(pool, calendar),
+    );
     const leases = new CycleLeaseManager(pool);
     const projection = new ProjectionService(
       pool,
@@ -73,6 +80,8 @@ test(
           ]),
         ),
       browser: async () => ({
+        summary: async () => [{ problemId: problemIdSchema.parse(81291) }],
+        cursor: async () => new InitialSubmissionCursor(8129101n, 1),
         collect: async () => ({
           attempts: [
             {
@@ -95,6 +104,7 @@ test(
         close: async () => {},
       }),
       persist: (input) => persistence.persist(input),
+      initialize: (snapshot) => initialization.initialize(snapshot),
       refreshMetadata: async () => {},
       project: async () => {
         await projection.rebuild(new Date("2026-09-07T01:00:00Z"));
@@ -111,7 +121,7 @@ test(
             rank: async () => assert.fail("unexpected network rank"),
             browser: async () => assert.fail("unexpected browser"),
           },
-          { concurrency: 1, maxPages: 10, initialBackfillMaxPages: 100 },
+          { concurrency: 1, maxPages: 10 },
         ).run(new AbortController().signal);
         assert.equal(overlap.status, "skipped_overlap");
       } finally {
@@ -129,14 +139,13 @@ test(
             },
             rank: async () => assert.fail("unexpected rank after circuit"),
           },
-          { concurrency: 1, maxPages: 10, initialBackfillMaxPages: 100 },
+          { concurrency: 1, maxPages: 10 },
         ).run(new AbortController().signal);
         assert.equal(stopped.status, code);
       }
       const result = await new SyncCycleExecutor(adapters, {
         concurrency: 1,
         maxPages: 10,
-        initialBackfillMaxPages: 100,
       }).run(new AbortController().signal);
       assert.equal(result.status, "success");
       const [rows] = await connection.query<State[]>(
@@ -145,8 +154,8 @@ test(
       assert.equal(rows[0]?.corrects, 1);
       assert.equal(rows[0]?.solution, "8129101");
       assert.equal(Number(rows[0]?.attempts), 1);
-      assert.ok(Number(rows[0]?.scores) >= 1);
-      assert.ok(Number(rows[0]?.boards) >= 1);
+      assert.equal(Number(rows[0]?.scores), 0);
+      assert.equal(Number(rows[0]?.boards), 0);
     } finally {
       connection.release();
       await pool.end();

@@ -81,10 +81,10 @@ test("Given a local Jungol fixture When browsing Then rank, raw pagination and f
     });
     const plan = (cursorBefore: bigint, maxPages: number) =>
       new AccountSyncPlan(
-        cursorBefore === 0n ? "initial_backfill" : "incremental",
+        "incremental",
         member,
         cursorBefore,
-        cursorBefore === 0n ? member.solvedCount : 1,
+        member.solvedCount,
         maxPages,
       );
     const collector = new SubmissionCollector(settings, requests);

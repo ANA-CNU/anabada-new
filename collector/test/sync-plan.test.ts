@@ -5,9 +5,9 @@ import { rankMemberSchema } from "../src/domain/sync.js";
 import { SyncPlanner } from "../src/sync-plan.js";
 import { AccountWorkerPool } from "../src/worker-pool.js";
 
-const planner = new SyncPlanner({ maxPages: 2, initialBackfillMaxPages: 9 });
+const planner = new SyncPlanner({ maxPages: 2 });
 
-test("Given a new rank member When planning Then backfill starts at zero", () => {
+test("Given a new rank member When planning Then summary initialization starts at zero", () => {
   const member = rankMemberSchema.parse({
     accountId: "42",
     jungolName: "member",
@@ -17,11 +17,11 @@ test("Given a new rank member When planning Then backfill starts at zero", () =>
     tier: 0,
   });
   const result = planner.plan(member, null);
-  assert.equal(result.kind, "initial_backfill");
-  if (result.kind === "initial_backfill") {
+  assert.equal(result.kind, "initial_summary");
+  if (result.kind === "initial_summary") {
     assert.equal(result.plan.cursorBefore, 0n);
     assert.equal(result.plan.expectedSolvedDelta, 3);
-    assert.equal(result.plan.maxPages, 9);
+    assert.equal(result.plan.maxPages, 1);
   }
 });
 test("Given fewer solved problems When planning Then regression is explicit", () => {
