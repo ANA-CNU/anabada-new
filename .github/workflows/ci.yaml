@@ -102,6 +102,8 @@ jobs:
           bun run build
           cd ..
           sh backend/test/run-mysql.sh
+      - name: Seeded full-stack browser smoke
+        run: sh backend/test/run-browser-smoke.sh
       # 실제 Secret은 pull request에 제공하지 않는다. 아래 값은 Compose 배선만 검증하는 폐기 가능한 fixture다.
       - name: Compose topology and build without live credentials
         env:

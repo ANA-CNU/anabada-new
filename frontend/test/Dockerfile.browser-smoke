@@ -1,0 +1,8 @@
+FROM mcr.microsoft.com/playwright:v1.55.0-jammy
+
+WORKDIR /smoke
+COPY frontend/test/package.json frontend/test/package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts
+COPY frontend/test/browser-smoke.mjs ./browser-smoke.mjs
+USER pwuser
+CMD ["node", "browser-smoke.mjs"]

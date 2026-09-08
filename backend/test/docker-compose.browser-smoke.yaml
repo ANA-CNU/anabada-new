@@ -1,0 +1,98 @@
+services:
+  anabada-mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: browser-smoke-only
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin --protocol=TCP -h127.0.0.1 -uroot ping --silent"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 10s
+
+  jungol-migrator:
+    build: { context: ../.., dockerfile: database/migrator/Dockerfile }
+    environment:
+      DB_PASSWORD: browser-smoke-only
+    depends_on:
+      anabada-mysql: { condition: service_healthy }
+    restart: "no"
+
+  browser-smoke-seed:
+    build: { context: ../.., dockerfile: backend/Dockerfile.test }
+    command: ["bun", "test/smoke/seed.ts"]
+    environment:
+      DB_HOST: anabada-mysql
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: browser-smoke-only
+      DB_NAME: jungol_bada
+    depends_on:
+      jungol-migrator: { condition: service_completed_successfully }
+    restart: "no"
+
+  anabada-backend:
+    build: { context: ../../backend, dockerfile: Dockerfile.prod }
+    environment:
+      DB_HOST: anabada-mysql
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: browser-smoke-only
+      DB_NAME: jungol_bada
+      NODE_ENV: test
+      ALLOWED_ORIGIN: http://bada-nginx
+      JWT_SECRET: browser-smoke-jwt
+      WEBHOOK_URL: ""
+    depends_on:
+      browser-smoke-seed: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3000/health >/dev/null"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 5s
+
+  anabada-frontend:
+    build: { context: ../../frontend, dockerfile: Dockerfile.prod }
+    depends_on:
+      browser-smoke-seed: { condition: service_completed_successfully }
+
+  anabada-middleware:
+    build: { context: ../../middleware, dockerfile: Dockerfile }
+    environment:
+      PORT: "80"
+      NODE_ENV: test
+      JWT_SECRET: browser-smoke-jwt
+      ADMIN_USERNAME: smoke-admin
+      ADMIN_PASSWORD: smoke-password
+      FRONTEND_URL: http://anabada-frontend:20030
+      ALLOWED_ORIGIN: http://bada-nginx
+    depends_on:
+      browser-smoke-seed: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:80/').then((r)=>process.exit(r.ok ? 0 : 1)).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 5s
+
+  bada-nginx:
+    image: nginx:stable
+    volumes:
+      - ../../nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      anabada-backend: { condition: service_healthy }
+      anabada-middleware: { condition: service_healthy }
+
+  browser-smoke:
+    build: { context: ../.., dockerfile: frontend/test/Dockerfile.browser-smoke }
+    environment:
+      SMOKE_BASE_URL: http://bada-nginx
+      SMOKE_ARTIFACT_DIR: /artifacts
+    volumes:
+      - ../../test-output/frontend-smoke:/artifacts
+    depends_on:
+      bada-nginx: { condition: service_started }
+    restart: "no"
