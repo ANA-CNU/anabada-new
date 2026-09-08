@@ -252,6 +252,33 @@ test(
         },
       );
       await t.test(
+        "initial summary rejects a newer solved list without committing its cursor",
+        async () => {
+          const member = rankMemberSchema.parse({
+            accountId: "18",
+            jungolName: "user18",
+            solvedCount: 2,
+            wrongCount: 0,
+            acRating: 20,
+            tier: 0,
+          });
+          await assert.rejects(
+            initialization.initialize(
+              new AccountInitialSnapshot(
+                new AccountSyncPlan("initial_summary", member, 0n, 2, 1),
+                [16, 17, 18].map(
+                  (problemId) =>
+                    new InitialSolvedProblem(problemIdSchema.parse(problemId)),
+                ),
+                1899n,
+              ),
+            ),
+            { code: "account_conflict" },
+          );
+          assert.equal(await state(18), undefined);
+        },
+      );
+      await t.test(
         "zero-solved initial summary completes without a problem row",
         async () => {
           await initial(17, []);
@@ -599,7 +626,10 @@ test(
           const [rows] = await pool.query<BoardRow[]>(
             "SELECT id FROM ranking_boards WHERE is_active=1",
           );
-          assert.deepEqual(rows.map((row) => row.id), []);
+          assert.deepEqual(
+            rows.map((row) => row.id),
+            [],
+          );
         },
       );
       await t.test(

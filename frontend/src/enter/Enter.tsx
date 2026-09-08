@@ -136,8 +136,8 @@ function Enter() {
                       3
                     </div>
                     <div className="flex-1">
-                      <h3 className="font-semibold text-lg mb-2">Baekjoon 그룹 가입</h3>
-                      <p className="text-white/80 mb-2">Baekjoon Online Judge의 ANABADA 그룹에 가입하여 문제 풀이 기록을 관리합니다.</p>
+                      <h3 className="font-semibold text-lg mb-2">JUNGOL 그룹 가입</h3>
+                      <p className="text-white/80 mb-2">JUNGOL의 ANABADA 그룹에 가입하여 문제 풀이 기록을 관리합니다.</p>
                       <div className="text-sm text-purple-300 bg-purple-500/20 px-3 py-1 rounded-full inline-block">
                         🔗 그룹 링크는 담당자로부터 받을 수 있습니다
                       </div>

@@ -50,8 +50,9 @@ export class AccountSyncWorker {
     let snapshot: AccountInitialSnapshot;
     let scannedCount: number;
     try {
-      const solved = await browser.summary(this.job.plan, signal);
+      // 커서는 기준선보다 앞선 AC를 절대 건너뛰지 않도록 해결 목록보다 먼저 고정한다.
       const cursor = await browser.cursor(this.job.plan, signal);
+      const solved = await browser.summary(this.job.plan, signal);
       snapshot = new AccountInitialSnapshot(
         this.job.plan,
         solved,

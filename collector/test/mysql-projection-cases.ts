@@ -15,7 +15,9 @@ interface MemberRow extends RowDataPacket {
 }
 
 class StableRankingPolicy extends WeightedRankingPolicy {
-  override rank(users: readonly { readonly userId: number }[]): readonly number[] {
+  override rank(
+    users: readonly { readonly userId: number }[],
+  ): readonly number[] {
     return users.map((user) => user.userId);
   }
 }
