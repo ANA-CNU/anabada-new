@@ -40,7 +40,7 @@ Page code must not import Lisse or write ordinary rounded utilities / inline bor
 
 ## 6. Motion and interaction
 
-Keep existing hover, pressed, disabled, loading, and Radix open/closed states. Geometry never overwrites `data-state`. Resize updates are shared and frame-batched by Lisse. No decorative animation is added. Respect the application's reduced-motion behavior.
+Keep existing hover, pressed, disabled, loading, and Radix open/closed states. Geometry never overwrites `data-state`. Monthly-draw cards use an outer, unclipped hover wrapper so their native and fallback shadow siblings scale together: only hover-capable fine pointers receive `transform: scale(1.03)` over 200ms, and `prefers-reduced-motion: reduce` disables both transform and transition. Resize updates are shared and frame-batched by Lisse. Respect the application's reduced-motion behavior.
 
 ## 7. Depth and surface effects
 
