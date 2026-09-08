@@ -52,6 +52,9 @@ const expectedRoutes = [
   "PUT /api/hooks/:id",
   "DELETE /api/hooks/:id",
   "PATCH /api/hooks/:id/toggle",
+  "GET /api/admin/ranking-boards",
+  "GET /api/admin/ranking-boards/:id",
+  "PATCH /api/admin/ranking-boards/:id/active",
 ] as const;
 
 class EmptyConnection implements DatabaseConnection {
@@ -69,7 +72,7 @@ class EmptyConnection implements DatabaseConnection {
   destroy(): void {}
 }
 
-test("Given the application graph When registering routes Then its canonical inventory has 44 endpoints", () => {
+test("Given the application graph When registering routes Then its canonical inventory has 47 endpoints", () => {
   const databasePool = new DatabasePool({
     getConnection: async () => new EmptyConnection(),
   } satisfies DatabaseConnectionPool);
@@ -86,5 +89,5 @@ test("Given the application graph When registering routes Then its canonical inv
     )
     .sort();
   expect(actualRoutes).toEqual([...expectedRoutes].sort());
-  expect(actualRoutes).toHaveLength(44);
+  expect(actualRoutes).toHaveLength(47);
 });

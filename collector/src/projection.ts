@@ -7,6 +7,7 @@ interface ScoreRow extends RowDataPacket, RankingScore {
 }
 interface BoardRow extends RowDataPacket {
   readonly id: number;
+  readonly title: string | null;
 }
 interface RankedRow extends RowDataPacket {
   readonly user_id: number;
@@ -26,7 +27,7 @@ export type ProjectionResult =
       readonly entries: readonly ProjectedRankingEntry[];
     };
 
-/** 원장과 분리된 짧은 transaction으로 월 합계와 내부 순위 snapshot을 재생성한다. */
+/** 원장과 분리된 짧은 transaction으로 월 합계와 내부 순위 snapshot만 재생성하며, is_active 발행 상태는 관리자가 전담한다. */
 export class ProjectionService {
   constructor(
     private readonly pool: Pool,
@@ -48,17 +49,12 @@ export class ProjectionService {
         "SELECT u.id AS userId, u.jungol_name AS jungolName, COALESCE(b.total_point,0) AS score FROM user u LEFT JOIN user_bias_total b ON b.user_id=u.id WHERE u.ignored=0 AND COALESCE(b.total_point,0)>0 ORDER BY u.id ASC",
       );
       const [latest] = await connection.query<BoardRow[]>(
-        "SELECT id FROM ranking_boards WHERE is_active=1 ORDER BY id DESC LIMIT 1",
+        "SELECT id, title FROM ranking_boards ORDER BY id DESC LIMIT 1",
       );
       const previous = latest[0];
       if (users.length === 0) {
-        await connection.execute(
-          "UPDATE ranking_boards SET is_active=0 WHERE is_active=1",
-        );
         await connection.commit();
-        return previous
-          ? { kind: "changed", boardId: null, entries: [] }
-          : { kind: "unchanged", boardId: null };
+        return { kind: "unchanged", boardId: previous?.id ?? null };
       }
       const day = this.calendar.day(now);
       const year = Number(day.slice(0, 4));
@@ -77,7 +73,8 @@ export class ProjectionService {
           score: user.score,
         };
       });
-      if (previous) {
+      const title = `${year}년 ${month}월 랭킹`;
+      if (previous?.title === title) {
         const [members] = await connection.execute<RankedRow[]>(
           "SELECT user_id FROM ranked_users WHERE board_id=? ORDER BY `rank` ASC",
           [previous.id],
@@ -86,28 +83,17 @@ export class ProjectionService {
           members.length === ranking.length &&
           members.every((member, index) => member.user_id === ranking[index])
         ) {
-          await connection.execute(
-            "UPDATE ranking_boards SET is_active=0 WHERE is_active=1 AND id<>?",
-            [previous.id],
-          );
           await connection.commit();
           return { kind: "unchanged", boardId: previous.id };
         }
       }
       const [board] = await connection.execute<ResultSetHeader>(
         "INSERT INTO ranking_boards (title,is_active) VALUES (?,0)",
-        [`${year}년 ${month}월 랭킹`],
+        [title],
       );
       await connection.query(
         "INSERT INTO ranked_users (board_id,`rank`,user_id) VALUES ?",
         [ranking.map((userId, index) => [board.insertId, index + 1, userId])],
-      );
-      await connection.execute(
-        "UPDATE ranking_boards SET is_active=0 WHERE is_active=1",
-      );
-      await connection.execute(
-        "UPDATE ranking_boards SET is_active=1 WHERE id=?",
-        [board.insertId],
       );
       await connection.commit();
       return { kind: "changed", boardId: board.insertId, entries };

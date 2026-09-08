@@ -53,6 +53,13 @@ const protectedRequests: readonly ProtectedRequest[] = [
   { method: "GET", path: "/api/users/all" },
   { method: "PUT", path: "/api/users/1", body: { tier: 12 } },
   { method: "DELETE", path: "/api/users/1" },
+  { method: "GET", path: "/api/admin/ranking-boards" },
+  { method: "GET", path: "/api/admin/ranking-boards/501" },
+  {
+    method: "PATCH",
+    path: "/api/admin/ranking-boards/501/active",
+    body: { is_active: true },
+  },
 ];
 
 function request(input: ProtectedRequest): Request {

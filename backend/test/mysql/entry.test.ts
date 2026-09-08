@@ -6,6 +6,7 @@ import {
 } from "../../src/infrastructure/mysql/database-session.js";
 import { UserRepository } from "../../src/infrastructure/mysql/repositories/user-repository.js";
 import { runAdminAuthenticationCases } from "./cases/admin-auth-cases.js";
+import { runAdminRankingBoardCases } from "./cases/admin-ranking-board-cases.js";
 import { runEventHookCases } from "./cases/event-hook-cases.js";
 import { runRankingCases } from "./cases/ranking-cases.js";
 import { runScoreBiasCases } from "./cases/score-bias-cases.js";
@@ -86,6 +87,7 @@ test("Given a migrated database When every route family is driven through the re
   await runRankingCases(activeContext);
   await runScoreBiasCases(activeContext);
   await runEventHookCases(activeContext);
+  await runAdminRankingBoardCases(activeContext);
   await runAdminAuthenticationCases(activeContext);
 
   const userExists = await activeContext.pool.withSession((session) =>
@@ -98,7 +100,7 @@ test("Given a migrated database When every route family is driven through the re
   );
   expect(missingOperations).toEqual([]);
   expect(activeContext.observedOperationIds.size).toBe(allSqlOperationIds.size);
-  const expectedRouteCount = 44;
+  const expectedRouteCount = 47;
   expect(activeContext.observedRouteIds.size).toBe(expectedRouteCount);
   expect(activeContext.assertAllRoutesObserved()).toBe(true);
 });

@@ -43,6 +43,25 @@ const selectedMonthRow = name.extend({
   last_month_solved: count,
   last_month_score: number,
 });
+const adminBoardRow = z.object({
+  id: z.coerce.number().int().positive(),
+  title: z.string().nullable(),
+  created_at: utcDate,
+  is_active: z.union([z.literal(0), z.literal(1)]).transform(Boolean),
+  member_count: count,
+});
+const adminBoardCountRow = z.object({ total: count });
+const adminBoardMemberRow = z.object({
+  rank: z.coerce.number().int().positive(),
+  user_id: z.coerce.number().int().positive(),
+  jungol_name: z.string(),
+  tier: z.coerce.number().int(),
+});
+
+export type AdminRankingBoard = Readonly<z.infer<typeof adminBoardRow>>;
+export type AdminRankingBoardMember = Readonly<
+  z.infer<typeof adminBoardMemberRow>
+>;
 const scoreRow = z.object({
   id: z.number().int().nonnegative(),
   display_name: z.string(),
@@ -161,6 +180,62 @@ export class RankingRepository {
       "SELECT sh.id, u.jungol_name AS display_name, sh.desc, sh.bias, sh.event_id, CAST(sh.problem_id AS CHAR) AS problem_id, sh.created_at FROM score_history sh JOIN user u ON u.id = sh.user_id WHERE sh.user_id = ? ORDER BY sh.created_at DESC LIMIT ?",
       [userId, limit],
       scoreRow,
+    );
+  }
+  adminBoards(limit: number, offset: number) {
+    return this.database.select(
+      operation("admin.ranking_boards.list"),
+      "SELECT rb.id, rb.title, rb.created_at, rb.is_active, COUNT(ru.id) AS member_count FROM ranking_boards rb LEFT JOIN ranked_users ru ON ru.board_id = rb.id GROUP BY rb.id, rb.title, rb.created_at, rb.is_active ORDER BY rb.id DESC LIMIT ? OFFSET ?",
+      [limit, offset],
+      adminBoardRow,
+    );
+  }
+  async adminBoardCount(): Promise<number> {
+    const row = await this.database.selectOne(
+      operation("admin.ranking_boards.count"),
+      "SELECT COUNT(*) AS total FROM ranking_boards",
+      [],
+      adminBoardCountRow,
+    );
+    return row?.total ?? 0;
+  }
+  adminBoard(id: number) {
+    return this.database.selectOne(
+      operation("admin.ranking_boards.find"),
+      "SELECT rb.id, rb.title, rb.created_at, rb.is_active, COUNT(ru.id) AS member_count FROM ranking_boards rb LEFT JOIN ranked_users ru ON ru.board_id = rb.id WHERE rb.id = ? GROUP BY rb.id, rb.title, rb.created_at, rb.is_active",
+      [id],
+      adminBoardRow,
+    );
+  }
+  adminBoardMembers(id: number) {
+    return this.database.select(
+      operation("admin.ranking_boards.members"),
+      "SELECT ru.`rank`, u.id AS user_id, u.jungol_name, u.tier FROM ranked_users ru JOIN user u ON u.id = ru.user_id WHERE ru.board_id = ? ORDER BY ru.`rank` ASC",
+      [id],
+      adminBoardMemberRow,
+    );
+  }
+  /** 관리자 선택 경합을 직렬화하기 위해 작은 보드 집합 전체를 항상 같은 순서로 잠근다. */
+  lockAllAdminBoards() {
+    return this.database.select(
+      operation("admin.ranking_boards.lock"),
+      "SELECT id FROM ranking_boards ORDER BY id ASC FOR UPDATE",
+      [],
+      z.object({ id: z.coerce.number().int().positive() }),
+    );
+  }
+  deactivateAllAdminBoards() {
+    return this.database.execute(
+      operation("admin.ranking_boards.deactivate_all"),
+      "UPDATE ranking_boards SET is_active = 0 WHERE is_active = 1",
+      [],
+    );
+  }
+  setAdminBoardActive(id: number, isActive: boolean) {
+    return this.database.execute(
+      operation("admin.ranking_boards.set_active"),
+      "UPDATE ranking_boards SET is_active = ? WHERE id = ?",
+      [isActive ? 1 : 0, id],
     );
   }
 }

@@ -1,6 +1,8 @@
 import { cors } from "@elysiajs/cors";
 import { swagger } from "@elysiajs/swagger";
 import { Elysia } from "elysia";
+import { AdminRankingBoardService } from "./api/admin/ranking-board-service.js";
+import { createAdminRankingBoardRoutes } from "./api/admin/ranking-boards.js";
 import { EventService } from "./api/event/event-service.js";
 import { createEventRoute } from "./api/event/event.js";
 import { BoundedHealthTimeout, createHealthRoute } from "./api/health.js";
@@ -245,6 +247,21 @@ export function createApplication(dependencies: ApplicationDependencies) {
           ),
         clock,
         calendar,
+      }),
+    )
+    .use(
+      createAdminRankingBoardRoutes({
+        withRepository: (work) =>
+          databasePool.withSession((session) =>
+            work(new RankingRepository(session)),
+          ),
+        service: new AdminRankingBoardService({
+          unitOfWork: (work) =>
+            databasePool.unitOfWork((session) =>
+              work(new RankingRepository(session)),
+            ),
+        }),
+        authorizer,
       }),
     )
     .use(createScoreHistoryRoutes(scoreRoutes))

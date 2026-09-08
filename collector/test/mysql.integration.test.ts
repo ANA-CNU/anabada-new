@@ -20,6 +20,7 @@ import { ProjectionService } from "../src/projection.js";
 import { KstCalendar } from "../src/scoring/daily.js";
 import { WeightedRankingPolicy } from "../src/scoring/ranking.js";
 import { runEdgeCases } from "./mysql-edge-cases.js";
+import { runManualProjectionCases } from "./mysql-projection-cases.js";
 
 interface StateRow extends RowDataPacket {
   readonly attempts: string;
@@ -598,10 +599,7 @@ test(
           const [rows] = await pool.query<BoardRow[]>(
             "SELECT id FROM ranking_boards WHERE is_active=1",
           );
-          assert.deepEqual(
-            rows.map((row) => row.id),
-            [boardId],
-          );
+          assert.deepEqual(rows.map((row) => row.id), []);
         },
       );
       await t.test(
@@ -739,6 +737,7 @@ test(
         },
       );
       await runEdgeCases(t, pool);
+      await runManualProjectionCases(t, pool);
     } finally {
       await pool.end();
     }

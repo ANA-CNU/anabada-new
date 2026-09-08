@@ -18,7 +18,8 @@ import {
   Plus,
   Menu,
   X,
-  ExternalLink
+  ExternalLink,
+  Trophy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -32,6 +33,7 @@ import BiasManagement from "./components/BiasManagement";
 import UserManagement from "./components/UserManagement";
 import WebhookManagement from "./components/WebhookManagement";
 import type { User } from "@/types";
+import { RankingBoardManagement } from "./components/ranking-boards/RankingBoardManagement";
 
 function Admin() {
 
@@ -116,6 +118,13 @@ function Admin() {
         { name: "이벤트 추가", icon: <Plus className="h-4 w-4" />, id: "event-stats" },
         { name: "알림 관리", icon: <AlertCircle className="h-4 w-4" />, id: "notification" },
       ]
+    },
+    {
+      title: "추첨 관리",
+      icon: <Trophy className="h-4 w-4" />,
+      items: [
+        { name: "추첨 보드 관리", icon: <Trophy className="h-4 w-4" />, id: "ranking-boards" },
+      ]
     }
   ];
 
@@ -166,6 +175,8 @@ function Admin() {
         return <EventList />;
       case "event-stats":
         return <EventAdd />;
+      case "ranking-boards":
+        return <RankingBoardManagement />;
       default:
         return (
           <div className="space-y-6">

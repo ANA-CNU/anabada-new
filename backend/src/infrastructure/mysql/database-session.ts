@@ -186,6 +186,34 @@ export const sqlOperations = {
     id: "ranking.user_score_history" as SqlOperationId,
     timeoutMs: 1_000,
   },
+  adminRankingBoardsList: {
+    id: "admin.ranking_boards.list" as SqlOperationId,
+    timeoutMs: 1_000,
+  },
+  adminRankingBoardsCount: {
+    id: "admin.ranking_boards.count" as SqlOperationId,
+    timeoutMs: 1_000,
+  },
+  adminRankingBoardsFind: {
+    id: "admin.ranking_boards.find" as SqlOperationId,
+    timeoutMs: 1_000,
+  },
+  adminRankingBoardsMembers: {
+    id: "admin.ranking_boards.members" as SqlOperationId,
+    timeoutMs: 1_000,
+  },
+  adminRankingBoardsLock: {
+    id: "admin.ranking_boards.lock" as SqlOperationId,
+    timeoutMs: 1_000,
+  },
+  adminRankingBoardsDeactivateAll: {
+    id: "admin.ranking_boards.deactivate_all" as SqlOperationId,
+    timeoutMs: 2_000,
+  },
+  adminRankingBoardsSetActive: {
+    id: "admin.ranking_boards.set_active" as SqlOperationId,
+    timeoutMs: 2_000,
+  },
 } as const satisfies Record<string, SqlOperation>;
 const registeredSqlOperationIds = Object.values(sqlOperations).map(
   (operation) => operation.id,

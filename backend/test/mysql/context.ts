@@ -94,6 +94,9 @@ const allRouteIds: ReadonlySet<string> = new Set([
   "GET /api/statistics/recently-solved",
   "GET /api/statistics/monthly-problems",
   "GET /api/statistics/total-problems",
+  "GET /api/admin/ranking-boards",
+  "GET /api/admin/ranking-boards/:id",
+  "PATCH /api/admin/ranking-boards/:id/active",
 ] as const);
 
 function routeId(request: Request): string {
@@ -114,6 +117,14 @@ function routeId(request: Request): string {
     .replace(
       /^\/api\/user\/\d+\/(problems|monthly-summary)$/,
       "/api/user/:userId/$1",
+    )
+    .replace(
+      /^\/api\/admin\/ranking-boards\/\d+\/active$/,
+      "/api/admin/ranking-boards/:id/active",
+    )
+    .replace(
+      /^\/api\/admin\/ranking-boards\/\d+$/,
+      "/api/admin/ranking-boards/:id",
     );
   return `${request.method} ${template}`;
 }

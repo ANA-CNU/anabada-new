@@ -174,6 +174,71 @@ try {
   await page.getByText("https://created.invalid/hook", { exact: true }).waitFor();
   await capture("admin-hooks");
 
+  const boardsResponse = await page.request.get(`${baseUrl}/api/admin/ranking-boards?page=1&limit=10`);
+  if (boardsResponse.status() !== 200) throw new Error("ranking board list failed");
+  const boardsPayload = await boardsResponse.json();
+  const originalActiveBoard = boardsPayload.data.find((board) => board.is_active);
+  const targetBoard = boardsPayload.data.find((board) => !board.is_active && board.member_count > 0);
+  if (!originalActiveBoard || !targetBoard) throw new Error("ranking board smoke fixture is incomplete");
+  const targetDetailResponse = await page.request.get(`${baseUrl}/api/admin/ranking-boards/${targetBoard.id}`);
+  if (targetDetailResponse.status() !== 200) throw new Error("ranking board detail failed");
+  const targetDetail = await targetDetailResponse.json();
+
+  await page.getByRole("button", { name: "추첨 보드 관리", exact: true }).click();
+  await page.getByRole("heading", { name: "추첨 보드 관리", exact: true }).waitFor();
+  const targetRow = page.locator("table").first().locator("tbody tr").filter({
+    has: page.getByRole("cell", { name: String(targetBoard.id), exact: true }),
+  });
+  await targetRow.getByRole("button", { name: "상세 보기", exact: true }).click();
+  await page.getByText(`보드 #${targetBoard.id}`, { exact: false }).waitFor();
+  await page.getByText(targetDetail.data.members[0].jungol_name, { exact: true }).last().waitFor();
+  const renderedMembers = await page.evaluate(() => {
+    const memberTable = Array.from(document.querySelectorAll("table")).find((table) =>
+      Array.from(table.querySelectorAll("th")).some((header) => header.textContent?.trim() === "사용자"),
+    );
+    if (!memberTable) return null;
+    return Array.from(memberTable.querySelectorAll("tbody tr")).map((row) => {
+      const cells = Array.from(row.querySelectorAll("td"));
+      return { rank: cells[0]?.textContent?.trim(), jungolName: cells[1]?.textContent?.trim() };
+    });
+  });
+  const expectedMembers = targetDetail.data.members.map((member) => ({ rank: String(member.rank), jungolName: member.jungol_name }));
+  if (renderedMembers === null || JSON.stringify(renderedMembers) !== JSON.stringify(expectedMembers)) {
+    throw new Error(`ranking board detail members are not rendered in rank order: ${JSON.stringify({ renderedMembers, expectedMembers })}`);
+  }
+  await page.getByRole("button", { name: "활성화", exact: true }).click();
+  await page.getByRole("dialog").getByRole("heading", { name: "추첨 보드를 활성화할까요?", exact: true }).waitFor();
+  const activation = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return url.pathname === `/api/admin/ranking-boards/${targetBoard.id}/active` && response.request().method() === "PATCH";
+  });
+  await page.getByRole("dialog").getByRole("button", { name: "확인", exact: true }).click();
+  if ((await activation).status() !== 200) throw new Error("ranking board activation failed");
+  await page.getByText("활성", { exact: true }).last().waitFor();
+
+  const publicAfterActivation = await page.request.get(`${baseUrl}/api/ranking/selected-month-board`);
+  if (publicAfterActivation.status() !== 200) throw new Error("public selected board after activation failed");
+  const publicEntries = (await publicAfterActivation.json()).data;
+  const expectedEntries = targetDetail.data.members.slice(0, 7);
+  if (publicEntries.length !== expectedEntries.length || publicEntries.some((entry, index) => entry.rank !== expectedEntries[index].rank || entry.jungol_name !== expectedEntries[index].jungol_name)) {
+    throw new Error("public selected board does not match the activated board");
+  }
+
+  await page.getByRole("button", { name: "비활성화", exact: true }).click();
+  await page.getByRole("dialog").getByText("더 이상 표시되지 않습니다", { exact: false }).waitFor();
+  const deactivation = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return url.pathname === `/api/admin/ranking-boards/${targetBoard.id}/active` && response.request().method() === "PATCH";
+  });
+  await page.getByRole("dialog").getByRole("button", { name: "확인", exact: true }).click();
+  if ((await deactivation).status() !== 200) throw new Error("ranking board deactivation failed");
+  const publicAfterDeactivation = await page.request.get(`${baseUrl}/api/ranking/selected-month-board`);
+  if (publicAfterDeactivation.status() !== 200) throw new Error("public selected board after deactivation failed");
+  if ((await publicAfterDeactivation.json()).data.length !== 0) throw new Error("deactivated board is still publicly selected");
+  const restoreOriginal = await page.request.patch(`${baseUrl}/api/admin/ranking-boards/${originalActiveBoard.id}/active`, { data: { is_active: true } });
+  if (restoreOriginal.status() !== 200) throw new Error("ranking board fixture restore failed");
+  await capture("admin-ranking-boards");
+
   await page.getByRole("button", { name: "이벤트 목록", exact: true }).click();
   await page.getByRole("heading", { name: "이벤트 목록", exact: true }).waitFor();
   const eventBeforeResponse = await page.request.get(`${baseUrl}/api/events/201`);
