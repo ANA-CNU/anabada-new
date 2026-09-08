@@ -153,14 +153,9 @@ worker는 생성됐지만 첫 API batch에서 기존 cursor를 만나 중단했�
 
 검증 뒤 trigger를 제거했다.
 
-## 구현 파일
+## 구현 기록
 
-- `poc/jungol-container/ingest.mjs`: 실행 조정, 랭킹 diff, bounded worker pool
-- `poc/jungol-container/jungol-browser.mjs`: 로그인, 랭킹, submission pagination
-- `poc/jungol-container/jungol-wire.mjs`: X-Fp XOR/BSON 경계 파싱과 verdict 정규화
-- `poc/jungol-container/jungol-store.mjs`: `jungol_bada` 연결과 사용자 단위 transaction
-- `poc/jungol-container/schema.sql`: POC 전용 database/table
-- `poc/jungol-container/jungol-wire.test.mjs`: grouped 원본 attempt 복원 regression test
+당시 POC 구현물은 검증 완료 후 현재 `collector/` 기반 운영 수집기로 대체되었으며, 2026-09-08에 저장소에서 제거됐다. 위 검증 결과는 설계 기록으로만 유지한다.
 
 ## 검증 범위와 남은 위험
 

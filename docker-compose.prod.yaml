@@ -1,4 +1,5 @@
 services:
+  # 브라우저에 공개되는 정적 화면; Kakao 키는 이미지 빌드 시점에만 주입한다.
   anabada-frontend:
     build:
       context: ./frontend
@@ -7,6 +8,7 @@ services:
         VITE_KAKAO_MAP_API_KEY: ${VITE_KAKAO_MAP_API_KEY:-}
     networks: [bada-network]
   anabada-middleware:
+    # 관리자 인증과 프런트엔드 연결을 중계한다. 운영 도메인 origin만 허용한다.
     build: {context: ./middleware, dockerfile: Dockerfile}
     environment:
       PORT: "80"
@@ -23,6 +25,7 @@ services:
       timeout: 5s
       retries: 3
   anabada-backend:
+    # 내부 MySQL DNS와 jungol_bada 스키마를 고정하고, 선택 Webhook으로 긴급 장애만 알린다.
     build: {context: ./backend, dockerfile: Dockerfile.prod}
     environment:
       DB_HOST: anabada-mysql
@@ -39,10 +42,13 @@ services:
     depends_on:
       anabada-mysql: {condition: service_healthy}
   jungol-collector:
+    # 외부 포트를 열지 않는 내부 수집기. 같은 DB를 사용하고 프로필 볼륨으로 Chromium 로그인 상태를 보존한다.
     build: {context: ./collector, dockerfile: Dockerfile}
     init: true
     restart: unless-stopped
+    # Chromium 브라우저의 shared memory 부족으로 인한 불안정을 방지한다.
     shm_size: 1gb
+    # 불필요한 Linux capability를 제거하고 권한 상승을 방지한다.
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     networks: [bada-network]
@@ -55,6 +61,7 @@ services:
       WEBHOOK_URL: ${WEBHOOK_URL:-}
     volumes: ["jungol-profile:/var/lib/jungol/profile"]
   bada-nginx:
+    # 운영의 단일 공개 진입점이며 내부 서비스 프록시와 외부 DMOJ nginx 네트워크 연결을 담당한다.
     image: nginx:stable
     volumes: ["./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro"]
     ports: ["20050:80"]
@@ -63,6 +70,7 @@ services:
       anabada-backend: {condition: service_healthy}
       anabada-middleware: {condition: service_healthy}
   anabada-mysql:
+    # 운영 DB는 호스트 bind mount에 보관해 배포 컨테이너 교체 후에도 데이터를 유지한다.
     image: mysql:8.4
     ports: ["20040:3306"]
     environment:
@@ -73,16 +81,20 @@ services:
     networks: [bada-network]
     restart: unless-stopped
     healthcheck:
+      # 의존 서비스가 단순 컨테이너 시작이 아닌 MySQL 응답 가능 시점 이후 시작하도록 보장한다.
       test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin --protocol=TCP -h127.0.0.1 -uroot ping --silent"]
       interval: 10s
       timeout: 5s
       start_period: 60s
       retries: 12
 volumes:
+  # 재시작 뒤 Chromium 로그인 세션과 프로필을 재사용하기 위한 저장소.
   jungol-profile:
 networks:
+  # 기존 운영 인프라가 제공하는 외부 애플리케이션 네트워크.
   bada-network:
     external: true
 
   dmoj_nginx_network:
+    # DMOJ nginx와 통신해야 하는 공개 프록시에만 연결하는 외부 네트워크.
     external: true

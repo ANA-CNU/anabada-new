@@ -126,7 +126,7 @@ docker compose --env-file .env -f docker-compose.dev.yaml -p jungol-dev ps
 
 운영 rollout 순서:
 
-1. 이전 backend/config 복구 경로와 DB 백업을 확보하고 기존 crawler/sync 작업을 정지합니다.
+1. 이전 backend/config 복구 경로와 DB 백업을 확보하고 기존 레거시 수집/sync 작업을 정지합니다.
 2. DBA가 기존 MySQL에 002를 수동 적용하고 9개 테이블, FK, unique key와 empty 정책을 검증합니다.
 3. GitHub production Environment에 아래 필수 secrets를 등록합니다. workflow가 서버 루트 `.env`를 생성합니다. 기존 MySQL root 비밀번호와 `DB_PASSWORD`가 일치하고 backend/collector가 `anabada-mysql:3306/jungol_bada`에 접속하는지 확인합니다.
 4. `.env`와 profile 권한, external networks, MySQL image 호환성을 확인합니다. 운영자가 통제하는 단일 one-shot으로 초기 적재·점수·재실행을 검증합니다.
@@ -207,7 +207,7 @@ docker compose --env-file .env -f docker-compose.prod.yaml up -d jungol-collecto
 
 - [ ] 새 DB의 수동 SQL 적용 완료, 9개 테이블/FK/unique key 검증; 이전 DB 변경 없음.
 - [ ] backend와 collector의 DB host/port/name 확인; 동일 root 계정과 DB_PASSWORD 사용 확인.
-- [ ] legacy crawler/기존 sync scheduler 비활성화; collector 단일 replica.
+- [ ] legacy 수집기/기존 sync scheduler 비활성화; collector 단일 replica.
 - [ ] 실제 서버에서 non-root Chromium, secrets, profile 재사용 및 컨테이너 재생성 확인.
 - [ ] 긴 이력 pagination, cursor 도달, AC-only와 rejected cursor 전진, 재실행 멱등성 검증.
 - [ ] 사용자 실패 시 cursor/점수 rollback, 다른 사용자 commit 유지, projection 복구 검증.
