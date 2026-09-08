@@ -56,11 +56,11 @@ html, body, #root {
 }
 
 :root {
-  --squircle-radius-compact: 8px;
-  --squircle-radius-control: 12px;
-  --squircle-radius-surface: 20px;
-  --squircle-radius-panel: 28px;
-  --squircle-radius-hero: 36px;
+  --squircle-radius-compact: 10px;
+  --squircle-radius-control: 16px;
+  --squircle-radius-surface: 28px;
+  --squircle-radius-panel: 40px;
+  --squircle-radius-hero: 52px;
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);

@@ -20,11 +20,13 @@ Preserve the existing Tailwind spacing scale, responsive breakpoints, grids, fle
 
 | Token | Radius | Role |
 | --- | --- | --- |
-| compact | 8px | Small indicators and dense controls |
-| control | 12px | Buttons, inputs, compact rows |
-| surface | 20px | Cards, list rows, square icon holders |
-| panel | 28px | Dialogs, sheets, larger panels |
-| hero | 36px | Large featured surfaces |
+| compact | 10px | Small indicators and dense controls |
+| control | 16px | Buttons, inputs, compact rows |
+| surface | 28px | Cards, list rows, square icon holders |
+| panel | 40px | Dialogs, sheets, larger panels |
+| hero | 52px | Large featured surfaces |
+
+The high-radius ladder above is the global corner contract: use the semantic token rather than compensating in individual components. Nested surfaces still choose the next smaller token where appropriate; check that their inset leaves a visibly coherent inner curve, and never make an inner surface rounder than its outer surface.
 
 Use `SquircleSurface` from `@/components/ui/squircle`. Its default element is a div; `asChild` merges onto one semantic child, preserving its ref, events, ARIA, and data attributes. `radius` defaults to surface. `corners` supports all, left, right, top, bottom, and none; calendar range middles use none to remain square.
 
