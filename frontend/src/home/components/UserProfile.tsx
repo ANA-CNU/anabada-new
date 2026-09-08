@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
-import { ArrowLeft, Trophy, Target, TrendingUp, Calendar, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Trophy, Target, TrendingUp, Calendar } from 'lucide-react';
 import { URL } from '@/resource/constant';
 import UserRankHistoryChart from './UserRankHistoryChart';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
@@ -42,10 +42,9 @@ const UserProfile: React.FC = () => {
       setIsLoading(true);
       try {
         const userRes = await fetch(`${URL}/api/users/${id}`);
-        if (userRes.ok) {
-          const json = await userRes.json();
-          setUser(json.data);
-        }
+        const json = await userRes.json();
+        if (!userRes.ok || !json?.success) throw new Error(json?.error || "사용자 정보를 가져오지 못했습니다.");
+        setUser(json.data);
       } catch (e) {
         console.error(e);
       } finally {
@@ -153,37 +152,15 @@ const UserProfile: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div className="min-w-0 w-full">
                   <CardTitle className="text-2xl flex flex-wrap items-center gap-3">
-                    <span className="min-w-0 [overflow-wrap:anywhere]">{user.name}</span>
-                    {user.kr_name && (
-                      <span className="min-w-0 text-lg text-gray-300 break-keep [overflow-wrap:anywhere]">({user.kr_name})</span>
+                    <span className="min-w-0 [overflow-wrap:anywhere]">{user.jungol_name}</span>
+                    {user.korean_name && (
+                      <span className="min-w-0 text-lg text-gray-300 break-keep [overflow-wrap:anywhere]">({user.korean_name})</span>
                     )}
                   </CardTitle>
                   <div className="flex flex-wrap items-center gap-4 mt-2">
                     <Badge className={`text-lg px-3 py-1 ${getTierColor(user.tier)} bg-transparent border-current`}>
                       {getTierName(user.tier)} (Tier {user.tier})
                     </Badge>
-                    {user.atcoder_handle && (
-                      <a
-                        href={`https://atcoder.jp/users/${user.atcoder_handle}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex shrink-0 items-center gap-2 text-blue-400 hover:text-blue-300"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                        AtCoder
-                      </a>
-                    )}
-                    {user.codeforces_handle && (
-                      <a
-                        href={`https://codeforces.com/profile/${user.codeforces_handle}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex shrink-0 items-center gap-2 text-blue-400 hover:text-blue-300"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                        Codeforces
-                      </a>
-                    )}
                   </div>
                 </div>
               </div>
@@ -352,14 +329,14 @@ const UserProfile: React.FC = () => {
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
-                          <div className="font-medium">{problem.name}</div>
+                          <div className="font-medium">{problem.problem_name ?? `JUNGOL #${problem.problem}`}</div>
                           <div className="text-sm text-gray-300">
                             Difficulty {problem.level} • Problem Tier {problem.problem_tier}
                           </div>
                         </div>
                         <div className="text-right">
                           <div className="text-sm text-gray-400">
-                            {formatDate(problem.time)}
+                            {formatDate(problem.submitted_at)}
                           </div>
                         </div>
                       </div>

@@ -6,13 +6,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { URL } from "@/resource/constant";
 import { Separator } from "@/components/ui/separator";
 
+const messageOf = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
+
 type ScoreHistoryRow = {
   id: number;
-  username: string;
+  user_id: number;
+  display_name: string;
   desc: string | null;
   bias: number;
   event_id: number | null;
-  problem_id: number | null;
+  problem_id: string | null;
   created_at: string;
 };
 
@@ -27,7 +30,7 @@ export default function LogManagement() {
   const [rows, setRows] = useState<ScoreHistoryRow[]>([]);
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 10, total: 0, total_pages: 0 });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
   const [searchUsername, setSearchUsername] = useState("");
 
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -48,11 +51,11 @@ export default function LogManagement() {
       setError(null);
       const res = await fetch(`${URL}/api/admin/score-history?${qp.toString()}`, { credentials: "include" });
       const json = await res.json();
-      if (!json?.success) throw new Error(json?.message || "조회 실패");
+      if (!res.ok || !json?.success) throw new Error(json?.message || "조회 실패");
       setRows(json.data || []);
       setPagination(json.pagination);
-    } catch (err: any) {
-      setError(err?.message || "서버 오류");
+    } catch (err: unknown) {
+      setError(messageOf(err, "서버 오류"));
     } finally {
       setLoading(false);
     }
@@ -75,11 +78,11 @@ export default function LogManagement() {
 
   const saveEdit = async (id: number) => {
     try {
-      const payload: any = {};
+      const payload: Record<string, string | number | null> = {};
       if (typeof editForm.desc !== "undefined") payload.desc = editForm.desc;
       if (typeof editForm.bias !== "undefined") payload.bias = Number(editForm.bias) || 0;
-      if (typeof editForm.event_id !== "undefined") payload.eventId = editForm.event_id ?? null;
-      if (typeof editForm.problem_id !== "undefined") payload.problemId = editForm.problem_id ?? null;
+      if (typeof editForm.event_id !== "undefined") payload.event_id = editForm.event_id ?? null;
+      if (typeof editForm.problem_id !== "undefined") payload.problem_id = editForm.problem_id ?? null;
 
       const res = await fetch(`${URL}/api/score-history/${id}`, {
         method: "PUT",
@@ -93,8 +96,8 @@ export default function LogManagement() {
       // 목록 갱신 (현재 페이지 유지)
       await fetchRows();
       cancelEdit();
-    } catch (err: any) {
-      alert(err?.message || "수정 중 오류가 발생했습니다.");
+    } catch (err: unknown) {
+      alert(messageOf(err, "수정 중 오류가 발생했습니다."));
     }
   };
 
@@ -114,8 +117,8 @@ export default function LogManagement() {
       } else {
         await fetchRows();
       }
-    } catch (err: any) {
-      alert(err?.message || "삭제 중 오류가 발생했습니다.");
+    } catch (err: unknown) {
+      alert(messageOf(err, "삭제 중 오류가 발생했습니다."));
     }
   };
 
@@ -200,7 +203,7 @@ export default function LogManagement() {
                 return (
                   <tr key={row.id} className="border-t">
                     <td className="px-4 py-2 align-top">{row.id}</td>
-                    <td className="px-4 py-2 align-top">{row.username}</td>
+                    <td className="px-4 py-2 align-top">{row.display_name}</td>
                     <td className="px-4 py-2 align-top w-[26rem]">
                       {isEditing ? (
                         <Input
@@ -215,7 +218,7 @@ export default function LogManagement() {
                     <td className="px-4 py-2 align-top w-28">
                       {isEditing ? (
                         <Input
-                          type="number"
+                          inputMode="numeric"
                           value={String(editForm.bias ?? 0)}
                           onChange={(e) => setEditForm((prev) => ({ ...prev, bias: Number(e.target.value) }))}
                         />
@@ -239,7 +242,7 @@ export default function LogManagement() {
                         <Input
                           type="number"
                           value={String(editForm.problem_id ?? "")}
-                          onChange={(e) => setEditForm((prev) => ({ ...prev, problem_id: e.target.value === "" ? null : Number(e.target.value) }))}
+                          onChange={(e) => setEditForm((prev) => ({ ...prev, problem_id: e.target.value === "" ? null : e.target.value }))}
                         />
                       ) : (
                         row.problem_id ?? ""

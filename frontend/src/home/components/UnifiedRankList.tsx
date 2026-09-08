@@ -1,21 +1,11 @@
 import { SquircleSurface } from "@/components/ui/squircle";
 import { URL } from "@/resource/constant";
 import React, { useEffect, useRef, useState } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Spool, Spotlight } from "lucide-react";
-import SpotlightCard from "@/react_bits/SpotlightCard/SpotlightCard";
 import LastUpdateTime from "./LastUpdateTime";
+import type { LatestBiasRanking } from "@/types";
 
 // API 응답 타입 (/api/v2/ranking/bias)
-interface RankingItemV2 {
-  username: string;
-  tier: number;
-  rank: number;
-  delta: number;
-  total_problem: number;
-  bias: number;
-  monthly_problem: number;
-}
+type RankingItemV2 = LatestBiasRanking;
 
 interface ApiV2Response {
   success: boolean;
@@ -63,7 +53,7 @@ export default function UnifiedRankList() {
         } else {
           setError(json.message || "랭킹 데이터를 가져오지 못했습니다.");
         }
-      } catch (err) {
+      } catch {
         setError("서버 연결 실패");
       } finally {
         if (mounted) setLoading(false);
@@ -162,7 +152,7 @@ export default function UnifiedRankList() {
         const motionClass = animate ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3";
         return (
           <div
-            key={u.username}
+            key={u.jungol_name}
             className={`transition-opacity transition-transform duration-500 ease-out ${motionClass}`}
             style={{ transitionDelay: `${(u.rank - 1) * 60}ms` }}
           >
@@ -194,7 +184,7 @@ export default function UnifiedRankList() {
                 <span 
                   className="text-white font-semibold truncate block"
                 >
-                  {u.username}
+                  {u.display_name}
                 </span>
                 <div className="text-xs text-white/60 flex items-center gap-2">
                   <span>티어: {u.tier}</span>

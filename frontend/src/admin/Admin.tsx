@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EventAdd } from "./components/EventAdd";
 import ScoreManagement from "./components/ScoreManagement";
 import EventList from "./components/EventList";
@@ -31,6 +31,7 @@ import LogManagement from "./components/LogManagement";
 import BiasManagement from "./components/BiasManagement";
 import UserManagement from "./components/UserManagement";
 import WebhookManagement from "./components/WebhookManagement";
+import type { User } from "@/types";
 
 function Admin() {
 
@@ -60,7 +61,7 @@ function Admin() {
   };
 
   // 유저 정보 목록 상태
-  const [userList, setUserList] = useState<{ id: number; kr_name: string | null; name: string }[]>([]);
+  const [userList, setUserList] = useState<User[]>([]);
 
   useEffect(() => {
     let mounted = true;
@@ -71,15 +72,13 @@ function Admin() {
         });
         const json = await res.json();
         if (!mounted) return;
-        if (json?.success && Array.isArray(json?.data)) {
-          const users = json.data.map((u: any) => ({
-            id: u.id,
-            kr_name: u.kr_name,
-            name: u.name
-          }));
-          setUserList(users);
+        if (!res.ok || !json?.success) {
+          throw new Error(json?.message || "유저 목록을 가져오지 못했습니다.");
+        }
+        if (Array.isArray(json.data)) {
+          setUserList(json.data as User[]);
         } else {
-          console.warn('유저 목록 조회 실패:', json?.message);
+          throw new Error("유저 목록 응답이 올바르지 않습니다.");
         }
       } catch (err) {
         console.error('유저 목록 불러오기 오류:', err);
@@ -314,4 +313,4 @@ function Admin() {
   }
 }
 
-export default Admin; 
+export default Admin;

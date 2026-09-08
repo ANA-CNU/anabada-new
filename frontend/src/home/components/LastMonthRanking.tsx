@@ -3,13 +3,9 @@ import React, { useEffect, useState } from 'react';
 import { Trophy, TrendingUp, Calendar, Crown } from 'lucide-react';
 import { getProblemCountColor } from './activity/types';
 import { URL } from '@/resource/constant';
+import type { SelectedMonthRanking } from '@/types';
 
-interface RankItem {
-    name : string;
-    rank : number;
-    lastMonthSolved : number;
-    lastMonthScore : number;
-}
+type RankItem = SelectedMonthRanking;
 
 interface Response {
     data : RankItem[];
@@ -170,19 +166,19 @@ const LastMonthRanking: React.FC = () => {
                       {/* 사용자 이름 */}
                       <div className="text-center min-w-0 w-full">
                         <h3 className={`text-xs sm:text-sm font-semibold mb-1 [overflow-wrap:anywhere] ${rank <= 3 ? 'bg-clip-text text-transparent ' + (rank === 1 ? 'bg-gradient-to-r from-yellow-200 via-white to-yellow-200' : rank === 2 ? 'bg-gradient-to-r from-slate-200 via-white to-slate-200' : 'bg-gradient-to-r from-amber-300 via-white to-amber-300') : getRankColor(rank)}`}>
-                          {item.name}
+                          {item.display_name}
                         </h3>
                         {/* 추가 정보 */}
                         <div className="text-xs text-white/60 space-y-1">
                           <div className="flex items-center justify-center gap-1">
                             <span className="text-xs">문제:</span>
-                            <SquircleSurface radius="compact" asChild><span className={`px-1 sm:px-2 py-1 text-xs font-medium border ${getProblemCountColor(item.lastMonthSolved)}`}>
-                              {item.lastMonthSolved}개
+                            <SquircleSurface radius="compact" asChild><span className={`px-1 sm:px-2 py-1 text-xs font-medium border ${getProblemCountColor(item.last_month_solved)}`}>
+                              {item.last_month_solved}개
                             </span></SquircleSurface>
                           </div>
                           <div className="flex items-center justify-center gap-1">
                             <span className="text-xs">점수:</span>
-                            <span className="text-green-400 font-medium text-xs">{item.lastMonthScore}</span>
+                            <span className="text-green-400 font-medium text-xs">{item.last_month_score}</span>
                           </div>
                         </div>
                       </div>
@@ -227,19 +223,19 @@ const LastMonthRanking: React.FC = () => {
                       {/* 사용자 이름 */}
                       <div className="text-center min-w-0 w-full">
                         <h3 className={`text-xs sm:text-sm font-semibold [overflow-wrap:anywhere] ${getRankColor(rank)} mb-1`}>
-                          {item.name}
+                          {item.display_name}
                         </h3>
                         {/* 추가 정보 */}
                         <div className="text-xs text-white/60 space-y-1 whitespace-nowrap">
                           <div className="flex items-center justify-center gap-1">
                             <span className="text-xs">문제:</span>
-                            <SquircleSurface radius="compact" asChild><span className={`px-1 sm:px-2 py-1 text-xs font-medium border ${getProblemCountColor(item.lastMonthSolved)}`}>
-                              {item.lastMonthSolved}개
+                            <SquircleSurface radius="compact" asChild><span className={`px-1 sm:px-2 py-1 text-xs font-medium border ${getProblemCountColor(item.last_month_solved)}`}>
+                              {item.last_month_solved}개
                             </span></SquircleSurface>
                           </div>
                           <div className="flex items-center justify-center gap-1">
                             <span className="text-xs">점수:</span>
-                            <span className="text-green-400 font-medium text-xs">{item.lastMonthScore}</span>
+                            <span className="text-green-400 font-medium text-xs">{item.last_month_score}</span>
                           </div>
                         </div>
                       </div>

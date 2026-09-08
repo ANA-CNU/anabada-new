@@ -9,10 +9,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button as ShadButton } from "@/components/ui/button";
 import { CalendarIcon } from "lucide-react";
 
+const messageOf = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
+
 type BiasRow = {
   user_id: number;
-  username: string;
-  actual_name: string;
+  display_name: string;
+  jungol_name: string;
+  korean_name: string | null;
   total_point: number;
   updated_at: string | null;
 };
@@ -20,7 +23,7 @@ type BiasRow = {
 export default function BiasManagement() {
   const [rows, setRows] = useState<BiasRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
 
   const [begin, setBegin] = useState(""); // YYYY-MM-DD HH:MM:SS
@@ -35,8 +38,9 @@ export default function BiasManagement() {
     const f = filter.trim().toLowerCase();
     if (!f) return rows;
     return rows.filter(r => 
-      r.username.toLowerCase().includes(f) || 
-      (r.actual_name && r.actual_name.toLowerCase().includes(f))
+      r.display_name.toLowerCase().includes(f) ||
+      r.jungol_name.toLowerCase().includes(f) ||
+      (r.korean_name && r.korean_name.toLowerCase().includes(f))
     );
   }, [rows, filter]);
 
@@ -46,10 +50,10 @@ export default function BiasManagement() {
       setError(null);
       const res = await fetch(`${URL}/api/bias/all`, { credentials: 'include' });
       const json = await res.json();
-      if (!json?.success) throw new Error(json?.message || '조회 실패');
+      if (!res.ok || !json?.success) throw new Error(json?.message || '조회 실패');
       setRows(json.data || []);
-    } catch (err: any) {
-      setError(err?.message || '서버 오류');
+    } catch (err: unknown) {
+      setError(messageOf(err, '서버 오류'));
     } finally {
       setLoading(false);
     }
@@ -76,8 +80,8 @@ export default function BiasManagement() {
       if (!res.ok || json?.success === false) throw new Error(json?.message || '재계산 실패');
       await fetchRows();
       alert(`재계산 완료: ${json.insertedCount}건`);
-    } catch (err: any) {
-      alert(err?.message || '재계산 중 오류가 발생했습니다.');
+    } catch (err: unknown) {
+      alert(messageOf(err, '재계산 중 오류가 발생했습니다.'));
     } finally {
       setIsRecalcLoading(false);
     }
@@ -208,7 +212,7 @@ export default function BiasManagement() {
                 )}
                 {!loading && filtered.map((r) => (
                   <tr key={r.user_id} className="border-t">
-                    <td className="px-4 py-2">{r.username} <span className="text-muted-foreground text-xs ml-1">({r.actual_name})</span></td>
+                    <td className="px-4 py-2">{r.display_name} <span className="text-muted-foreground text-xs ml-1">({r.jungol_name})</span></td>
                     <td className="px-4 py-2 font-medium">{r.total_point}</td>
                     <td className="px-4 py-2 text-muted-foreground">{r.updated_at ? new Date(r.updated_at).toLocaleString() : '-'}</td>
                   </tr>

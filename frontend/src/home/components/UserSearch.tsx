@@ -5,30 +5,17 @@ import { Button } from '../../components/ui/button';
 import { Search, User } from 'lucide-react';
 import { URL } from '@/resource/constant';
 import { getTierName } from '../../lib/utils';
-import { useNavigate } from 'react-router-dom';
-
-interface User {
-  id: number;
-  name: string;
-  kr_name?: string;
-  corrects: number;
-  submissions: number;
-  solution: number;
-  tier: number;
-  atcoder_handle?: string;
-  codeforces_handle?: string;
-}
+import type { User as JungolUser } from '@/types';
 
 interface UserSearchProps {
-  onUserSelect?: (user: User) => void;
+  onUserSelect?: (user: JungolUser) => void;
   wide?: boolean;
 }
 
 const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect, wide = false }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [searchResults, setSearchResults] = useState<JungolUser[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const navigate = useNavigate();
 
   const handleSearch = async () => {
     if (!searchTerm.trim()) return;
@@ -36,10 +23,9 @@ const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect, wide = false }) =
     setIsSearching(true);
     try {
       const response = await fetch(`${URL}/api/user/search?q=${encodeURIComponent(searchTerm)}`);
-      if (response.ok) {
-        const data = await response.json();
-        setSearchResults(data);
-      }
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || '검색에 실패했습니다.');
+      setSearchResults(data as JungolUser[]);
     } catch (error) {
       console.error('사용자 검색 중 오류 발생:', error);
     } finally {
@@ -67,7 +53,7 @@ const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect, wide = false }) =
     ? 'w-full p-6 bg-white/5 backdrop-blur-sm border border-white/10'
     : 'w-full max-w-2xl mx-auto p-6 bg-white/5 backdrop-blur-sm border border-white/10';
 
-  const goProfile = (user: User) => {
+  const goProfile = (user: JungolUser) => {
     if (onUserSelect) onUserSelect(user);
   };
 
@@ -113,9 +99,9 @@ const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect, wide = false }) =
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-white">{user.name}</span>
-                        {user.kr_name && (
-                          <span className="text-sm text-gray-300">({user.kr_name})</span>
+                        <span className="font-semibold text-white">{user.jungol_name}</span>
+                        {user.korean_name && (
+                          <span className="text-sm text-gray-300">({user.korean_name})</span>
                         )}
                       </div>
                       <div className="flex items-center gap-4 text-sm text-gray-300">
