@@ -21,7 +21,6 @@ const LastMonthRanking: React.FC = () => {
         const fetchRankList = async () => {
             const response = await fetch(`${URL}/api/ranking/selected-month-board`);
             const res: Response = await response.json();
-            console.log(res)
             setRankList(res.data);
             setIsLoading(false);
         }
@@ -62,7 +61,7 @@ const LastMonthRanking: React.FC = () => {
         {/* 랭킹 리스트 */}
         <div className="relative isolate p-4 sm:p-6 lg:p-8 border border-transparent">
           {/* 그라데이션 보더/글로우 */}
-          <SquircleSurface radius="panel" className="pointer-events-none absolute inset-0 -z-10 bg-black/30 backdrop-blur-md border border-white/10 ring-1 ring-inset ring-white/10" />
+          <SquircleSurface radius="panel" className="pointer-events-none absolute inset-0 -z-10 bg-white/10 backdrop-blur-md border border-white/10 ring-1 ring-inset ring-white/10" />
           <div className="pointer-events-none absolute -inset-px blur-xl"><SquircleSurface radius="panel" className="h-full w-full bg-gradient-to-br from-blue-500/15 via-cyan-400/10 to-blue-500/15" /></div>
           {isLoading ? (
             // 로딩 스켈레톤
@@ -70,7 +69,7 @@ const LastMonthRanking: React.FC = () => {
               {Array.from({ length: 7 }).map((_, index) => (
                 <SquircleSurface radius="surface"
                   key={index}
-                  className="group relative bg-white/5 p-4 sm:p-5 flex flex-col items-center justify-center min-h-[150px] sm:min-h-[170px] animate-pulse"
+                  className="group relative bg-white/10 p-4 sm:p-5 flex flex-col items-center justify-center min-h-[150px] sm:min-h-[170px] animate-pulse"
                 >
                   {/* 순위 배지 스켈레톤 */}
                   <div className="flex flex-col items-center gap-1 sm:gap-2 mb-1 sm:mb-2">
@@ -120,7 +119,7 @@ const LastMonthRanking: React.FC = () => {
                       key={`top-${index}`}
                       className={`group relative isolate border-2 border-transparent p-3 sm:p-4 transition-all duration-300 hover:scale-105 flex flex-col items-center justify-center min-h-[140px] sm:min-h-[160px] w-full max-w-[220px] md:max-w-[240px] xl:max-w-[260px] `}
                     >
-                      <SquircleSurface className={`pointer-events-none absolute -inset-0.5 -z-10 bg-white/5 group-hover:bg-white/10 transition-all duration-300 ${
+                      <SquircleSurface className={`pointer-events-none absolute -inset-0.5 -z-10 bg-white/12 group-hover:bg-white/16 transition-all duration-300 ${
                         rank === 1 
                           ? 'border-2 border-yellow-400 shadow-lg shadow-yellow-400/20' 
                           : rank === 2 
@@ -196,7 +195,7 @@ const LastMonthRanking: React.FC = () => {
                       key={`bottom-${index}`}
                       className={`group relative isolate border-2 border-transparent px-3 py-4 sm:px-8 sm:py-5 transition-all duration-300 hover:scale-105 flex flex-col items-center justify-center min-h-[150px] sm:min-h-[170px] w-full `}
                     >
-                      <SquircleSurface className={`pointer-events-none absolute -inset-0.5 -z-10 bg-white/5 group-hover:bg-white/10 transition-all duration-300 ${
+                      <SquircleSurface className={`pointer-events-none absolute -inset-0.5 -z-10 bg-white/12 group-hover:bg-white/16 transition-all duration-300 ${
                         rank === 1 
                           ? 'border-2 border-yellow-400 shadow-lg shadow-yellow-400/20' 
                           : rank === 2 

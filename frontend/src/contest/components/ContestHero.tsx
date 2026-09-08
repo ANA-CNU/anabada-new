@@ -8,7 +8,7 @@ type ContestHeroProps = {
 const ContestHero: React.FC<ContestHeroProps> = ({ onApplyHref = "https://forms.gle/rsReeLGpgHWntZtv8" }) => {
   return (
     <section className="mb-8">
-      <SquircleSurface asChild radius="hero"><div className="relative overflow-hidden border border-white/10 bg-[radial-gradient(1200px_500px_at_-10%_-20%,rgba(255,255,255,0.08),transparent_60%),radial-gradient(900px_400px_at_110%_10%,rgba(255,255,255,0.06),transparent_60%)] mt-10 px-5 py-8 md:px-8 md:py-12">
+      <SquircleSurface asChild radius="hero"><div className="relative overflow-hidden border border-white/10 bg-white/5 mt-10 px-5 py-8 md:px-8 md:py-12">
         {/* accent badge */}
         <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1 text-sm text-white/80 backdrop-blur">
           2025 스위트콘
@@ -48,5 +48,3 @@ const ContestHero: React.FC<ContestHeroProps> = ({ onApplyHref = "https://forms.
 };
 
 export default ContestHero;
-
-

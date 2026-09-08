@@ -3,7 +3,7 @@ import React from "react";
 
 const ContestRules: React.FC = () => {
   return (
-    <SquircleSurface asChild radius="surface"><section className="mt-8 bg-gradient-to-b from-white/6 to-white/3 border border-white/10 p-6 text-white">
+    <SquircleSurface asChild radius="surface"><section className="mt-8 bg-white/5 border border-white/10 p-6 text-white">
       <h2 className="text-lg font-bold mb-3">대회 규칙</h2>
       <ol className="list-decimal list-inside space-y-1 text-white/80">
         <li>대회 입장 수속간에 운영진이 각 참가자에게 대회 참가 전용 백준 온라인 저지 계정을 발부, 대회 전용 계정으로 참가 진행</li>
@@ -16,5 +16,4 @@ const ContestRules: React.FC = () => {
 };
 
 export default ContestRules;
-
 

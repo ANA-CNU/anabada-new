@@ -22,7 +22,7 @@ const ContestPage: React.FC = () => {
           {/* Left column: 2 components (일정, 시상) */}
           <div className="flex-1 flex flex-col gap-4">
             {/* 일정 */}
-            <SquircleSurface asChild radius="surface"><div className="bg-gradient-to-b from-white/6 to-white/3 border border-white/10 p-6">
+            <SquircleSurface asChild radius="surface"><div className="bg-white/5 border border-white/10 p-6">
             <h2 className="text-lg font-bold mb-4">대회 일정</h2>
             <div className="mb-4">
               <ContestCalender anchorISO="2025-09-27" weeks={3} />
@@ -37,7 +37,7 @@ const ContestPage: React.FC = () => {
             </div></SquircleSurface>
 
             {/* 시상 */}
-            <SquircleSurface asChild radius="surface"><div className="bg-gradient-to-b from-white/6 to-white/3 border border-white/10 p-6">
+            <SquircleSurface asChild radius="surface"><div className="bg-white/5 border border-white/10 p-6">
             <h2 className="text-lg font-bold mb-4">시상</h2>
             <SquircleSurface asChild radius="control"><div className="overflow-hidden border border-white/10">
               <table className="w-full text-left text-sm">
@@ -81,7 +81,7 @@ const ContestPage: React.FC = () => {
           {/* Right column: 참가 자격 + 장소 */}
           <div className="w-full md:w-[38%] flex flex-col gap-4">
             {/* 참가 자격 (높이 제한) */}
-            <SquircleSurface asChild radius="surface"><div className="bg-gradient-to-b from-white/6 to-white/3 border border-white/10 overflow-hidden">
+            <SquircleSurface asChild radius="surface"><div className="bg-white/5 border border-white/10 overflow-hidden">
               <div className="p-6 max-h-[238px] overflow-auto">
               <h2 className="text-lg font-bold mb-4">참가 자격</h2>
               <ul className="space-y-2 text-white/90">
@@ -93,7 +93,7 @@ const ContestPage: React.FC = () => {
             </div></SquircleSurface>
 
             {/* 장소/접수 (지도 포함) */}
-            <SquircleSurface asChild radius="surface"><div className="bg-gradient-to-b from-white/6 to-white/3 border border-white/10 p-6">
+            <SquircleSurface asChild radius="surface"><div className="bg-white/5 border border-white/10 p-6">
               <h2 className="text-lg font-bold mb-4">장소 · 접수</h2>
               <ul className="space-y-2 text-white/90">
                 <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 rounded-full bg-violet-400"></span> 장소: 충남대학교 교내 (추후 공지)</li>
@@ -108,7 +108,7 @@ const ContestPage: React.FC = () => {
         </section>
 
         {/* Footer-like bottom sections */}
-        <SquircleSurface asChild radius="surface"><section className="mt-6 bg-gradient-to-b from-white/6 to-white/3 border border-white/10 p-6">
+        <SquircleSurface asChild radius="surface"><section className="mt-6 bg-white/5 border border-white/10 p-6">
           <h2 className="text-lg font-bold mb-2">역대 대회/문제 아카이브</h2>
           <p className="text-white/75 text-sm mb-3">
             역대 충남대학교 대회와 출제 문제는 백준 카테고리에서 확인할 수 있어요.

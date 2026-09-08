@@ -3,7 +3,7 @@ import React from "react";
 
 const ContestCTA: React.FC = () => {
   return (
-    <SquircleSurface asChild radius="surface"><section className="mt-4 mb-2 flex flex-wrap items-center justify-between gap-3 bg-gradient-to-b from-white/6 to-white/3 border border-white/10 p-6 text-white">
+    <SquircleSurface asChild radius="surface"><section className="mt-4 mb-2 flex flex-wrap items-center justify-between gap-3 bg-white/5 border border-white/10 p-6 text-white">
       <div className="text-white/80">문의: ANA 운영진</div>
       <SquircleSurface asChild radius="control"><a
         href="https://forms.gle/rsReeLGpgHWntZtv8"
@@ -18,5 +18,4 @@ const ContestCTA: React.FC = () => {
 };
 
 export default ContestCTA;
-
 

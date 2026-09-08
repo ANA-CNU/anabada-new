@@ -13,7 +13,7 @@ function Enter() {
           <Header />
 
           <main className="flex-1 flex items-center justify-center py-8 px-4 break-keep [overflow-wrap:anywhere]">
-            <SquircleSurface asChild radius="panel"><div className="w-full max-w-[900px] bg-gradient-to-br from-white/10 to-white/5 border border-white/20 shadow-2xl backdrop-blur-sm p-8 sm:p-12 text-white">
+            <SquircleSurface asChild radius="panel"><div className="w-full max-w-[900px] bg-white/10 border border-white/20 shadow-2xl backdrop-blur-sm p-8 sm:p-12 text-white">
               {/* 헤더 섹션 */}
               <div className="text-center mb-10">
                 <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full mb-6 shadow-lg">
@@ -28,7 +28,7 @@ function Enter() {
               </div>
 
               {/* 참여 혜택 섹션 */}
-              <SquircleSurface asChild radius="surface"><div className="mb-10 p-6 bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-400/30">
+              <SquircleSurface asChild radius="surface"><div className="mb-10 p-6 bg-white/5 border border-blue-400/30">
                 <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
                   <Star className="w-6 h-6 text-yellow-400" />
                   참여 혜택
@@ -66,7 +66,7 @@ function Enter() {
               </div></SquircleSurface>
 
               {/* 상품 혜택 섹션 */}
-              <SquircleSurface asChild radius="surface"><div className="mb-10 p-6 bg-gradient-to-r from-yellow-500/20 to-red-500/20 border border-yellow-400/30">
+              <SquircleSurface asChild radius="surface"><div className="mb-10 p-6 bg-white/5 border border-yellow-400/30">
                 <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
                   <Trophy className="w-6 h-6 text-yellow-400" />
                   상품 혜택
@@ -160,7 +160,7 @@ function Enter() {
               </div>
 
               {/* 주의사항 섹션 */}
-              <SquircleSurface asChild radius="surface"><div className="mb-10 p-6 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-400/30">
+              <SquircleSurface asChild radius="surface"><div className="mb-10 p-6 bg-white/5 border border-yellow-400/30">
                 <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
                   <MessageCircle className="w-6 h-6 text-yellow-400" />
                   주의사항
@@ -186,7 +186,7 @@ function Enter() {
               </div></SquircleSurface>
 
               {/* 문의 섹션 */}
-              <SquircleSurface asChild radius="surface"><div className="mb-10 p-6 bg-gradient-to-r from-green-500/20 to-blue-500/20 border border-green-400/30">
+              <SquircleSurface asChild radius="surface"><div className="mb-10 p-6 bg-white/5 border border-green-400/30">
                 <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
                   <Users className="w-6 h-6 text-green-400" />
                   문의 및 연락처

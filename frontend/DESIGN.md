@@ -6,7 +6,7 @@ Preserve the existing community dashboard: bright surfaces, blue accents, compac
 
 ## 2. Color
 
-`src/index.css` is the color source of truth. Preserve its background, foreground, card, popover, primary, secondary, muted, accent, destructive, border, input, ring, chart, and sidebar variables and their dark overrides. Existing page blue/slate ramps remain unchanged.
+`src/index.css` is the color source of truth. Preserve its background, foreground, card, popover, primary, secondary, muted, accent, destructive, border, input, ring, chart, and sidebar variables and their dark overrides. Existing page atmosphere, text treatments, controls, badges, charts, and score boards retain their visual effects. Only card and panel surface backgrounds replace gradients with the existing translucent single-color fill.
 
 ## 3. Typography
 

@@ -6,7 +6,7 @@ const ContestEndNotice: React.FC = () => {
   return (
     <section className="w-full px-10 mb-10 lg:px-20 py-6 break-keep [overflow-wrap:anywhere]">
       <div className="max-w-6xl mx-auto">
-        <SquircleSurface radius="panel" className="w-full bg-gradient-to-r from-green-400/20 via-emerald-200/10 to-white/5 outline outline-1 outline-green-300/30 outline-offset-0 text-white p-6 md:p-8">
+        <SquircleSurface radius="panel" className="w-full bg-white/5 outline outline-1 outline-green-300/30 outline-offset-0 text-white p-6 md:p-8">
           <div className="text-center mb-6">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-green-500/20 rounded-full mb-4">
               <span className="text-3xl">🎉</span>
@@ -28,7 +28,7 @@ const ContestEndNotice: React.FC = () => {
                 대회에서 출제된 모든 문제들이 백준 온라인 저지에 공개되었습니다.
               </p>
               <SquircleSurface radius="control" asChild><Link
-                to="https://www.acmicpc.net/category/detail/4575"
+                to="https://aoj.anacnu.kr/sources/11"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center px-4 py-2 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-400/40 text-blue-300 hover:text-blue-200 transition-colors"

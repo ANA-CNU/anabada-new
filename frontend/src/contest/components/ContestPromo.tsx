@@ -6,7 +6,7 @@ const ContestPromo: React.FC = () => {
   return (
     <section className="w-full px-10 mb-10 lg:px-20 py-6">
       <div className="max-w-6xl mx-auto">
-        <SquircleSurface asChild radius="surface"><div className="w-full bg-gradient-to-r from-amber-400/20 via-amber-200/10 to-white/5 outline outline-1 outline-amber-300/30 outline-offset-0 text-white p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center gap-4">
+        <SquircleSurface asChild radius="surface"><div className="w-full bg-white/5 outline outline-1 outline-amber-300/30 outline-offset-0 text-white p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center gap-4">
           <div className="flex-1">
             <h2 className="text-xl md:text-2xl font-bold mb-2">💫 2025 충남대학교 SW-IT Contest</h2>
             <p className="text-white/80 text-sm md:text-base">
@@ -36,5 +36,4 @@ const ContestPromo: React.FC = () => {
 };
 
 export default ContestPromo;
-
 
