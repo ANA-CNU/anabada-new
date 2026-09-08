@@ -70,7 +70,7 @@ export class RankingRepository {
   solvedThisMonth(start: Date, end: Date) {
     return this.database.select(
       operation("ranking.solved_month"),
-      `SELECT COALESCE(u.korean_name, u.jungol_name) AS display_name, u.jungol_name, u.korean_name, u.tier, COUNT(p.id) AS solved FROM user u JOIN problem p ON p.user_id = u.id WHERE p.repeatation = 0 AND p.verdict = 'accepted' AND p.submitted_at >= ? AND p.submitted_at < ? GROUP BY u.id, u.jungol_name, u.korean_name, u.tier HAVING COUNT(p.id) > 0 ORDER BY solved DESC, u.jungol_name ASC`,
+      `SELECT u.jungol_name AS display_name, u.jungol_name, u.korean_name, u.tier, COUNT(p.id) AS solved FROM user u JOIN problem p ON p.user_id = u.id WHERE p.repeatation = 0 AND p.verdict = 'accepted' AND p.submitted_at >= ? AND p.submitted_at < ? GROUP BY u.id, u.jungol_name, u.korean_name, u.tier HAVING COUNT(p.id) > 0 ORDER BY solved DESC, u.jungol_name ASC`,
       [start, end],
       solvedRow,
     );
@@ -78,7 +78,7 @@ export class RankingRepository {
   monthlySolved(start: Date, end: Date) {
     return this.database.select(
       operation("ranking.monthly_solved"),
-      `SELECT COALESCE(u.korean_name, u.jungol_name) AS display_name, u.jungol_name, u.korean_name, u.tier, COUNT(p.id) AS solved, u.corrects AS total_solved FROM user u JOIN problem p ON p.user_id = u.id WHERE p.repeatation = 0 AND p.verdict = 'accepted' AND p.submitted_at >= ? AND p.submitted_at < ? GROUP BY u.id, u.jungol_name, u.korean_name, u.tier, u.corrects HAVING COUNT(p.id) > 0 ORDER BY solved DESC, u.jungol_name ASC`,
+      `SELECT u.jungol_name AS display_name, u.jungol_name, u.korean_name, u.tier, COUNT(p.id) AS solved, u.corrects AS total_solved FROM user u JOIN problem p ON p.user_id = u.id WHERE p.repeatation = 0 AND p.verdict = 'accepted' AND p.submitted_at >= ? AND p.submitted_at < ? GROUP BY u.id, u.jungol_name, u.korean_name, u.tier, u.corrects HAVING COUNT(p.id) > 0 ORDER BY solved DESC, u.jungol_name ASC`,
       [start, end],
       monthlySolvedRow,
     );
@@ -86,7 +86,7 @@ export class RankingRepository {
   bias() {
     return this.database.select(
       operation("ranking.bias"),
-      "SELECT COALESCE(u.korean_name, u.jungol_name) AS display_name, u.jungol_name, u.korean_name, u.tier, ub.total_point AS bias FROM user u JOIN user_bias_total ub ON ub.user_id = u.id WHERE ub.total_point > 0 ORDER BY ub.total_point DESC",
+      "SELECT u.jungol_name AS display_name, u.jungol_name, u.korean_name, u.tier, ub.total_point AS bias FROM user u JOIN user_bias_total ub ON ub.user_id = u.id WHERE ub.total_point > 0 ORDER BY ub.total_point DESC",
       [],
       biasRow,
     );
@@ -94,7 +94,7 @@ export class RankingRepository {
   latestBias(start: Date, end: Date) {
     return this.database.select(
       operation("ranking.bias_v2"),
-      `WITH latest_board AS (SELECT id FROM ranking_boards ORDER BY id DESC LIMIT 1), previous_board AS (SELECT id FROM ranking_boards WHERE id < (SELECT id FROM latest_board) ORDER BY id DESC LIMIT 1), monthly_problems AS (SELECT user_id, COUNT(*) AS monthly_problem FROM problem WHERE repeatation = 0 AND verdict = 'accepted' AND submitted_at >= ? AND submitted_at < ? GROUP BY user_id) SELECT COALESCE(u.korean_name, u.jungol_name) AS display_name, u.jungol_name, u.korean_name, u.tier, lr.rank, COALESCE(pr.rank - lr.rank, 0) AS delta, u.corrects AS total_problem, COALESCE(ubt.total_point, 0) AS bias, COALESCE(mp.monthly_problem, 0) AS monthly_problem FROM ranked_users lr JOIN latest_board lb ON lr.board_id = lb.id JOIN user u ON u.id = lr.user_id LEFT JOIN ranked_users pr ON pr.user_id = lr.user_id AND pr.board_id = (SELECT id FROM previous_board) LEFT JOIN user_bias_total ubt ON ubt.user_id = u.id LEFT JOIN monthly_problems mp ON mp.user_id = u.id ORDER BY lr.rank`,
+      `WITH latest_board AS (SELECT id FROM ranking_boards ORDER BY id DESC LIMIT 1), previous_board AS (SELECT id FROM ranking_boards WHERE id < (SELECT id FROM latest_board) ORDER BY id DESC LIMIT 1), monthly_problems AS (SELECT user_id, COUNT(*) AS monthly_problem FROM problem WHERE repeatation = 0 AND verdict = 'accepted' AND submitted_at >= ? AND submitted_at < ? GROUP BY user_id) SELECT u.jungol_name AS display_name, u.jungol_name, u.korean_name, u.tier, lr.rank, COALESCE(pr.rank - lr.rank, 0) AS delta, u.corrects AS total_problem, COALESCE(ubt.total_point, 0) AS bias, COALESCE(mp.monthly_problem, 0) AS monthly_problem FROM ranked_users lr JOIN latest_board lb ON lr.board_id = lb.id JOIN user u ON u.id = lr.user_id LEFT JOIN ranked_users pr ON pr.user_id = lr.user_id AND pr.board_id = (SELECT id FROM previous_board) LEFT JOIN user_bias_total ubt ON ubt.user_id = u.id LEFT JOIN monthly_problems mp ON mp.user_id = u.id ORDER BY lr.rank`,
       [start, end],
       latestBiasRow,
     );
@@ -102,7 +102,7 @@ export class RankingRepository {
   latestBoard() {
     return this.database.select(
       operation("ranking.board_latest"),
-      "SELECT COALESCE(u.korean_name, u.jungol_name) AS display_name, u.jungol_name, u.korean_name, u.tier, COALESCE(ub.total_point, 0) AS bias, ru.rank FROM ranked_users ru JOIN user u ON u.id = ru.user_id LEFT JOIN user_bias_total ub ON ub.user_id = u.id WHERE ru.board_id = (SELECT id FROM ranking_boards ORDER BY created_at DESC LIMIT 1) ORDER BY ru.rank",
+      "SELECT u.jungol_name AS display_name, u.jungol_name, u.korean_name, u.tier, COALESCE(ub.total_point, 0) AS bias, ru.rank FROM ranked_users ru JOIN user u ON u.id = ru.user_id LEFT JOIN user_bias_total ub ON ub.user_id = u.id WHERE ru.board_id = (SELECT id FROM ranking_boards ORDER BY created_at DESC LIMIT 1) ORDER BY ru.rank",
       [],
       boardRow,
     );
@@ -118,7 +118,7 @@ export class RankingRepository {
   topGainers(limit: number) {
     return this.database.select(
       operation("ranking.top_gainers"),
-      "WITH boards AS (SELECT id, ROW_NUMBER() OVER (ORDER BY created_at DESC) AS ordinal FROM ranking_boards) SELECT ru_latest.user_id, COALESCE(u.korean_name, u.jungol_name) AS display_name, u.jungol_name, u.korean_name, u.tier, ru_latest.rank, ru_previous.rank - ru_latest.rank AS delta FROM ranked_users ru_latest JOIN boards latest ON latest.id = ru_latest.board_id AND latest.ordinal = 1 JOIN boards previous ON previous.ordinal = 2 JOIN ranked_users ru_previous ON ru_previous.board_id = previous.id AND ru_previous.user_id = ru_latest.user_id JOIN user u ON u.id = ru_latest.user_id ORDER BY delta DESC LIMIT ?",
+      "WITH boards AS (SELECT id, ROW_NUMBER() OVER (ORDER BY created_at DESC) AS ordinal FROM ranking_boards) SELECT ru_latest.user_id, u.jungol_name AS display_name, u.jungol_name, u.korean_name, u.tier, ru_latest.rank, ru_previous.rank - ru_latest.rank AS delta FROM ranked_users ru_latest JOIN boards latest ON latest.id = ru_latest.board_id AND latest.ordinal = 1 JOIN boards previous ON previous.ordinal = 2 JOIN ranked_users ru_previous ON ru_previous.board_id = previous.id AND ru_previous.user_id = ru_latest.user_id JOIN user u ON u.id = ru_latest.user_id ORDER BY delta DESC LIMIT ?",
       [limit],
       gainersRow,
     );
@@ -134,7 +134,7 @@ export class RankingRepository {
   selectedMonth(start: Date, end: Date, limit: number) {
     return this.database.select(
       operation("ranking.selected_month"),
-      `SELECT COALESCE(u.korean_name, u.jungol_name) AS display_name, u.jungol_name, u.korean_name, u.tier, ru.rank, COALESCE(ps.solved, 0) AS last_month_solved, COALESCE(ss.score, 0) AS last_month_score FROM ranked_users ru JOIN (SELECT id FROM ranking_boards WHERE is_active = 1 ORDER BY created_at DESC LIMIT 1) board ON board.id = ru.board_id JOIN user u ON u.id = ru.user_id LEFT JOIN (SELECT user_id, COUNT(*) AS solved FROM problem WHERE repeatation = 0 AND verdict = 'accepted' AND submitted_at >= ? AND submitted_at < ? GROUP BY user_id) ps ON ps.user_id = u.id LEFT JOIN (SELECT user_id, SUM(bias) AS score FROM score_history WHERE created_at >= ? AND created_at < ? GROUP BY user_id) ss ON ss.user_id = u.id ORDER BY ru.rank LIMIT ?`,
+      `SELECT u.jungol_name AS display_name, u.jungol_name, u.korean_name, u.tier, ru.rank, COALESCE(ps.solved, 0) AS last_month_solved, COALESCE(ss.score, 0) AS last_month_score FROM ranked_users ru JOIN (SELECT id FROM ranking_boards WHERE is_active = 1 ORDER BY created_at DESC LIMIT 1) board ON board.id = ru.board_id JOIN user u ON u.id = ru.user_id LEFT JOIN (SELECT user_id, COUNT(*) AS solved FROM problem WHERE repeatation = 0 AND verdict = 'accepted' AND submitted_at >= ? AND submitted_at < ? GROUP BY user_id) ps ON ps.user_id = u.id LEFT JOIN (SELECT user_id, SUM(bias) AS score FROM score_history WHERE created_at >= ? AND created_at < ? GROUP BY user_id) ss ON ss.user_id = u.id ORDER BY ru.rank LIMIT ?`,
       [start, end, start, end, limit],
       selectedMonthRow,
     );
@@ -142,7 +142,7 @@ export class RankingRepository {
   recentlyScore(limit: number, offset: number) {
     return this.database.select(
       operation("ranking.recent_score"),
-      "SELECT sh.id, COALESCE(u.korean_name, u.jungol_name) AS display_name, sh.desc, sh.bias, sh.event_id, CAST(sh.problem_id AS CHAR) AS problem_id, sh.created_at FROM score_history sh JOIN user u ON u.id = sh.user_id WHERE u.ignored = 0 ORDER BY sh.created_at DESC LIMIT ? OFFSET ?",
+      "SELECT sh.id, u.jungol_name AS display_name, sh.desc, sh.bias, sh.event_id, CAST(sh.problem_id AS CHAR) AS problem_id, sh.created_at FROM score_history sh JOIN user u ON u.id = sh.user_id WHERE u.ignored = 0 ORDER BY sh.created_at DESC LIMIT ? OFFSET ?",
       [limit, offset],
       scoreRow,
     );
@@ -150,7 +150,7 @@ export class RankingRepository {
   recentScoreTop(limit: number) {
     return this.database.select(
       operation("ranking.recent_score_top"),
-      "SELECT sh.id, COALESCE(u.korean_name, u.jungol_name) AS display_name, sh.desc, sh.bias, sh.event_id, CAST(sh.problem_id AS CHAR) AS problem_id, sh.created_at FROM score_history sh JOIN user u ON u.id = sh.user_id ORDER BY sh.created_at DESC LIMIT ?",
+      "SELECT sh.id, u.jungol_name AS display_name, sh.desc, sh.bias, sh.event_id, CAST(sh.problem_id AS CHAR) AS problem_id, sh.created_at FROM score_history sh JOIN user u ON u.id = sh.user_id ORDER BY sh.created_at DESC LIMIT ?",
       [limit],
       scoreRow,
     );
@@ -158,7 +158,7 @@ export class RankingRepository {
   scoreHistory(userId: number, limit: number) {
     return this.database.select(
       operation("ranking.user_score_history"),
-      "SELECT sh.id, COALESCE(u.korean_name, u.jungol_name) AS display_name, sh.desc, sh.bias, sh.event_id, CAST(sh.problem_id AS CHAR) AS problem_id, sh.created_at FROM score_history sh JOIN user u ON u.id = sh.user_id WHERE sh.user_id = ? ORDER BY sh.created_at DESC LIMIT ?",
+      "SELECT sh.id, u.jungol_name AS display_name, sh.desc, sh.bias, sh.event_id, CAST(sh.problem_id AS CHAR) AS problem_id, sh.created_at FROM score_history sh JOIN user u ON u.id = sh.user_id WHERE sh.user_id = ? ORDER BY sh.created_at DESC LIMIT ?",
       [userId, limit],
       scoreRow,
     );

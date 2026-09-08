@@ -9,7 +9,7 @@ export type AccountId = z.infer<typeof accountIdSchema>;
 const rawRankMemberSchema = z
   .object({
     accountId: accountIdSchema,
-    jungolName: z.string().trim().min(1),
+    jungolName: z.string().trim().min(1).max(50),
     solvedCount: z.number().int().nonnegative().safe(),
     wrongCount: z.number().int().nonnegative().safe(),
     acRating: z.number().int().nonnegative().safe(),

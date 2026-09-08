@@ -51,7 +51,7 @@ export class BiasRepository {
   async list(): Promise<readonly BiasUser[]> {
     return this.database.select(
       operations.list,
-      "SELECT u.id AS user_id, u.jungol_name, u.korean_name, COALESCE(u.korean_name, u.jungol_name) AS display_name, COALESCE(ubt.total_point, 0) AS total_point, ubt.updated_at FROM user u LEFT JOIN user_bias_total ubt ON ubt.user_id = u.id ORDER BY total_point DESC, u.jungol_name ASC",
+      "SELECT u.id AS user_id, u.jungol_name, u.korean_name, u.jungol_name AS display_name, COALESCE(ubt.total_point, 0) AS total_point, ubt.updated_at FROM user u LEFT JOIN user_bias_total ubt ON ubt.user_id = u.id ORDER BY total_point DESC, u.jungol_name ASC",
       [],
       biasUserSchema,
     );

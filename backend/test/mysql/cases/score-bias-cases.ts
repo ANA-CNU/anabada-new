@@ -111,7 +111,7 @@ export async function runScoreBiasCases(
     data: [
       {
         user_id: 1,
-        display_name: "가나다",
+        display_name: "alpha",
         jungol_name: "alpha",
         korean_name: "가나다",
         rule_type: "manual",

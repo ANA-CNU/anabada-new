@@ -51,7 +51,7 @@ CREATE TABLE `hook` (
 -- 별도의 rank 테이블은 만들지 않으며, Jungol 랭킹 페이지의 값은 이 테이블과 직접 비교한다.
 CREATE TABLE `user` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
-  -- 랭킹 페이지와 사용자 화면에 표시할 Jungol 계정 이름이다.
+  -- Jungol 랭킹의 계정 링크(handle)에서 읽은 로그인 사용자명이다. 외부 nickname/name은 저장하지 않는다.
   `jungol_name` varchar(50) NOT NULL,
   -- 마지막으로 정상 반영한 Jungol 랭킹 페이지의 서로 다른 해결 문제 수다.
   `corrects` int unsigned NOT NULL DEFAULT 0,
@@ -60,7 +60,7 @@ CREATE TABLE `user` (
   -- 마지막으로 끝까지 검사하고 transaction으로 정상 커밋한 Jungol 제출 번호다.
   -- 검사 완료한 최신 제출이 오답이어도 cursor는 그 제출 번호까지 전진할 수 있다.
   `solution` bigint unsigned NOT NULL DEFAULT 0 COMMENT '마지막으로 검사 완료하고 커밋한 Jungol 제출 번호이며 오답 제출 번호일 수도 있음',
-  -- 서비스 화면에서 사용할 한글 이름이다. 등록되지 않은 사용자는 NULL이다.
+  -- 관리자가 입력한 내부 한글 표기다. Jungol nickname/name에서 채우지 않으며, 기본 표시는 jungol_name이다.
   `korean_name` varchar(25) DEFAULT NULL,
   -- 서비스 점수 규칙에서 사용하는 0~31 범위의 정규화 난이도 값이다.
   `tier` int NOT NULL DEFAULT 0,
@@ -68,7 +68,7 @@ CREATE TABLE `user` (
   `ac_rating` int unsigned NOT NULL DEFAULT 0,
   -- 수집 또는 내부 순위에서 제외할 사용자를 표시한다.
   `ignored` tinyint(1) NOT NULL DEFAULT 0,
-  -- 계정 이름 변경과 무관하게 사용자를 식별하는 Jungol의 불변 account ID다.
+  -- 로그인 사용자명(handle) 변경과 무관하게 사용자를 식별하는 Jungol의 불변 숫자 account ID다.
   `jungol_account_id` bigint unsigned NOT NULL,
   -- 마지막으로 정상 반영한 Jungol 랭킹 페이지의 틀린 문제 수다.
   `rank_wrong_count` int unsigned NOT NULL DEFAULT 0,

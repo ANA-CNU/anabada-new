@@ -19,7 +19,7 @@ export async function runRankingScoreCases(
       data: [
         {
           id: 403,
-          display_name: "가나다",
+          display_name: "alpha",
           desc: "수동 차감",
           bias: -3,
           event_id: null,
@@ -28,7 +28,7 @@ export async function runRankingScoreCases(
         },
         {
           id: 402,
-          display_name: "가나다",
+          display_name: "alpha",
           desc: "이벤트",
           bias: 1,
           event_id: 201,
@@ -48,7 +48,7 @@ export async function runRankingScoreCases(
       data: [
         {
           id: 401,
-          display_name: "가나다",
+          display_name: "alpha",
           desc: "일일",
           bias: 1,
           event_id: null,
@@ -77,7 +77,7 @@ export async function runRankingScoreCases(
       data: [
         {
           id: 405,
-          display_name: "무시",
+          display_name: "ignored",
           desc: "제외 대상",
           bias: 9,
           event_id: null,
@@ -92,7 +92,7 @@ export async function runRankingScoreCases(
   await expectRankingJson(context, "/api/score_history/user/1", [
     {
       id: 403,
-      display_name: "가나다",
+      display_name: "alpha",
       desc: "수동 차감",
       bias: -3,
       event_id: null,
@@ -101,7 +101,7 @@ export async function runRankingScoreCases(
     },
     {
       id: 402,
-      display_name: "가나다",
+      display_name: "alpha",
       desc: "이벤트",
       bias: 1,
       event_id: 201,
@@ -110,7 +110,7 @@ export async function runRankingScoreCases(
     },
     {
       id: 401,
-      display_name: "가나다",
+      display_name: "alpha",
       desc: "일일",
       bias: 1,
       event_id: null,

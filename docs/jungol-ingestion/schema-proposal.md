@@ -46,8 +46,8 @@ erDiagram
 | 테이블 | 컬럼 | 의미 |
 |---|---|---|
 | user | id | 내부 INT UNSIGNED PK |
-| user | jungol_name | 현재 Jungol 이름/handle, VARCHAR(50), 필수·유일 |
-| user | korean_name | 한글 표시 이름, VARCHAR(25), NULL 가능 |
+| user | jungol_name | 현재 Jungol 로그인 사용자명/handle, VARCHAR(50), 필수·유일. 외부 name/nickname은 저장하지 않음 |
+| user | korean_name | 관리자가 입력한 내부 한글 표기, VARCHAR(25), NULL 가능. Jungol name/nickname은 저장하지 않음 |
 | user | jungol_account_id | 불변 외부 계정 BIGINT UNSIGNED ID, 필수·유일 |
 | user | corrects | 마지막으로 성공 처리한 페이지 푼 문제 수, UNSIGNED 기본 0 |
 | user | rank_wrong_count | 같은 관찰의 틀린 문제 수, UNSIGNED 기본 0 |

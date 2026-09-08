@@ -16,7 +16,7 @@ export async function runRankingCases(
     success: true,
     data: [
       {
-        display_name: "가나다",
+        display_name: "alpha",
         jungol_name: "alpha",
         korean_name: "가나다",
         tier: 12,
@@ -29,7 +29,7 @@ export async function runRankingCases(
     success: true,
     data: [
       {
-        display_name: "가나다",
+        display_name: "alpha",
         jungol_name: "alpha",
         korean_name: "가나다",
         tier: 12,
@@ -60,7 +60,7 @@ export async function runRankingCases(
     success: true,
     data: [
       {
-        display_name: "가나다",
+        display_name: "alpha",
         jungol_name: "alpha",
         korean_name: "가나다",
         tier: 12,
@@ -88,7 +88,7 @@ export async function runRankingCases(
     success: true,
     data: [
       {
-        display_name: "가나다",
+        display_name: "alpha",
         jungol_name: "alpha",
         korean_name: "가나다",
         tier: 12,
@@ -116,7 +116,7 @@ export async function runRankingCases(
     data: [
       {
         user_id: 1,
-        display_name: "가나다",
+        display_name: "alpha",
         jungol_name: "alpha",
         korean_name: "가나다",
         tier: 12,
@@ -142,7 +142,7 @@ export async function runRankingCases(
     success: true,
     data: [
       {
-        display_name: "가나다",
+        display_name: "alpha",
         jungol_name: "alpha",
         korean_name: "가나다",
         tier: 12,

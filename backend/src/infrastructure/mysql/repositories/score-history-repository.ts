@@ -128,7 +128,7 @@ export class ScoreHistoryRepository {
     );
     const data = await this.database.select(
       operations.list,
-      `SELECT sh.id, sh.user_id, COALESCE(u.korean_name, u.jungol_name) AS display_name, u.jungol_name, u.korean_name, sh.\`desc\`, sh.bias, sh.rule_type, sh.score_day, sh.event_id, CAST(sh.problem_id AS CHAR) AS problem_id, sh.created_at FROM score_history sh JOIN user u ON u.id = sh.user_id${filter} ORDER BY sh.created_at DESC, sh.id DESC LIMIT ? OFFSET ?`,
+      `SELECT sh.id, sh.user_id, u.jungol_name AS display_name, u.jungol_name, u.korean_name, sh.\`desc\`, sh.bias, sh.rule_type, sh.score_day, sh.event_id, CAST(sh.problem_id AS CHAR) AS problem_id, sh.created_at FROM score_history sh JOIN user u ON u.id = sh.user_id${filter} ORDER BY sh.created_at DESC, sh.id DESC LIMIT ? OFFSET ?`,
       [...values, limit, (page - 1) * limit],
       adminScoreHistorySchema,
     );

@@ -42,7 +42,7 @@ export class ActivityRepository {
   ): Promise<readonly RecentSolvedDto[]> {
     return this.database.select(
       operations.recent,
-      "SELECT COALESCE(u.korean_name, u.jungol_name) AS display_name, u.jungol_name, u.korean_name, p.problem, p.problem_name, p.submitted_at FROM problem p JOIN user u ON p.user_id = u.id WHERE p.repeatation = 0 AND p.verdict = 'accepted' AND u.ignored = 0 ORDER BY p.submitted_at DESC LIMIT ? OFFSET ?",
+      "SELECT u.jungol_name AS display_name, u.jungol_name, u.korean_name, p.problem, p.problem_name, p.submitted_at FROM problem p JOIN user u ON p.user_id = u.id WHERE p.repeatation = 0 AND p.verdict = 'accepted' AND u.ignored = 0 ORDER BY p.submitted_at DESC LIMIT ? OFFSET ?",
       [limit, offset],
       recentSolvedDtoSchema,
     );

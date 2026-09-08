@@ -111,7 +111,7 @@ export async function runUserActivityCases(
     success: true,
     data: [
       {
-        display_name: "가나다",
+        display_name: "alpha",
         jungol_name: "alpha",
         korean_name: "가나다",
         problem: 1000,

@@ -32,7 +32,7 @@ test("Given a local Jungol fixture When browsing Then rank, raw pagination and f
     response.setHeader("content-type", "text/html; charset=utf-8");
     if (url.pathname.endsWith("/rank")) {
       response.end(
-        '<table><tr><th>등수</th><th>계정</th><th>푼 문제</th><th>틀린 문제</th><th>스트릭</th><th>AC 레이팅</th></tr><tr><td>1</td><td><a href="/account/42">member</a></td><td>1,234문제</td><td>2문제</td><td>0일</td><td>45</td></tr></table>',
+        '<table><tr><th>등수</th><th>계정</th><th>푼 문제</th><th>틀린 문제</th><th>스트릭</th><th>AC 레이팅</th></tr><tr><td>1</td><td><a href="/account/42"></a><script>{ const chip = document.createElement("a"); chip.className = "chip"; chip.href = "/account/42"; chip.textContent = "member"; document.currentScript.previousElementSibling.append(chip); }</script></td><td>1,234문제</td><td>2문제</td><td>0일</td><td>45</td></tr></table>',
       );
       return;
     }
