@@ -53,6 +53,12 @@ pass 'each required key missing/empty and every key with CR/LF fail while preser
 (unset VITE_KAKAO_MAP_API_KEY WEBHOOK_URL; bash "$renderer" "$test_dir/optional.env")
 grep -Fqx 'VITE_KAKAO_MAP_API_KEY=""' "$test_dir/optional.env" || fail 'optional default is not empty'
 grep -Fqx 'WEBHOOK_URL=""' "$test_dir/optional.env" || fail 'optional webhook default is not empty'
+# Given an optional Discord-compatible webhook, when rendered, then its exact value is retained without logs.
+webhook_fixture='https://discord.com/api/webhooks/000000000000000000/placeholder-not-live'
+export WEBHOOK_URL="$webhook_fixture"
+bash "$renderer" "$test_dir/webhook.env" >"$test_dir/stdout" 2>"$test_dir/stderr" || fail 'optional webhook render'
+[[ ! -s "$test_dir/stdout" && ! -s "$test_dir/stderr" ]] || fail 'optional webhook render leaked logs'
+grep -Fqx "WEBHOOK_URL=\"$webhook_fixture\"" "$test_dir/webhook.env" || fail 'optional webhook did not round trip'
 if bash "$renderer" >"$test_dir/stdout" 2>"$test_dir/stderr"; then fail 'missing path accepted'; fi
 if bash "$renderer" "$test_dir/production.env" extra >"$test_dir/stdout" 2>"$test_dir/stderr"; then fail 'extra arguments accepted'; fi
 if bash "$renderer" "$test_dir/missing/production.env" >"$test_dir/stdout" 2>"$test_dir/stderr"; then fail 'missing directory accepted'; fi

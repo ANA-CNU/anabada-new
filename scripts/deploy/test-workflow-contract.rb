@@ -18,11 +18,14 @@ inventory = example.lines.grep(/^#/).join.scan(/\b[A-Z][A-Z_]+\b/)
 (runtime + ssh + optional).each { |key| check(inventory.include?(key), "Missing secret inventory: #{key}") }
 
 workflow = YAML.load_file('.github/workflows/deploy.yaml')
+deploy_environment = workflow.fetch('jobs').fetch('deploy').fetch('env')
+check(deploy_environment.fetch('WEBHOOK_URL') == '${{ secrets.WEBHOOK_URL }}', 'Optional webhook must reach renderer environment')
 steps = workflow.fetch('jobs').fetch('deploy').fetch('steps')
 check(steps.first['name'] == 'Validate required GitHub secrets', 'Validation must be first')
 check(steps[1]['uses'] == 'actions/checkout@v4', 'Checkout must follow validation')
 validate = steps.first.fetch('run')
 deploy = steps.find { |step| step['name'] == 'Render root environment and deploy' }.fetch('run')
+check(!validate.match?(/\bWEBHOOK_URL\b/), 'Optional webhook must not become a required GitHub secret')
 check(!deploy.match?(/runtime-secrets|\.secrets|\bsource\b|JUNGOL_DB_PASSWORD/), 'Obsolete secret provisioning')
 %w[StrictHostKeyChecking=accept-new BatchMode=yes].each { |text| check(deploy.include?(text), "Missing SSH safety: #{text}") }
 ['git status --porcelain --untracked-files=all', 'git merge --ff-only "$2"', 'test "$(git rev-parse HEAD)" = "$2"', 'test "$(git rev-parse origin/main)" = "$1"', 'install -m 0600 "$1/.env" .env.next', 'mv -f .env.next .env', 'docker compose --env-file .env -f docker-compose.prod.yaml config --quiet', '--wait --wait-timeout 180'].each do |text|
@@ -56,6 +59,7 @@ Dir.mktmpdir('workflow-contract-') do |dir|
     [[ "$1" == '-i' ]]
     env_file="${2%/key}/.env"
     test -f "$env_file"
+    grep -Fqx "WEBHOOK_URL=\"${EXPECTED_WEBHOOK}\"" "$env_file"
     printf '%s' "${2%/key}" > "$MOCK_TEMP"
     docker compose --env-file "$env_file" -f docker-compose.prod.yaml config --quiet
     cat > /dev/null
@@ -64,7 +68,7 @@ Dir.mktmpdir('workflow-contract-') do |dir|
   File.chmod(0700, mock)
   env = (runtime + ssh).to_h { |key| [key, 'fake-workflow-value'] }
   env.merge!('DEPLOY_PORT' => '22', 'DEPLOY_SHA' => 'a' * 40, 'VITE_KAKAO_MAP_API_KEY' => nil, 'WEBHOOK_URL' => nil,
-             'PATH' => "#{dir}:#{ENV.fetch('PATH')}", 'MOCK_LOG' => "#{dir}/calls", 'MOCK_TEMP' => "#{dir}/transit")
+             'EXPECTED_WEBHOOK' => '', 'PATH' => "#{dir}:#{ENV.fetch('PATH')}", 'MOCK_LOG' => "#{dir}/calls", 'MOCK_TEMP' => "#{dir}/transit")
   combined = validate + "\n" + deploy
   _, errors, status = Open3.capture3('bash', '-n', stdin_data: combined)
   check(status.success?, "Invalid deployment shell: #{errors}")
@@ -76,10 +80,14 @@ Dir.mktmpdir('workflow-contract-') do |dir|
   _, _, status = Open3.capture3(env.merge('DB_PASSWORD' => "bad\nvalue"), 'bash', '-c', combined)
   check(!status.success? && !File.exist?(env['MOCK_LOG']), 'Malformed runtime secret reached SSH')
   [nil, 'fake-kakao'].each do |kakao|
-    output, errors, status = Open3.capture3(env.merge('VITE_KAKAO_MAP_API_KEY' => kakao, 'WEBHOOK_URL' => kakao, 'JUNGOL_PASSWORD' => '$(touch /tmp/forbidden-workflow-command); `id` # literal'), 'bash', '-c', combined)
+    output, errors, status = Open3.capture3(env.merge('VITE_KAKAO_MAP_API_KEY' => kakao, 'WEBHOOK_URL' => nil, 'EXPECTED_WEBHOOK' => '', 'JUNGOL_PASSWORD' => '$(touch /tmp/forbidden-workflow-command); `id` # literal'), 'bash', '-c', combined)
     check(status.exitstatus == 73 && output.empty? && errors.empty?, 'Valid fake secrets did not stop at mock preflight')
     check(!Dir.exist?(File.read(env['MOCK_TEMP'])), 'Runner transit directory leaked')
   end
-  check(File.readlines(env['MOCK_LOG']).length == 2, 'Unexpected SSH calls beyond preflight')
+  webhook = 'https://discord.com/api/webhooks/000000000000000000/placeholder-not-live'
+  output, errors, status = Open3.capture3(env.merge('WEBHOOK_URL' => webhook, 'EXPECTED_WEBHOOK' => webhook), 'bash', '-c', combined)
+  check(status.exitstatus == 73 && output.empty? && errors.empty?, 'Optional webhook did not reach mock preflight without logs')
+  check(!Dir.exist?(File.read(env['MOCK_TEMP'])), 'Runner transit directory leaked after webhook render')
+  check(File.readlines(env['MOCK_LOG']).length == 3, 'Unexpected SSH calls beyond preflight')
 end
-puts 'Workflow contract passed: 10 missing secrets, malformed input, optional Kakao, literal secret values, mock preflight/config, cleanup, and static topology.'
+puts 'Workflow contract passed: 10 missing secrets, malformed input, optional Kakao/webhook, literal secret values, mock preflight/config, cleanup, and static topology.'
