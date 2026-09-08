@@ -36,6 +36,17 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3.10"
+      - name: Migrator checks, image build, and disposable MySQL integration
+        working-directory: database/migrator
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test
+          npm run typecheck
+          npm run lint
+          npm run build
+          cd ../..
+          node scripts/database/test-migrator-integration.mjs
+          node scripts/database/test-compose-startup-order.mjs
       # 브라우저 테스트가 설치 단계 누락으로 조용히 약화되지 않도록 CI 명령 순서를 계약으로 고정한다.
       - name: Assert collector browser gate cannot be omitted
         run: |
@@ -120,7 +131,23 @@ jobs:
                 . as $root | .services["jungol-collector"] as $c |
                 ($c != null) and
                 ($root.services | has("anabada-crawling") | not) and
+                (if $mode == "dev" then
+                  ($root.services | has("jungol-migrator") | not)
+                else
+                  $root.services["jungol-migrator"] as $m |
+                  ($m.profiles == null) and
+                  ($m.build.context | endswith("/anabada-new")) and
+                  ($m.build.dockerfile == "database/migrator/Dockerfile") and
+                  ($m.environment | keys == ["DB_PASSWORD"]) and
+                  ($m.networks | has("bada-network")) and
+                  ($m.depends_on["anabada-mysql"].condition == "service_healthy") and
+                  ($m.restart == "no") and ($m.ports == null) and ($m.volumes == null) and ($m.healthcheck == null)
+                end) and
                 ($root.services["anabada-frontend"].build.args | has("VITE_KAKAO_MAP_API_KEY")) and
+                (if $mode == "dev" then true else
+                  (["anabada-frontend", "anabada-middleware", "anabada-backend", "jungol-collector"] | all(.[];
+                    $root.services[.].depends_on["jungol-migrator"].condition == "service_completed_successfully"))
+                end) and
                 ($c.build.context | endswith("/collector")) and
                 ($c.build.dockerfile == "Dockerfile") and
                 ($c.command == null) and ($c.entrypoint == null) and

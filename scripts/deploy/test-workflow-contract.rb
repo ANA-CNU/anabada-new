@@ -28,14 +28,17 @@ deploy = steps.find { |step| step['name'] == 'Render root environment and deploy
 check(!validate.match?(/\bWEBHOOK_URL\b/), 'Optional webhook must not become a required GitHub secret')
 check(!deploy.match?(/runtime-secrets|\.secrets|\bsource\b|JUNGOL_DB_PASSWORD/), 'Obsolete secret provisioning')
 %w[StrictHostKeyChecking=accept-new BatchMode=yes].each { |text| check(deploy.include?(text), "Missing SSH safety: #{text}") }
-['git status --porcelain --untracked-files=all', 'git merge --ff-only "$2"', 'test "$(git rev-parse HEAD)" = "$2"', 'test "$(git rev-parse origin/main)" = "$1"', 'install -m 0600 "$1/.env" .env.next', 'mv -f .env.next .env', 'docker compose --env-file .env -f docker-compose.prod.yaml config --quiet', '--wait --wait-timeout 180'].each do |text|
+['git status --porcelain --untracked-files=all', 'git merge --ff-only "$2"', 'test "$(git rev-parse HEAD)" = "$2"', 'test "$(git rev-parse origin/main)" = "$1"', 'install -m 0600 "$1/.env" .env.next', 'mv -f .env.next .env', 'docker compose --env-file .env -f docker-compose.prod.yaml config --quiet', 'docker compose --env-file .env -f docker-compose.prod.yaml up -d --build --remove-orphans --wait --wait-timeout 180'].each do |text|
   check(deploy.include?(text), "Missing deployment gate: #{text}")
 end
+check(deploy.scan(/docker compose --env-file \.env -f docker-compose\.prod\.yaml up /).length == 1, 'Deployment must have one canonical Compose-up path')
+check(!deploy.match?(/run-migrations|--no-deps|--profile|--scale/), 'Deployment must not bypass Compose migration dependencies')
 
 expected = {
   'anabada-frontend' => ['VITE_KAKAO_MAP_API_KEY'], 'anabada-mysql' => ['DB_PASSWORD'],
   'anabada-backend' => %w[DB_PASSWORD JWT_SECRET WEBHOOK_URL],
   'anabada-middleware' => %w[JWT_SECRET ADMIN_USERNAME ADMIN_PASSWORD],
+  'jungol-migrator' => ['DB_PASSWORD'],
   'jungol-collector' => %w[DB_PASSWORD JUNGOL_USERNAME JUNGOL_PASSWORD WEBHOOK_URL], 'bada-nginx' => []
 }
 %w[dev stage prod].each do |mode|
@@ -48,6 +51,15 @@ expected = {
   end
   collector = config.fetch('services').fetch('jungol-collector')
   check(collector.fetch('environment').keys.sort == %w[DB_PASSWORD JUNGOL_PASSWORD JUNGOL_USERNAME WEBHOOK_URL], 'Collector settings must be static')
+  if mode == 'dev'
+    check(!config.fetch('services').key?('jungol-migrator'), 'Dev must not include the automatic migrator')
+  else
+    migrator = config.fetch('services').fetch('jungol-migrator')
+    check(!migrator.key?('profiles'), "#{mode} migrator must be included in normal Compose up")
+    %w[anabada-frontend anabada-middleware anabada-backend jungol-collector].each do |service|
+      check(config.fetch('services').fetch(service).fetch('depends_on').fetch('jungol-migrator').fetch('condition') == 'service_completed_successfully', "#{mode}/#{service} must wait for migrator success")
+    end
+  end
 end
 
 Dir.mktmpdir('workflow-contract-') do |dir|

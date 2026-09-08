@@ -1,4 +1,13 @@
 services:
+  # 배포 전 새 스키마만 순방향으로 적용하는 일회성 작업이다.
+  jungol-migrator:
+    build: {context: ., dockerfile: database/migrator/Dockerfile}
+    environment:
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+    networks: [bada-network]
+    depends_on:
+      anabada-mysql: {condition: service_healthy}
+    restart: "no"
   # 브라우저에 공개되는 정적 화면; Kakao 키는 이미지 빌드 시점에만 주입한다.
   anabada-frontend:
     build:
@@ -7,6 +16,8 @@ services:
       args:
         VITE_KAKAO_MAP_API_KEY: ${VITE_KAKAO_MAP_API_KEY:-}
     networks: [bada-network]
+    depends_on:
+      jungol-migrator: {condition: service_completed_successfully}
   anabada-middleware:
     # 관리자 인증과 프런트엔드 연결을 중계한다. stage의 localhost 공개 origin만 허용한다.
     build: {context: ./middleware, dockerfile: Dockerfile}
@@ -19,6 +30,8 @@ services:
       FRONTEND_URL: http://anabada-frontend:20030
       ALLOWED_ORIGIN: http://localhost:20050
     networks: [bada-network]
+    depends_on:
+      jungol-migrator: {condition: service_completed_successfully}
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:80/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
@@ -42,6 +55,7 @@ services:
     restart: unless-stopped
     depends_on:
       anabada-mysql: {condition: service_healthy}
+      jungol-migrator: {condition: service_completed_successfully}
   jungol-collector:
     # 외부 포트를 열지 않는 내부 수집기. 같은 DB를 사용하고 프로필 볼륨으로 Chromium 로그인 상태를 보존한다.
     build: {context: ./collector, dockerfile: Dockerfile}
@@ -55,6 +69,7 @@ services:
     networks: [bada-network]
     depends_on:
       anabada-mysql: {condition: service_healthy}
+      jungol-migrator: {condition: service_completed_successfully}
     environment:
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
       JUNGOL_USERNAME: ${JUNGOL_USERNAME:?Set JUNGOL_USERNAME}

@@ -42,9 +42,9 @@ backend와 collector는 새 `jungol_bada`를 사용합니다. 기존 `anabada`�
 
 이후 새 문제를 풀어 지연 수집되면 점수는 수집 날짜가 아니라 원래 제출 timestamp를 사용합니다. 이미 종료한 이벤트여도 원래 기간과 생성/문제 추가 시각 조건을 만족하면 지급 가능합니다. 반대로 과거 제출 뒤 이벤트를 새로 만들거나 문제를 추가해도 retroactive award는 주지 않습니다. 이 정책은 반복 AC의 무기한 미수집을 해결하지 않습니다.
 
-## 수동 SQL 적용과 DB 권한
+## 자동 마이그레이션과 DB 권한
 
-DB 변경 SQL은 운영자가 서버에 직접 적용합니다. 배포 workflow, backend, collector와 Compose는 적용 여부나 버전을 관리하지 않습니다. [002 SQL](../../migrations/002_create_jungol_bada.sql)은 새 DB만 생성하며 기존 `jungol_bada`가 있으면 실패합니다. MySQL DDL은 transaction으로 전체 rollback되지 않으므로 중간 실패는 부분 생성 상태를 남깁니다. `--force`로 계속 실행하거나 기존 DB에 덮어쓰지 마세요.
+stage/production은 [마이그레이터](../../database/migrator/)가 활성 `migrations/NNN_snake_case.sql`을 순방향으로만 적용합니다. `migrations` 테이블은 버전·파일명·SHA-256 checksum을 기록합니다. 이미 적용한 파일은 절대 수정하지 말고 새 버전을 추가합니다. `jungol_bada`가 이미 있으나 `migrations` 테이블이 없으면 관리되지 않은 DB로 판단하여 변경 없이 실패합니다. 자동 rollback은 없습니다.
 
 승인된 운영 DB 관리자 접속 정보를 담은 저장소 밖의 제한된 client option 파일을 준비합니다. 아래 `MYSQL_OPERATOR_CNF`는 이 문서의 로컬 shell 변수이며 애플리케이션 환경 변수가 아닙니다. 파일 경로만 지정하고 비밀번호는 명령행에 넣지 않습니다. 실제 서버에 실행하기 전 백업과 대상 hostname/port를 확인합니다.
 
@@ -53,16 +53,23 @@ MYSQL_OPERATOR_CNF=/absolute/private/operator.cnf
 mysql --defaults-extra-file="$MYSQL_OPERATOR_CNF" --batch --execute="SELECT @@hostname, @@port; SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='jungol_bada';"
 ```
 
-목적 DB 조회가 0행일 때만 아래를 수동 실행합니다. `jungol_bada`가 이미 있다면 현재 스키마를 조사하고 중단합니다.
+stage/production의 일반 Compose 실행은 MySQL healthcheck 뒤 migrator를 한 번 실행하고, 성공 종료(`Exited (0)`) 후에만 frontend·middleware·backend·collector를 시작합니다. `--build`는 현재 migration image를 포함하도록 필수입니다.
 
 ```sh
-mysql --defaults-extra-file="$MYSQL_OPERATOR_CNF" --batch < migrations/002_create_jungol_bada.sql
+docker compose --env-file .env -f docker-compose.stage.yaml up -d --build --wait --wait-timeout 180
+docker compose --env-file .env -f docker-compose.prod.yaml up -d --build --wait --wait-timeout 180
 mysql --defaults-extra-file="$MYSQL_OPERATOR_CNF" --database=jungol_bada --batch --execute="SELECT DATABASE(); SELECT COUNT(*) AS table_count FROM information_schema.tables WHERE table_schema=DATABASE(); SELECT COUNT(*) AS users FROM user; SELECT COUNT(*) AS attempts FROM problem; SELECT COUNT(*) AS awards FROM score_history;"
 ```
 
-합격: mysql 두 명령 exit 0, database `jungol_bada`, 9개 테이블, 첫 적용 직후 users/attempts/awards 모두 0입니다. 별도의 스키마 버전 테이블이나 자동 검증기는 두지 않습니다. FK·unique key·필수 필드는 적용 전에 SQL과 직접 비교합니다.
+상태는 다음 조회로 확인합니다. 최초 성공 뒤 `jungol_bada`에는 업무 9개 테이블과 `migrations` 테이블이 있으며 version 2와 64자리 checksum이 기록됩니다.
 
-현재 운영 정책은 backend와 collector 모두 MySQL `root` 계정과 루트 `.env`의 동일한 `DB_PASSWORD`를 사용하는 것입니다. 주소는 `anabada-mysql:3306`, DB 이름은 `jungol_bada`로 고정합니다. 별도 collector 계정이나 role을 생성하지 않습니다. root 접근 권한이 두 애플리케이션에 전달되므로 서버와 Docker 접근 권한을 제한하고 새 DB만 사용하는 코드 계약을 유지합니다. SQL 적용은 여전히 운영자의 수동 작업입니다.
+```sql
+SELECT version, filename, checksum_sha256, applied_at FROM jungol_bada.migrations ORDER BY version;
+```
+
+현재 운영 정책은 backend와 collector, migrator 모두 MySQL `root` 계정과 루트 `.env`의 동일한 `DB_PASSWORD`를 사용하는 것입니다. 주소는 `anabada-mysql:3306`, DB 이름은 `jungol_bada`로 고정합니다. 별도 collector 계정이나 role을 생성하지 않습니다.
+
+`docker compose ... ps`와 `docker compose ... logs jungol-migrator`로 실행 상태와 오류를 확인합니다. migration 실패는 Compose 명령을 nonzero로 끝내고 종속 앱을 시작하지 않습니다. 자동 rollback은 없으므로 partial DDL은 DBA가 백업과 증거를 보존해 복구를 결정합니다. dev Compose에는 migrator가 없고 자동 스키마 적용도 없습니다.
 
 ### rollback
 
@@ -101,14 +108,13 @@ DB topology, Jungol HTTPS URL/그룹 1125, profile 경로 `/var/lib/jungol/profi
 
 ## 개발 Compose POC
 
-[개발 Compose](../../docker-compose.dev.yaml)는 project-scoped `mysql-data`와 `jungol-profile` named volume을 사용합니다. dev 환경에서도 SQL을 init directory에 mount하지 않으며 스키마를 자동 생성하지 않습니다. MySQL 컨테이너를 먼저 시작한 뒤 운영자가 002 SQL을 직접 적용해야 합니다.
+[개발 Compose](../../docker-compose.dev.yaml)는 project-scoped `mysql-data`와 `jungol-profile` named volume을 사용합니다. dev 환경에는 마이그레이터를 넣지 않으며 자동으로 스키마를 생성하지 않습니다.
 
 새 로컬 checkout에서 [환경 템플릿](../../.env.example)을 루트의 gitignore된 `.env`로 복사하고 필수 여섯 값을 채웁니다. 파일을 배포 사용자 소유, mode 0600으로 제한합니다. 실제 Jungol 인증 값도 이 파일에 입력하며 별도 secret 파일은 만들지 않습니다. MySQL, backend, collector는 동일한 `DB_PASSWORD`와 root 계정을 사용합니다.
 
 ```sh
 docker compose --env-file .env -f docker-compose.dev.yaml -p jungol-dev config --quiet
 docker compose --env-file .env -f docker-compose.dev.yaml -p jungol-dev up -d anabada-mysql
-docker compose --env-file .env -f docker-compose.dev.yaml -p jungol-dev exec -T anabada-mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot --batch' < migrations/002_create_jungol_bada.sql
 docker compose --env-file .env -f docker-compose.dev.yaml -p jungol-dev build jungol-collector
 docker compose --env-file .env -f docker-compose.dev.yaml -p jungol-dev run --rm --no-deps jungol-collector check-config
 docker compose --env-file .env -f docker-compose.dev.yaml -p jungol-dev run --rm --no-deps jungol-collector run-once
@@ -120,14 +126,14 @@ docker compose --env-file .env -f docker-compose.dev.yaml -p jungol-dev ps
 
 ## production 파일·배포 순서
 
-[운영 Compose](../../docker-compose.prod.yaml)와 [stage Compose](../../docker-compose.stage.yaml)는 기존 `./database/mysql_data`를 유지하고 SQL init mount를 사용하지 않습니다. 기존 서버의 MySQL 버전과 8.4 이미지 호환성은 별도 검증해야 합니다. production 외부 네트워크 `bada-network`, `dmoj_nginx_network`도 서버에 있어야 합니다. collector는 외부 포트를 열지 않으며 non-root image, init, 1GB shared memory, dropped capabilities, no-new-privileges를 사용합니다.
+[운영 Compose](../../docker-compose.prod.yaml)와 [stage Compose](../../docker-compose.stage.yaml)는 기존 `./database/mysql_data` bind mount를 유지하고 SQL init mount를 사용하지 않습니다. 기존 서버의 MySQL 버전과 8.4 이미지 호환성은 별도 검증해야 합니다. stage와 production의 external network `bada-network`, `dmoj_nginx_network`는 Compose 실행 전에 서버에 미리 존재해야 합니다. 같은 checkout에서 stage와 prod를 동시에 실행하지 않습니다. collector는 외부 포트를 열지 않으며 non-root image, init, 1GB shared memory, dropped capabilities, no-new-privileges를 사용합니다.
 
 `jungol-profile`은 project 이름에 종속됩니다. 운영 Compose project 이름/작업 경로를 변경하면 다른 profile volume을 만들 수 있으므로 이름을 유지합니다. profile에는 인증 상태가 있으므로 백업·접근 권한을 제한하고 로그/artifact로 업로드하지 않습니다. image 기본 CMD는 `start`이며 별도 host cron/systemd timer를 추가하지 않습니다. container healthcheck 실패만으로 Docker가 자동 재시작하는 것은 아닙니다.
 
 운영 rollout 순서:
 
 1. 이전 backend/config 복구 경로와 DB 백업을 확보하고 기존 레거시 수집/sync 작업을 정지합니다.
-2. DBA가 기존 MySQL에 002를 수동 적용하고 9개 테이블, FK, unique key와 empty 정책을 검증합니다.
+2. stage에서 `docker compose --env-file .env -f docker-compose.stage.yaml up -d --build --wait --wait-timeout 180`를 성공시킨 뒤 status SELECT와 9개 업무 테이블을 검증합니다. production workflow도 하나의 Compose `up -d --build --remove-orphans --wait` 안에서 migrator 성공 뒤에만 앱을 시작합니다.
 3. GitHub production Environment에 아래 필수 secrets를 등록합니다. workflow가 서버 루트 `.env`를 생성합니다. 기존 MySQL root 비밀번호와 `DB_PASSWORD`가 일치하고 backend/collector가 `anabada-mysql:3306/jungol_bada`에 접속하는지 확인합니다.
 4. `.env`와 profile 권한, external networks, MySQL image 호환성을 확인합니다. 운영자가 통제하는 단일 one-shot으로 초기 적재·점수·재실행을 검증합니다.
 5. backend와 collector를 배포하고 health 및 사용자별 적재 결과를 확인합니다. 초기 empty 응답과 나중의 projection 노출을 구분합니다.
@@ -161,7 +167,7 @@ workflow는 필수 값을 검증하고 Compose dotenv 형식으로 서버 루트
 
 별도의 `DEPLOY_KNOWN_HOSTS` Secret은 사용하지 않습니다. GitHub Actions의 일회성 runner는 `StrictHostKeyChecking=accept-new`로 첫 SSH 연결의 host key를 자동 수락합니다. 설정은 간단하지만 사전에 등록한 fingerprint와 서버 신원을 대조하는 방식은 아니므로, production Secrets를 관리할 수 있는 권한과 배포 대상 주소를 엄격하게 제한해야 합니다.
 
-workflow는 checkout 상태와 배포 SHA를 확인한 후 `.env` 설치, Compose validation, `up --build --remove-orphans --wait`를 수행합니다. 스키마를 조회하거나 SQL을 실행하지 않습니다. DB 변경 적용과 검증은 배포 전에 운영자가 별도로 수행합니다.
+workflow는 checkout 상태와 배포 SHA를 확인한 후 `.env` 설치, Compose validation, 단일 `up --build --remove-orphans --wait` 순서로 수행합니다. migration이 실패하면 Compose가 nonzero로 끝나고 새 앱 rollout은 시작하지 않습니다.
 
 ### 안전한 secret 회전
 
@@ -205,7 +211,7 @@ docker compose --env-file .env -f docker-compose.prod.yaml up -d jungol-collecto
 
 ## 운영 acceptance
 
-- [ ] 새 DB의 수동 SQL 적용 완료, 9개 테이블/FK/unique key 검증; 이전 DB 변경 없음.
+- [ ] stage 자동 migration 성공 및 migrations status SELECT 확인; production rollout 전 unmanaged DB/checksum 실패가 없는지 확인.
 - [ ] backend와 collector의 DB host/port/name 확인; 동일 root 계정과 DB_PASSWORD 사용 확인.
 - [ ] legacy 수집기/기존 sync scheduler 비활성화; collector 단일 replica.
 - [ ] 실제 서버에서 non-root Chromium, secrets, profile 재사용 및 컨테이너 재생성 확인.

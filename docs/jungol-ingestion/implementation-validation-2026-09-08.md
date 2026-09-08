@@ -40,7 +40,7 @@ Playwright test image 검증에는 로그인 필요 화면, 잘못된 로그인,
 당시 회전된 Jungol credential과 승인된 dev DB 접속 정보가 작업공간에 없었으므로 실제 `jungol.co.kr` 대상 `run-once`는 실행하지 않았다. 대화에 노출된 기존 비밀번호를 재사용하지 않는다. 운영 또는 승인된 dev 환경에서 다음을 완료해야 live POC가 끝난다.
 
 1. 로컬은 루트 `.env`에 필수 여섯 값을 준비하고, 운영은 GitHub production Secrets를 등록하여 workflow가 루트 `.env`를 생성하도록 한다. 파일 권한 0600과 대상 MySQL root 비밀번호 일치를 확인한다.
-2. `002_create_jungol_bada.sql`을 대상 dev DB에 수동 적용한다.
+2. dev Compose는 자동 적용하지 않으므로 대상 dev DB의 스키마 준비는 운영자 책임으로 남는다. stage/production 일반 Compose up은 MySQL → migrator → apps를 강제하며, `migrations`의 버전·파일명·checksum이 일치하지 않거나 관리되지 않은 기존 `jungol_bada`이면 migrator가 실패하고 종속 앱은 시작하지 않는다.
 3. scheduled collector가 정지된 상태에서 `check-config`, `run-once`, 동일 `run-once` 재실행을 수행한다.
 4. rank 사용자 수, AC-only 행, `corrects`, `submissions`, `solution`, daily/event 점수와 중복 0건을 SQL로 확인한다.
 5. 같은 named profile volume으로 container를 재생성해 로그인 유지 여부를 확인한다.

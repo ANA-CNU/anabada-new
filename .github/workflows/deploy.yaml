@@ -108,7 +108,6 @@ jobs:
           # 완성된 파일만 0600으로 설치하고 rename하여 부분 작성된 .env가 노출되지 않게 한다.
           install -m 0600 "$1/.env" .env.next
           mv -f .env.next .env
-          # SQL migration은 자동 실행하지 않는다. 운영자가 수동 적용한 스키마를 전제로 container만 교체한다.
           docker compose --env-file .env -f docker-compose.prod.yaml config --quiet
           timeout 1200 docker compose --env-file .env -f docker-compose.prod.yaml up -d --build --remove-orphans --wait --wait-timeout 180
           docker compose --env-file .env -f docker-compose.prod.yaml ps
