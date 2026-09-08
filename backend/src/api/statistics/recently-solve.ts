@@ -1,60 +1,34 @@
 import { Elysia } from "elysia";
-import { getDatabase } from "../../db/database.js";
-import { logger } from "../../index.js";
-
-export const recentlySolve = new Elysia().get(
-  "/api/statistics/recently-solved",
-  async ({ query }) => {
-    try {
-      const db = getDatabase();
-      const page = Math.max(parseInt(query.page as string) || 1, 1);
-      const limitRaw = parseInt(query.limit as string) || 10;
-      const limit = Math.min(Math.max(limitRaw, 1), 100);
-      const offset = (page - 1) * limit;
-
-      // 세션 시간대를 KST로 설정
-      await db.execute("SET time_zone = '+09:00'");
-
-      // 페이지네이션된 데이터 조회 (KST 시간대 유지)
-      const sql = `
-        SELECT 
-          COALESCE(u.kr_name, u.name) AS username,
-          p.problem AS problem,
-          CONCAT(
-            DATE_FORMAT(p.time, '%Y-%m-%dT%H:%i:%s'),
-            '+09:00'
-          ) AS solvedAt
-        FROM problem p
-        JOIN user u ON p.name = u.name
-        WHERE p.repeatation = 0
-          AND p.verdict = 'accepted'
-        ORDER BY p.time DESC
-        LIMIT ${limit} OFFSET ${offset}
-      `;
-
-      logger.debug(`SQL QUERY: ${sql} with limit: ${limit}, offset: ${offset}`);
-
-      const [rows] = await db.execute(sql, [limit, offset]);
-      const data = rows as any[];
-      logger.debug(`최근 해결된 문제 페이지 ${page} 조회 성공`);
-
-      return {
-        success: true,
-        data: data,
-        message: `최근 해결된 문제 페이지 ${page} 조회 성공`,
-        summary: {
-          count: data.length,
-          description: "중복 제거된 최근 해결된 문제 목록",
-          order: "해결 시간 기준 내림차순",
-        },
-      };
-    } catch (error: any) {
-      logger.error("최근 해결된 문제 페이지 조회 실패:", error);
-      return {
-        success: false,
-        error: error.message,
-        message: "최근 해결된 문제 페이지 조회에 실패했습니다.",
-      };
-    }
-  },
-);
+import { z } from "zod";
+import type { RecentSolvedDto } from "../../infrastructure/mysql/repositories/contracts.js";
+const querySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(10),
+});
+export interface RecentSolvedService {
+  recentlySolved(
+    limit: number,
+    offset: number,
+  ): Promise<readonly RecentSolvedDto[]>;
+}
+export const createActivityRoutes = (service: RecentSolvedService) =>
+  new Elysia().get("/api/statistics/recently-solved", async ({ query }) => {
+    const parsed = querySchema.safeParse(query);
+    if (!parsed.success)
+      return new Response(
+        JSON.stringify({ error: "유효하지 않은 페이지입니다." }),
+        { status: 400 },
+      );
+    const { page, limit } = parsed.data;
+    const data = await service.recentlySolved(limit, (page - 1) * limit);
+    return {
+      success: true,
+      data,
+      message: `최근 해결된 문제 페이지 ${page} 조회 성공`,
+      summary: {
+        count: data.length,
+        description: "중복 제거된 최근 해결된 문제 목록",
+        order: "해결 시간 기준 내림차순",
+      },
+    };
+  });

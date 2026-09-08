@@ -1,62 +1,90 @@
-import { Elysia } from 'elysia';
-import type { Pool, PoolConnection, RowDataPacket } from 'mysql2/promise';
-import { logger } from '../logger.js';
+import { Elysia } from "elysia";
+import type { InternalIncidentReporter } from "../emergency-webhook.js";
+import {
+  DatabaseContractError,
+  DatabaseQueryError,
+} from "../infrastructure/errors.js";
+import type { Clock } from "../infrastructure/time.js";
 
-export interface HealthFailureReporter {
-  databaseUnavailable(): void;
+export interface HealthProbe {
+  check(): Promise<boolean>;
 }
-
-const defaultFailureReporter: HealthFailureReporter = {
-  databaseUnavailable: () => {
-    logger.error({ code: 'database_unavailable' }, 'backend.database_unavailable');
-  },
-};
-
-async function databaseReady(getPool: () => Pick<Pool, 'getConnection'>): Promise<boolean> {
-  let connection: PoolConnection | undefined;
-  let expired = false;
-  const deadline = Promise.withResolvers<boolean>();
-  const timer = setTimeout(() => {
-    expired = true;
-    connection?.destroy();
-    deadline.resolve(false);
-  }, 1500);
-  const probe = async () => {
-    connection = await getPool().getConnection();
+export interface HealthTimeoutExecutor {
+  run<T>(operation: () => Promise<T>): Promise<T>;
+}
+export interface HealthTimer {
+  setTimeout(callback: () => void, delayMs: number): number;
+  clearTimeout(handle: number): void;
+}
+export class HealthTimeoutError extends Error {
+  readonly name = "HealthTimeoutError";
+}
+export class BoundedHealthTimeout implements HealthTimeoutExecutor {
+  constructor(
+    private readonly timer: HealthTimer = {
+      setTimeout: (callback, delayMs) =>
+        Number(globalThis.setTimeout(callback, delayMs)),
+      clearTimeout: (handle) => globalThis.clearTimeout(handle),
+    },
+    private readonly timeoutMs = 1_500,
+  ) {}
+  async run<T>(operation: () => Promise<T>): Promise<T> {
+    let handle: number | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      handle = this.timer.setTimeout(
+        () => reject(new HealthTimeoutError()),
+        this.timeoutMs,
+      );
+    });
     try {
-      if (expired) return false;
-      const [rows] = await connection.query<RowDataPacket[]>({
-        sql: 'SELECT 1 AS ready',
-        timeout: 1000,
-      });
-      return rows.length === 1;
-    } catch (error) {
-      connection.destroy();
-      throw error;
+      return await Promise.race([operation(), timeout]);
     } finally {
-      connection.release();
+      if (handle !== undefined) this.timer.clearTimeout(handle);
     }
-  };
-  try {
-    return await Promise.race([probe(), deadline.promise]);
-  } catch (error) {
-    if (error instanceof Error) return false;
-    throw error;
-  } finally {
-    clearTimeout(timer);
   }
 }
 
 export function createHealthRoute(
-  getPool: () => Pick<Pool, 'getConnection'>,
-  reporter: HealthFailureReporter = defaultFailureReporter,
+  probe: HealthProbe,
+  clock: Clock,
+  reporter: InternalIncidentReporter,
+  timeout: HealthTimeoutExecutor,
 ) {
-  return new Elysia().get('/health', async ({ set }) => {
-    if (!(await databaseReady(getPool))) {
-      reporter.databaseUnavailable();
-      set.status = 503;
-      return { status: 'unhealthy', message: 'Database is not ready' };
+  return new Elysia().get("/health", async ({ set }) => {
+    try {
+      if (!(await timeout.run(() => probe.check()))) {
+        set.status = 503;
+        await reporter.report({
+          code: "database_schema_not_ready",
+          occurredAt: clock.now(),
+          operationId: "health.ready",
+        });
+        return { status: "unhealthy" };
+      }
+      return { status: "healthy", timestamp: clock.now().toISOString() };
+    } catch (error) {
+      if (error instanceof HealthTimeoutError) {
+        set.status = 503;
+        await reporter.report({
+          code: "database_unavailable",
+          occurredAt: clock.now(),
+          operationId: "health.ready",
+        });
+        return { status: "unhealthy" };
+      }
+      if (
+        error instanceof DatabaseQueryError ||
+        error instanceof DatabaseContractError
+      ) {
+        set.status = 503;
+        await reporter.report({
+          code: error.code,
+          occurredAt: clock.now(),
+          operationId: error.operationId,
+        });
+        return { status: "unhealthy" };
+      }
+      throw error;
     }
-    return { status: 'healthy', timestamp: new Date().toISOString(), uptime: process.uptime() };
   });
 }

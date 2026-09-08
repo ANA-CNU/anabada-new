@@ -11,8 +11,10 @@ export abstract class BackendInfrastructureError extends Error {
 export class DatabaseQueryError extends BackendInfrastructureError {
   readonly name = "DatabaseQueryError";
   readonly code = "database_query_failed";
-  constructor(operationId: string) {
+  readonly vendorCode: "ER_DUP_ENTRY" | undefined;
+  constructor(operationId: string, vendorCode?: "ER_DUP_ENTRY") {
     super("Database query failed", operationId);
+    this.vendorCode = vendorCode;
   }
 }
 export class DatabaseContractError extends BackendInfrastructureError {

@@ -1,7 +1,6 @@
 import { expect, test } from "bun:test";
 import { bootstrap } from "../src/bootstrap.js";
 import type { BackendConfig } from "../src/config/backend-config.js";
-import { getDatabase } from "../src/db/database.js";
 import type {
   BackendEmergencyIncident,
   BackendEmergencyResult,
@@ -14,6 +13,12 @@ import {
   DatabaseQueryError,
   DatabaseTransactionError,
 } from "../src/infrastructure/errors.js";
+import {
+  type DatabaseConnection,
+  type DatabaseConnectionPool,
+  DatabasePool,
+  type SqlParameter,
+} from "../src/infrastructure/mysql/database-session.js";
 
 const config: BackendConfig = {
   DB_HOST: "db",
@@ -83,9 +88,42 @@ class RecordingReporter implements InternalIncidentReporter {
   }
 }
 
+function testDependencies(incidentReporter: InternalIncidentReporter) {
+  return {
+    databasePool: new DatabasePool(new EmptyPool()),
+    authorizer: { isAdmin: () => false },
+    incidentReporter,
+    config: {
+      NODE_ENV: "test" as const,
+      ALLOWED_ORIGIN: "http://localhost:3000",
+    },
+  };
+}
+
+class EmptyPool implements DatabaseConnectionPool {
+  async getConnection(): Promise<DatabaseConnection> {
+    return new EmptyConnection();
+  }
+}
+
+class EmptyConnection implements DatabaseConnection {
+  async query(_options: {
+    readonly sql: string;
+    readonly values: readonly SqlParameter[];
+    readonly timeout: number;
+  }): Promise<readonly [unknown, unknown]> {
+    return [[], []];
+  }
+  async beginTransaction(): Promise<void> {}
+  async commit(): Promise<void> {}
+  async rollback(): Promise<void> {}
+  release(): void {}
+  destroy(): void {}
+}
+
 test("Given client input error When app handles it Then sends no incident", async () => {
   const reporter = new RecordingReporter();
-  const app = createApplication({ getDatabase, incidentReporter: reporter });
+  const app = createApplication(testDependencies(reporter));
   app.get("/__test/client-input", () => {
     throw new ClientInputError();
   });
@@ -94,13 +132,13 @@ test("Given client input error When app handles it Then sends no incident", asyn
     new Request("http://localhost/__test/client-input"),
   );
 
-  expect(response.status).toBe(500);
+  expect(response.status).toBe(400);
   expect(reporter.incidents).toHaveLength(0);
 });
 
 test("Given unexpected failure When app handles it Then reports exactly one safe HTTP incident", async () => {
   const reporter = new RecordingReporter();
-  const app = createApplication({ getDatabase, incidentReporter: reporter });
+  const app = createApplication(testDependencies(reporter));
   app.get("/__test/unexpected", () => {
     throw new Error("raw secret payload");
   });
@@ -124,7 +162,7 @@ test("Given unexpected failure When app handles it Then reports exactly one safe
 
 test("Given database infrastructure errors When app handles them Then reports each exactly once", async () => {
   const reporter = new RecordingReporter();
-  const app = createApplication({ getDatabase, incidentReporter: reporter });
+  const app = createApplication(testDependencies(reporter));
   app.get("/__test/database-query", () => {
     throw new DatabaseQueryError("query.secret_safe");
   });
