@@ -35,7 +35,6 @@ function ScoreRecordsTable({ records }: ScoreRecordsTableProps) {
   useEffect(() => {
     let cancelled = false;
     const fetchPage = async () => {
-      if (loading) return;
       setLoading(true);
       try {
         const res = await fetch(`${URL}/api/statistics/recently-score?page=${page}&limit=${limit}`);
@@ -65,7 +64,7 @@ function ScoreRecordsTable({ records }: ScoreRecordsTableProps) {
     };
     fetchPage();
     return () => { cancelled = true; };
-  }, [page]);
+  }, [page, records]);
 
   const handleScroll = () => {
     const el = scrollRef.current;

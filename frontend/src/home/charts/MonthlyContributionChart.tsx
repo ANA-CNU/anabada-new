@@ -1,7 +1,7 @@
 import { SquircleSurface } from "@/components/ui/squircle";
 import { URL } from "@/resource/constant";
 import React, { useMemo, useCallback, useState, useEffect } from "react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, type TooltipContentProps } from 'recharts';
 
 interface MonthlyData {
   date: string;
@@ -68,7 +68,7 @@ function MonthlyContributionChart() {
   }, [monthlyData]);
 
   // 툴팁 커스터마이징 - useCallback으로 최적화
-  const CustomTooltip = useCallback(({ active, payload, label }: any) => {
+  const CustomTooltip = useCallback(({ active, payload, label }: TooltipContentProps<number, string>) => {
     if (active && payload && payload.length) {
       return (
         <SquircleSurface radius="control" className="bg-black/90 border border-gray-700 p-3 text-white">
@@ -127,7 +127,7 @@ function MonthlyContributionChart() {
               domain={yAxisDomain}
               tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={CustomTooltip} />
             <Area 
               type="monotone" 
               dataKey="cumulative" 

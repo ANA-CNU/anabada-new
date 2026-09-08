@@ -36,6 +36,7 @@ const UserProfile: React.FC = () => {
   const [rankHistory, setRankHistory] = useState<RankPoint[]>([]);
   const [monthly, setMonthly] = useState<MonthlySummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const userId = user?.id;
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -56,31 +57,31 @@ const UserProfile: React.FC = () => {
 
   useEffect(() => {
     const fetchUserData = async () => {
-      if (!user) return;
+      if (!userId) return;
       try {
         // 점수 히스토리
-        const historyResponse = await fetch(`${URL}/api/score_history/user/${user.id}`);
+        const historyResponse = await fetch(`${URL}/api/score_history/user/${userId}`);
         if (historyResponse.ok) {
           const historyData = await historyResponse.json();
           setScoreHistory(historyData);
         }
 
         // 최근 문제
-        const problemsResponse = await fetch(`${URL}/api/user/${user.id}/problems`);
+        const problemsResponse = await fetch(`${URL}/api/user/${userId}/problems`);
         if (problemsResponse.ok) {
           const problemsData = await problemsResponse.json();
           setRecentProblems(problemsData);
         }
 
         // 랭킹 히스토리
-        const rankRes = await fetch(`${URL}/api/board/user/${user.id}/rank-history`);
+        const rankRes = await fetch(`${URL}/api/board/user/${userId}/rank-history`);
         if (rankRes.ok) {
           const rankData = await rankRes.json();
           setRankHistory(rankData);
         }
 
         // 월별 요약
-        const monthlyRes = await fetch(`${URL}/api/user/${user.id}/monthly-summary`);
+        const monthlyRes = await fetch(`${URL}/api/user/${userId}/monthly-summary`);
         if (monthlyRes.ok) {
           const monthlyData = await monthlyRes.json();
           setMonthly(monthlyData['data']);
@@ -93,7 +94,7 @@ const UserProfile: React.FC = () => {
     };
 
     fetchUserData();
-  }, [user?.id]);
+  }, [userId]);
 
   // 랭크 분포 및 확률 계산 (1~8위 + 9위 이상)
   const rankCounts: Record<string, number> = {};

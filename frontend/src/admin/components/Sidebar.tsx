@@ -11,11 +11,9 @@ import {
   FileText,
   Clock,
   Star,
-  TrendingUp,
   AlertCircle,
   Plus
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { 
   Sidebar, 
@@ -131,4 +129,4 @@ export function AdminSidebar({ activeSection, onSectionChange }: SidebarProps) {
       </Sidebar>
     </div>
   );
-} 
+}

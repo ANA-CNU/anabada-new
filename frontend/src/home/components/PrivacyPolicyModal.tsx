@@ -8,8 +8,6 @@ interface PrivacyPolicyModalProps {
 }
 
 const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ isOpen, onClose }) => {
-  const currentYear = new Date().getFullYear();
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[80vh] grid-rows-[auto_minmax(0,1fr)] bg-gray-900 border-gray-700 text-white no-scrollbar">

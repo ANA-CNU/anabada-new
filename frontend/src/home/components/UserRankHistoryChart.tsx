@@ -3,7 +3,7 @@ import { SquircleSurface } from "@/components/ui/squircle";
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { URL } from '@/resource/constant';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, BarChart, Bar } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, BarChart, Bar, type TooltipContentProps } from 'recharts';
 
 interface RankPoint {
   board_id: number;
@@ -80,7 +80,7 @@ const UserRankHistoryChart: React.FC<Props> = ({ userId }) => {
     return Object.entries(buckets).map(([label, count]) => ({ label, count }));
   }, [data]);
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload }: TooltipContentProps<number, string>) => {
     if (active && payload && payload.length) {
       const d = payload[0].payload;
       return (
@@ -150,7 +150,7 @@ const UserRankHistoryChart: React.FC<Props> = ({ userId }) => {
                   />
                   {/* 평균 기준선 */}
                   <ReferenceLine y={stats.avg} stroke="#f59e0b" strokeDasharray="4 4" label={{ value: `평균 ${stats.avg.toFixed(1)}위`, position: 'insideTopRight', fill: '#fbbf24', fontSize: 12 }} />
-                  <Tooltip content={<CustomTooltip />} />
+                  <Tooltip content={CustomTooltip} />
                   <Line
                     type="monotone"
                     dataKey="rank"
