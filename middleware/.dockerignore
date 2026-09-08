@@ -4,7 +4,8 @@ npm-debug.log
 .git
 .gitignore
 README.md
-.env
+.env*
+!.env.example
 .nyc_output
 coverage
 .nyc_output
@@ -12,4 +13,4 @@ coverage
 .cache
 dist
 *.log
-.DS_Store 
+.DS_Store

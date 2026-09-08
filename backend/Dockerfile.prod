@@ -2,8 +2,8 @@ FROM oven/bun:1-alpine AS builder
 
 WORKDIR /app
 
-# package.json과 package-lock.json 복사
-COPY package*.json ./
+# Install against the exact lockfile used by this service.
+COPY package.json bun.lock ./
 
 # 의존성 설치
 RUN bun install --frozen-lockfile
@@ -22,7 +22,7 @@ WORKDIR /app
 
 # 프로덕션 의존성만 설치
 RUN apk add --no-cache curl
-COPY package*.json ./
+COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile --production
 
 # 빌드된 파일 복사

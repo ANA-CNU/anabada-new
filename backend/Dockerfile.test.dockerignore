@@ -1,0 +1,12 @@
+**
+!backend
+!backend/package.json
+!backend/bun.lock
+!backend/tsconfig.json
+!backend/biome.json
+!backend/src
+!backend/src/**
+!backend/test
+!backend/test/**
+!backend/tests
+!backend/tests/**
