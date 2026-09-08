@@ -17,6 +17,11 @@ dist-ssr
 !.vscode/extensions.json
 .idea
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+ehthumbs.db
 *.suo
 *.ntvs*
 *.njsproj
@@ -37,3 +42,9 @@ TODO
 
 .omo
 test-output/
+coverage/
+.cache/
+.eslintcache
+.playwright/
+playwright-report/
+blob-report/
