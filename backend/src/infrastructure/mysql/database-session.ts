@@ -14,6 +14,9 @@ export type SqlOperation = Readonly<{
   readonly id: SqlOperationId;
   readonly timeoutMs: number;
 }>;
+export interface SqlOperationObserver {
+  observe(operationId: SqlOperationId): void;
+}
 export type SqlParameter =
   | string
   | number
@@ -221,7 +224,10 @@ export interface DatabaseExecutor {
 /** UTC 세션과 제한 시간을 강제해 호출자가 연결 수명·결과 검증을 잊지 않게 하는 DB 경계다. */
 export class DatabaseSession implements DatabaseExecutor {
   private destroyed = false;
-  constructor(private readonly connection: DatabaseConnection) {}
+  constructor(
+    private readonly connection: DatabaseConnection,
+    private readonly observer?: SqlOperationObserver,
+  ) {}
   async initialize(): Promise<void> {
     await this.run(sqlOperations.configureUtc, "SET time_zone = '+00:00'", []);
   }
@@ -289,6 +295,7 @@ export class DatabaseSession implements DatabaseExecutor {
     values: readonly SqlParameter[],
   ): Promise<unknown> {
     try {
+      this.observer?.observe(operation.id);
       const [result] = await this.connection.query({
         sql,
         values: [...values],
@@ -310,10 +317,13 @@ export class DatabaseSession implements DatabaseExecutor {
 
 /** 풀 획득과 트랜잭션 종료를 한 곳에 모아 connection leak과 미완료 rollback을 방지한다. */
 export class DatabasePool {
-  constructor(private readonly pool: DatabaseConnectionPool) {}
+  constructor(
+    private readonly pool: DatabaseConnectionPool,
+    private readonly observer?: SqlOperationObserver,
+  ) {}
   async session(): Promise<DatabaseSession> {
     const connection = await this.pool.getConnection();
-    const session = new DatabaseSession(connection);
+    const session = new DatabaseSession(connection, this.observer);
     try {
       await session.initialize();
       return session;

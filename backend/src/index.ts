@@ -67,6 +67,10 @@ function isInfrastructureError(
   );
 }
 
+function incidentApi(request: Request): string {
+  return `${request.method} ${new URL(request.url).pathname}`;
+}
+
 function sessionServices(pool: DatabasePool) {
   const withRepository = <T>(
     work: (repository: UserRepository) => Promise<T>,
@@ -168,8 +172,10 @@ export function createApplication(dependencies: ApplicationDependencies) {
         await incidentReporter.report({
           code: unavailable ? error.code : "http_request_failed",
           occurredAt: clock.now(),
-          operationId: `http.error.${unavailable ? error.code : "http_request_failed"}`,
-          routeTemplate: "http.error",
+          operationId: unavailable
+            ? error.operationId
+            : "http.error.http_request_failed",
+          routeTemplate: incidentApi(request),
         });
       } catch {
         logger.warn(

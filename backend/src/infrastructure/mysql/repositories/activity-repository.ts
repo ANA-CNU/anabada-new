@@ -20,10 +20,10 @@ const operations = {
 } as const;
 const monthlyStatSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}$/),
-  solved_problem: z.number().int().nonnegative(),
+  solved_problem: z.coerce.number().int().nonnegative(),
 });
 const totalSchema = z.object({
-  total_problems: z.number().int().nonnegative(),
+  total_problems: z.coerce.number().int().nonnegative(),
 });
 
 export class ActivityRepository {

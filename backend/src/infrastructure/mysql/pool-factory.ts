@@ -1,7 +1,11 @@
 import mysql from "mysql2/promise";
 import type { Pool } from "mysql2/promise";
 import type { BackendConfig } from "../../config/backend-config.js";
-import { type DatabaseConnection, DatabasePool } from "./database-session.js";
+import {
+  type DatabaseConnection,
+  DatabasePool,
+  type SqlOperationObserver,
+} from "./database-session.js";
 
 export type InitializedDatabase = Readonly<{
   readonly rawPool: Pool;
@@ -11,6 +15,7 @@ export type InitializedDatabase = Readonly<{
 
 export async function initializeDatabase(
   config: BackendConfig,
+  observer?: SqlOperationObserver,
 ): Promise<InitializedDatabase> {
   const rawPool = mysql.createPool({
     host: config.DB_HOST,
@@ -33,20 +38,23 @@ export async function initializeDatabase(
     } finally {
       connection.release();
     }
-    const databasePool = new DatabasePool({
-      getConnection: async (): Promise<DatabaseConnection> => {
-        const connection = await rawPool.getConnection();
-        return {
-          query: async (options) =>
-            connection.query({ ...options, values: [...options.values] }),
-          beginTransaction: () => connection.beginTransaction(),
-          commit: () => connection.commit(),
-          rollback: () => connection.rollback(),
-          release: () => connection.release(),
-          destroy: () => connection.destroy(),
-        };
+    const databasePool = new DatabasePool(
+      {
+        getConnection: async (): Promise<DatabaseConnection> => {
+          const connection = await rawPool.getConnection();
+          return {
+            query: async (options) =>
+              connection.query({ ...options, values: [...options.values] }),
+            beginTransaction: () => connection.beginTransaction(),
+            commit: () => connection.commit(),
+            rollback: () => connection.rollback(),
+            release: () => connection.release(),
+            destroy: () => connection.destroy(),
+          };
+        },
       },
-    });
+      observer,
+    );
     return { rawPool, pool: databasePool, close: () => rawPool.end() };
   } catch (error) {
     await rawPool.end();

@@ -19,7 +19,7 @@ export class DatabaseQueryError extends BackendInfrastructureError {
 }
 export class DatabaseContractError extends BackendInfrastructureError {
   readonly name = "DatabaseContractError";
-  readonly code = "database_contract_failed";
+  readonly code = "database_contract_invalid";
   constructor(operationId: string) {
     super("Database result violated its contract", operationId);
   }

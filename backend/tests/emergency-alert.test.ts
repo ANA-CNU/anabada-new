@@ -10,6 +10,7 @@ import {
 const incident = {
   code: "internal_server_error",
   occurredAt: new Date("2026-09-08T00:00:00Z"),
+  routeTemplate: "GET /api/hooks",
 };
 
 test("Given Elysia error codes When classifying Then only server failures are urgent", () => {
@@ -24,9 +25,10 @@ test("Given Elysia error codes When classifying Then only server failures are ur
 test("Given a backend failure When formatting Then returns an actionable Discord Markdown alert", () => {
   const message = new BackendEmergencyAlertFormatter().format(incident);
 
-  expect(message).toContain("# 🚨 ANABADA 긴급 장애 알림");
+  expect(message).toContain("# 🚨 ANABADA Backend 긴급 장애");
   expect(message).toContain("**서비스:** `anabada-backend`");
   expect(message).toContain("**오류 코드:** `internal_server_error`");
+  expect(message).toContain("**API:** `GET /api/hooks`");
   expect(message).toContain("## 즉시 확인");
   expect(message).toContain("2026-09-08 09:00:00 KST");
 });

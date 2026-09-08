@@ -144,7 +144,7 @@ test("Given unexpected failure When app handles it Then reports exactly one safe
   });
 
   const response = await app.handle(
-    new Request("http://localhost/__test/unexpected"),
+    new Request("http://localhost/__test/unexpected?secret=not-for-alert"),
   );
 
   expect(response.status).toBe(500);
@@ -152,7 +152,7 @@ test("Given unexpected failure When app handles it Then reports exactly one safe
     expect.objectContaining({
       code: "http_request_failed",
       operationId: "http.error.http_request_failed",
-      routeTemplate: "http.error",
+      routeTemplate: "GET /__test/unexpected",
     }),
   ]);
   expect(JSON.stringify(reporter.incidents)).not.toContain(
@@ -173,18 +173,33 @@ test("Given database infrastructure errors When app handles them Then reports ea
     throw new DatabaseTransactionError("transaction.secret_safe");
   });
 
-  await app.handle(new Request("http://localhost/__test/database-query"));
+  await app.handle(
+    new Request("http://localhost/__test/database-query?secret=not-for-alert"),
+  );
   await app.handle(new Request("http://localhost/__test/database-contract"));
   await app.handle(new Request("http://localhost/__test/database-transaction"));
 
   expect(reporter.incidents.map((incident) => incident.code)).toEqual([
     "database_query_failed",
-    "database_contract_failed",
+    "database_contract_invalid",
     "database_transaction_failed",
   ]);
   expect(reporter.incidents).toHaveLength(3);
-  for (const incident of reporter.incidents) {
-    expect(incident.operationId).toBe(`http.error.${incident.code}`);
-    expect(incident.routeTemplate).toBe("http.error");
-  }
+  expect(reporter.incidents.map((incident) => incident.operationId)).toEqual([
+    "query.secret_safe",
+    "contract.secret_safe",
+    "transaction.secret_safe",
+  ]);
+  expect(
+    reporter.incidents.every(
+      (incident, index) =>
+        incident.routeTemplate ===
+        [
+          "GET /__test/database-query",
+          "GET /__test/database-contract",
+          "GET /__test/database-transaction",
+        ][index],
+    ),
+  ).toBe(true);
+  expect(JSON.stringify(reporter.incidents)).not.toContain("not-for-alert");
 });

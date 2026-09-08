@@ -32,7 +32,7 @@ export function isEmergencyServerError(code: string | number): boolean {
 export class BackendEmergencyAlertFormatter {
   format(incident: BackendEmergencyIncident): string {
     return [
-      "# 🚨 ANABADA 긴급 장애 알림",
+      "# 🚨 ANABADA Backend 긴급 장애",
       "",
       "> **서비스:** `anabada-backend`",
       `> **발생 시각:** \`${this.kst(incident.occurredAt)}\``,
@@ -41,7 +41,7 @@ export class BackendEmergencyAlertFormatter {
         ? [`> **작업 ID:** \`${incident.operationId}\``]
         : []),
       ...(incident.routeTemplate
-        ? [`> **경로:** \`${incident.routeTemplate}\``]
+        ? [`> **API:** \`${incident.routeTemplate}\``]
         : []),
       "",
       "## 영향",

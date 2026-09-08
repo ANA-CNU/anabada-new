@@ -32,7 +32,7 @@ export const problemDtoSchema = z.object({
   repeatation: z.number().int().nonnegative(),
   verdict: z.literal("accepted"),
   external_submission_id: decimalString.nullable(),
-  score: z.number().finite().nullable(),
+  score: z.coerce.number().finite().nullable(),
 });
 export type ProblemDto = Readonly<z.output<typeof problemDtoSchema>>;
 
@@ -73,8 +73,8 @@ export type UserPatch = Readonly<z.output<typeof userPatchSchema>>;
 export const monthlySummarySchema = z.object({
   start_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   end_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  total_solved: z.number().int().nonnegative(),
-  total_score: z.number().finite(),
+  total_solved: z.coerce.number().int().nonnegative(),
+  total_score: z.coerce.number().finite(),
 });
 export type MonthlySummaryDto = Readonly<z.output<typeof monthlySummarySchema>>;
 

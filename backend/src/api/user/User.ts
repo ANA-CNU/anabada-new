@@ -95,7 +95,7 @@ export const createUserRoutes = (
   new Elysia()
     .get("/api/users/all", async ({ request }) => {
       if (!(await dependencies.adminAuthorizer.authorize(request)))
-        return json(403, { error: "관리자 권한이 없습니다." });
+        return json(401, { error: "관리자 권한이 없습니다." });
       const data = await dependencies.service.list();
       return {
         success: true,
@@ -121,7 +121,7 @@ export const createUserRoutes = (
     })
     .put("/api/users/:id", async ({ request, params, body }) => {
       if (!(await dependencies.adminAuthorizer.authorize(request)))
-        return json(403, { error: "관리자 권한이 없습니다." });
+        return json(401, { error: "관리자 권한이 없습니다." });
       const id = idSchema.safeParse(params.id);
       const patch = requestPatchSchema.safeParse(body);
       if (!id.success || !patch.success)
@@ -142,7 +142,7 @@ export const createUserRoutes = (
     })
     .delete("/api/users/:id", async ({ request, params }) => {
       if (!(await dependencies.adminAuthorizer.authorize(request)))
-        return json(403, { error: "관리자 권한이 없습니다." });
+        return json(401, { error: "관리자 권한이 없습니다." });
       const id = idSchema.safeParse(params.id);
       if (!id.success)
         return json(400, { error: "유효한 사용자 ID가 필요합니다." });

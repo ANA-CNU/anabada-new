@@ -14,8 +14,8 @@ const operations = {
   remove: sqlOperations.scoreHistoryRemove,
 } as const;
 
-const existsSchema = z.object({ id: z.number().int().positive() });
-const totalSchema = z.object({ total: z.number().int().nonnegative() });
+const existsSchema = z.object({ id: z.coerce.number().int().positive() });
+const totalSchema = z.object({ total: z.coerce.number().int().nonnegative() });
 const utcDate = z.date().transform((value) => value.toISOString());
 const scoreDay = z
   .date()
@@ -57,7 +57,7 @@ export class ScoreHistoryRepository {
     if (
       !(await this.database.selectOne(
         operations.userExists,
-        "SELECT id FROM user WHERE id = ?",
+        "SELECT 1 AS id FROM user WHERE id = ?",
         [record.user_id],
         existsSchema,
       ))
@@ -67,7 +67,7 @@ export class ScoreHistoryRepository {
       record.event_id !== null &&
       !(await this.database.selectOne(
         operations.eventExists,
-        "SELECT id FROM event WHERE id = ?",
+        "SELECT 1 AS id FROM event WHERE id = ?",
         [record.event_id],
         existsSchema,
       ))
@@ -76,7 +76,7 @@ export class ScoreHistoryRepository {
     if (record.problem_id !== null) {
       const owner = await this.database.selectOne(
         operations.problemOwner,
-        "SELECT id FROM problem WHERE id = ? AND user_id = ?",
+        "SELECT 1 AS id FROM problem WHERE id = ? AND user_id = ?",
         [record.problem_id, record.user_id],
         existsSchema,
       );
@@ -84,7 +84,7 @@ export class ScoreHistoryRepository {
       if (record.event_id !== null) {
         const linked = await this.database.selectOne(
           operations.eventProblem,
-          "SELECT ep.id FROM event_problem ep JOIN problem p ON p.problem = ep.problem WHERE ep.event_id = ? AND p.id = ?",
+          "SELECT 1 AS id FROM event_problem ep JOIN problem p ON p.problem = ep.problem WHERE ep.event_id = ? AND p.id = ?",
           [record.event_id, record.problem_id],
           existsSchema,
         );

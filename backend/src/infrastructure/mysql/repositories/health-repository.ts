@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { DatabaseExecutor } from "../database-session.js";
 import { sqlOperations } from "../database-session.js";
 
-const readySchema = z.object({ ready: z.literal(1) });
+const readySchema = z.object({ ready: z.coerce.number().pipe(z.literal(1)) });
 const migrationSchema = z.object({
   version: z.coerce.number().int().nonnegative(),
 });
@@ -46,7 +46,7 @@ export class HealthRepository {
     const placeholders = requiredApplicationTables.map(() => "?").join(", ");
     const rows = await this.database.select(
       sqlOperations.healthTables,
-      `SELECT table_name FROM information_schema.tables WHERE table_schema = 'jungol_bada' AND table_name IN (${placeholders})`,
+      `SELECT table_name AS table_name FROM information_schema.tables WHERE table_schema = 'jungol_bada' AND table_name IN (${placeholders})`,
       requiredApplicationTables,
       tableSchema,
     );

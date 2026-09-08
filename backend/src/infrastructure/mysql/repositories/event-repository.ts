@@ -11,7 +11,7 @@ const eventRowSchema = z.object({
   created_at: z.date(),
 });
 const eventListRowSchema = eventRowSchema.extend({
-  problem_count: z.number().int().nonnegative(),
+  problem_count: z.coerce.number().int().nonnegative(),
 });
 const recentRowSchema = z.object({
   event_title: z.string(),
@@ -149,7 +149,7 @@ export class EventRepository implements EventRepositoryPort {
       sqlOperations.eventList,
       "SELECT COUNT(*) AS total FROM event",
       [],
-      z.object({ total: z.number().int().nonnegative() }),
+      z.object({ total: z.coerce.number().int().nonnegative() }),
     );
     return row?.total ?? 0;
   }

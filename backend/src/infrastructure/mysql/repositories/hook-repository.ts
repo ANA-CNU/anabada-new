@@ -8,7 +8,9 @@ const hookRowSchema = z.object({
   ignored: z.union([z.literal(0), z.literal(1)]),
   created_at: z.date(),
 });
-const countRowSchema = z.object({ total: z.number().int().nonnegative() });
+const countRowSchema = z.object({
+  total: z.coerce.number().int().nonnegative(),
+});
 const hookOperations = {
   count: sqlOperations.hookCount,
   list: sqlOperations.hookList,

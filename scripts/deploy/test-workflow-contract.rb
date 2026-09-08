@@ -41,6 +41,18 @@ expected = {
   'jungol-migrator' => ['DB_PASSWORD'],
   'jungol-collector' => %w[DB_PASSWORD JUNGOL_USERNAME JUNGOL_PASSWORD WEBHOOK_URL], 'bada-nginx' => []
 }
+
+ci = YAML.load_file('.github/workflows/ci.yaml')
+backend_step = ci.fetch('jobs').fetch('verify').fetch('steps').find do |step|
+  step['name'] == 'Backend unit, type, build, and migrated MySQL contracts'
+end
+check(!backend_step.nil?, 'CI backend migrated-MySQL gate is missing')
+backend_commands = backend_step.fetch('run')
+%w[bun\ run\ test:unit bun\ run\ typecheck bun\ run\ lint bun\ run\ build sh\ backend/test/run-mysql.sh].each do |command|
+  check(backend_commands.include?(command), "CI backend gate is missing: #{command}")
+end
+check(!backend_commands.match?(/backend_qa|TEST_DATABASE_URL|CREATE DATABASE/), 'CI backend gate must not use the legacy shared MySQL flow')
+
 %w[dev stage prod].each do |mode|
   config = YAML.load_file("docker-compose.#{mode}.yaml")
   check(!config.key?('secrets'), 'Top-level secrets forbidden')

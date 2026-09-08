@@ -4,8 +4,11 @@
   "scripts": {
     "test": "bun test",
     "test:unit": "bun test tests --timeout 5000",
+    "test:mysql": "bun test test/mysql/entry.test.ts --timeout 30000",
+    "test:api": "bun run test:mysql",
+    "test:mysql:docker": "sh test/run-mysql.sh",
     "typecheck": "tsc --noEmit",
-    "lint": "biome check src tests",
+    "lint": "biome check src tests test",
     "dev": "bun run --watch src/cli.ts",
     "build": "bun build src/cli.ts --outdir dist --target bun",
     "start": "bun run dist/cli.js"

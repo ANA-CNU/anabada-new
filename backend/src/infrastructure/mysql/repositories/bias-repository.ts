@@ -10,7 +10,7 @@ const operations = {
 } as const;
 const aggregateSchema = z.object({
   user_id: z.number().int().positive(),
-  total_point: z.number().int(),
+  total_point: z.coerce.number().int(),
 });
 const utcDateNullable = z
   .date()
@@ -21,7 +21,7 @@ export const biasUserSchema = z.object({
   jungol_name: z.string(),
   korean_name: z.string().nullable(),
   display_name: z.string(),
-  total_point: z.number().int(),
+  total_point: z.coerce.number().int(),
   updated_at: utcDateNullable,
 });
 export type BiasUser = Readonly<z.output<typeof biasUserSchema>>;
