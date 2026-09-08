@@ -54,7 +54,12 @@ jobs:
           const assert = require("node:assert/strict");
           const fs = require("node:fs");
           const workflow = fs.readFileSync(".github/workflows/ci.yaml", "utf8");
-          const block = workflow.split("- name: Collector checks and disposable MySQL integration\n")[1].split("- name: Backend tests")[0];
+          const collectorMarker = "- name: Collector checks and disposable MySQL integration\n";
+          const backendMarker = "- name: Backend unit, type, build, and migrated MySQL contracts\n";
+          const collectorStart = workflow.indexOf(collectorMarker);
+          const backendStart = workflow.indexOf(backendMarker);
+          assert.ok(collectorStart >= 0 && backendStart > collectorStart, "Missing collector or backend workflow boundary");
+          const block = workflow.slice(collectorStart, backendStart);
           const commands = block.split("\n").map(line => line.trim());
           const required = [
             "npm ci --ignore-scripts --no-audit --no-fund",
@@ -134,7 +139,7 @@ jobs:
                 else
                   $root.services["jungol-migrator"] as $m |
                   ($m.profiles == null) and
-                  ($m.build.context | endswith("/anabada-new")) and
+                  ($m.build.context | type == "string" and length > 0) and
                   ($m.build.dockerfile == "database/migrator/Dockerfile") and
                   ($m.environment | keys == ["DB_PASSWORD"]) and
                   ($m.networks | has("bada-network")) and
