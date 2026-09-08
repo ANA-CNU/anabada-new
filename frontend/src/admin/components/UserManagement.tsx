@@ -116,7 +116,7 @@ export default function UserManagement() {
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold tracking-tight">유저 목록</h2>
-        <p className="text-muted-foreground">모든 유저의 정보를 조회, 수정, 삭제할 수 있습니다. 정올 수집 메타데이터는 다음 수집 주기에 덮어써질 수 있습니다.</p>
+        <p className="text-muted-foreground break-keep">유저 정보를 조회·수정·삭제합니다. 수집 정보는 다음 수집 때 덮어쓸 수 있습니다.</p>
       </div>
 
       <Card>

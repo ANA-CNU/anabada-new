@@ -204,7 +204,10 @@ const UserProfile: React.FC = () => {
           {monthly && (
             <Card className="bg-white/5 border-white/20 text-white mb-8">
               <CardHeader>
-                <CardTitle className="text-xl">이번 달 요약 ({monthly.start_date} ~ {monthly.end_date})</CardTitle>
+                <CardTitle className="flex flex-col gap-1 text-lg sm:flex-row sm:items-baseline sm:gap-2 sm:text-xl">
+                  <span className="break-keep">이번 달 요약</span>
+                  <span className="whitespace-nowrap text-base sm:text-xl">({monthly.start_date} ~ {monthly.end_date})</span>
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

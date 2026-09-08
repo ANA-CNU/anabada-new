@@ -13,14 +13,17 @@ import { URL } from "@/resource/constant";
 interface Webhook {
   id: number;
   url: string;
-  ignored: number;
+  ignored: boolean;
   created_at: string;
 }
 
 interface WebhookFormData {
   url: string;
-  ignored: number;
+  ignored: boolean;
 }
+
+const messageOf = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
 
 export default function WebhookManagement() {
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
@@ -31,7 +34,7 @@ export default function WebhookManagement() {
   const [editingWebhook, setEditingWebhook] = useState<Webhook | null>(null);
   const [formData, setFormData] = useState<WebhookFormData>({
     url: "",
-    ignored: 0
+    ignored: false
   });
   const [pagination, setPagination] = useState({
     page: 1,
@@ -60,8 +63,8 @@ export default function WebhookManagement() {
       } else {
         setError(data.message || 'Webhook 목록 조회에 실패했습니다.');
       }
-    } catch (err: any) {
-      setError(err.message || 'Webhook 목록 조회 중 오류가 발생했습니다.');
+    } catch (error: unknown) {
+      setError(messageOf(error, 'Webhook 목록 조회 중 오류가 발생했습니다.'));
     } finally {
       setLoading(false);
     }
@@ -90,13 +93,13 @@ export default function WebhookManagement() {
 
       if (data.success) {
         setIsCreateDialogOpen(false);
-        setFormData({ url: "", ignored: 0 });
+        setFormData({ url: "", ignored: false });
         fetchWebhooks();
       } else {
         setError(data.message || 'Webhook 생성에 실패했습니다.');
       }
-    } catch (err: any) {
-      setError(err.message || 'Webhook 생성 중 오류가 발생했습니다.');
+    } catch (error: unknown) {
+      setError(messageOf(error, 'Webhook 생성 중 오류가 발생했습니다.'));
     }
   };
 
@@ -121,13 +124,13 @@ export default function WebhookManagement() {
       if (data.success) {
         setIsEditDialogOpen(false);
         setEditingWebhook(null);
-        setFormData({ url: "", ignored: 0 });
+        setFormData({ url: "", ignored: false });
         fetchWebhooks();
       } else {
         setError(data.message || 'Webhook 수정에 실패했습니다.');
       }
-    } catch (err: any) {
-      setError(err.message || 'Webhook 수정 중 오류가 발생했습니다.');
+    } catch (error: unknown) {
+      setError(messageOf(error, 'Webhook 수정 중 오류가 발생했습니다.'));
     }
   };
 
@@ -148,8 +151,8 @@ export default function WebhookManagement() {
       } else {
         setError(data.message || 'Webhook 삭제에 실패했습니다.');
       }
-    } catch (err: any) {
-      setError(err.message || 'Webhook 삭제 중 오류가 발생했습니다.');
+    } catch (error: unknown) {
+      setError(messageOf(error, 'Webhook 삭제 중 오류가 발생했습니다.'));
     }
   };
 
@@ -168,8 +171,8 @@ export default function WebhookManagement() {
       } else {
         setError(data.message || 'Webhook 상태 변경에 실패했습니다.');
       }
-    } catch (err: any) {
-      setError(err.message || 'Webhook 상태 변경 중 오류가 발생했습니다.');
+    } catch (error: unknown) {
+      setError(messageOf(error, 'Webhook 상태 변경 중 오류가 발생했습니다.'));
     }
   };
 
@@ -181,16 +184,6 @@ export default function WebhookManagement() {
       ignored: webhook.ignored
     });
     setIsEditDialogOpen(true);
-  };
-
-  // URL 검증
-  const isValidUrl = (url: string) => {
-    try {
-      new globalThis.URL(url);
-      return true;
-    } catch {
-      return false;
-    }
   };
 
   useEffect(() => {
@@ -215,16 +208,16 @@ export default function WebhookManagement() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Webhook 관리</h2>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground break-keep">
             Discord webhook을 관리합니다.
           </p>
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="w-full sm:w-auto">
               <Plus className="mr-2 h-4 w-4" />
               Webhook 추가
             </Button>
@@ -251,8 +244,8 @@ export default function WebhookManagement() {
                 <input
                   type="checkbox"
                   id="ignored"
-                  checked={formData.ignored === 1}
-                  onChange={(e) => setFormData({ ...formData, ignored: e.target.checked ? 1 : 0 })}
+                  checked={formData.ignored}
+                  onChange={(e) => setFormData({ ...formData, ignored: e.target.checked })}
                 />
                 <Label htmlFor="ignored">비활성화</Label>
               </div>
@@ -312,14 +305,15 @@ export default function WebhookManagement() {
                         variant="ghost"
                         size="sm"
                         onClick={() => window.open(webhook.url, '_blank')}
+                        aria-label="Webhook 주소 열기"
                       >
                         <ExternalLink className="h-4 w-4" />
                       </Button>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant={webhook.ignored === 1 ? "secondary" : "default"}>
-                      {webhook.ignored === 1 ? "비활성화" : "활성화"}
+                    <Badge variant={webhook.ignored ? "secondary" : "default"}>
+                      {webhook.ignored ? "비활성화" : "활성화"}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -331,8 +325,9 @@ export default function WebhookManagement() {
                         variant="ghost"
                         size="sm"
                         onClick={() => toggleWebhookStatus(webhook.id)}
+                        aria-label={webhook.ignored ? "Webhook 활성화" : "Webhook 비활성화"}
                       >
-                        {webhook.ignored === 1 ? (
+                        {webhook.ignored ? (
                           <Power className="h-4 w-4" />
                         ) : (
                           <PowerOff className="h-4 w-4" />
@@ -342,6 +337,7 @@ export default function WebhookManagement() {
                         variant="ghost"
                         size="sm"
                         onClick={() => startEdit(webhook)}
+                        aria-label="Webhook 수정"
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -349,6 +345,7 @@ export default function WebhookManagement() {
                         variant="ghost"
                         size="sm"
                         onClick={() => deleteWebhook(webhook.id)}
+                        aria-label="Webhook 삭제"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -385,8 +382,8 @@ export default function WebhookManagement() {
               <input
                 type="checkbox"
                 id="edit-ignored"
-                checked={formData.ignored === 1}
-                onChange={(e) => setFormData({ ...formData, ignored: e.target.checked ? 1 : 0 })}
+                checked={formData.ignored}
+                onChange={(e) => setFormData({ ...formData, ignored: e.target.checked })}
               />
               <Label htmlFor="edit-ignored">비활성화</Label>
             </div>

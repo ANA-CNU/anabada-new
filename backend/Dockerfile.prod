@@ -39,5 +39,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3000/health || exit 1
 
-# 애플리케이션 실행
-CMD ["bun", "run", "dist/index.js"]
+# 빌드 산출물의 실제 CLI 진입점으로 실행한다. bootstrap이 DB 연결과 listen을 명시적으로 시작한다.
+CMD ["bun", "run", "dist/cli.js"]

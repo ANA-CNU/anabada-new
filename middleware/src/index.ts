@@ -40,6 +40,7 @@ if (isProduction) {
   // Development: Safari 호환성을 위한 Helmet 설정
   app.use(helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginOpenerPolicy: false,
     contentSecurityPolicy: false
   }));
 }
@@ -121,4 +122,4 @@ app.use((req: express.Request, res: express.Response) => {
 
 app.listen(PORT, () => {
   console.log(`🚀 서버가 포트 ${PORT}에서 실행 중입니다. (${isProduction ? 'Production' : 'Development'})`);
-}); 
+});

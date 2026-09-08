@@ -202,7 +202,7 @@ function ScoreManagement({ userList }: ScoreManagementProps) {
             <Settings className="h-5 w-5" />
             일괄 설정
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="break-keep">
             모든 항목에 동일한 가중치나 이유를 한 번에 적용할 수 있습니다.
           </CardDescription>
         </CardHeader>

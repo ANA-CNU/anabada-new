@@ -218,6 +218,7 @@ function Admin() {
                 size="sm"
                 className="lg:hidden"
                 onClick={() => setSidebarOpen(false)}
+                aria-label="관리자 메뉴 닫기"
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -293,6 +294,7 @@ function Admin() {
                 variant="ghost"
                 size="sm"
                 onClick={() => setSidebarOpen(true)}
+                aria-label="관리자 메뉴 열기"
               >
                 <Menu className="h-5 w-5" />
               </Button>

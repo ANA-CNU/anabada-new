@@ -1,25 +1,21 @@
 import React, { useState, useEffect } from "react";
 import { SquircleSurface } from "@/components/ui/squircle";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
 import { URL } from "@/resource/constant";
 import { 
   Calendar, 
   Clock, 
   Edit, 
   Trash2, 
-  Plus, 
-  Eye,
   AlertTriangle,
   CheckCircle,
   XCircle,
-  MoreVertical
 } from "lucide-react";
 // toast 대신 alert 사용
 
@@ -44,6 +40,44 @@ interface PaginationInfo {
   total_pages: number;
 }
 
+type EventEditForm = {
+  readonly title: string;
+  readonly desc: string;
+  readonly begin: string;
+  readonly end: string;
+  readonly problems: string;
+};
+
+const parseProblemNumbers = (value: string): readonly number[] | null => {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return [];
+  const values = trimmed.split(',').map((entry) => entry.trim());
+  if (values.some((entry) => entry.length === 0)) return null;
+  const numbers = values.map(Number);
+  if (numbers.some((value) => !Number.isInteger(value) || value <= 0)) return null;
+  return new Set(numbers).size === numbers.length ? numbers : null;
+};
+
+const toBackendDateTime = (value: string): string | null => {
+  const normalized = value.trim().replace('T', ' ');
+  return /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(normalized)
+    ? `${normalized}:00`
+    : null;
+};
+
+const toKstDateTimeLocal = (value: string): string => {
+  const instant = new Date(value);
+  if (Number.isNaN(instant.getTime())) return '';
+
+  const kst = new Date(instant.getTime() + 9 * 60 * 60 * 1000);
+  const pad = (part: number) => part.toString().padStart(2, '0');
+  return [
+    kst.getUTCFullYear(),
+    pad(kst.getUTCMonth() + 1),
+    pad(kst.getUTCDate()),
+  ].join('-') + `T${pad(kst.getUTCHours())}:${pad(kst.getUTCMinutes())}`;
+};
+
 const EventList: React.FC = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,13 +91,14 @@ const EventList: React.FC = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [eventToDelete, setEventToDelete] = useState<Event | null>(null);
-  const [editForm, setEditForm] = useState({
+  const [editForm, setEditForm] = useState<EventEditForm>({
     title: '',
     desc: '',
     begin: '',
     end: '',
     problems: ''
   });
+  const [editError, setEditError] = useState<string | null>(null);
 
   // 이벤트 목록 조회
   const fetchEvents = async (page: number = 1) => {
@@ -111,29 +146,44 @@ const EventList: React.FC = () => {
   const handleEditEvent = async () => {
     if (!selectedEvent) return;
 
+    const problems = parseProblemNumbers(editForm.problems);
+    const begin = toBackendDateTime(editForm.begin);
+    const end = toBackendDateTime(editForm.end);
+    if (!problems || !begin || !end || editForm.title.trim().length === 0) {
+      setEditError('제목, 날짜와 문제 번호를 확인해주세요. 문제 번호는 양의 정수를 쉼표로 구분하며 중복될 수 없습니다.');
+      return;
+    }
+
     try {
+      setEditError(null);
       const response = await fetch(`${URL}/api/events/${selectedEvent.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include', // 쿠키 포함
-        body: JSON.stringify(editForm)
+        body: JSON.stringify({
+          title: editForm.title.trim(),
+          desc: editForm.desc.trim() || null,
+          begin,
+          end,
+          problems,
+        })
       });
       const result = await response.json();
 
-      if (result.success) {
+      if (response.ok && result.success) {
         alert('이벤트가 성공적으로 수정되었습니다.');
         setEditDialogOpen(false);
         setSelectedEvent(null);
         setEditForm({ title: '', desc: '', begin: '', end: '', problems: '' });
-        fetchEvents(pagination.page); // 현재 페이지 새로고침
+        await fetchEvents(pagination.page);
       } else {
-        alert(result.message || '이벤트 수정에 실패했습니다.');
+        setEditError(result.message || '이벤트 수정에 실패했습니다.');
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('이벤트 수정 실패:', error);
-      alert('이벤트 수정 중 오류가 발생했습니다.');
+      setEditError('이벤트 수정 중 오류가 발생했습니다.');
     }
   };
 
@@ -179,12 +229,13 @@ const EventList: React.FC = () => {
 
   // 수정 폼 초기화
   const openEditDialog = (event: Event) => {
+    setEditError(null);
     setSelectedEvent({ ...event, problems: [] });
     setEditForm({
       title: event.title,
       desc: event.desc || '',
-      begin: event.begin.slice(0, 16),
-      end: event.end.slice(0, 16),
+      begin: toKstDateTimeLocal(event.begin),
+      end: toKstDateTimeLocal(event.end),
       problems: '' // 문제는 상세 조회 후 설정
     });
     
@@ -357,6 +408,11 @@ const EventList: React.FC = () => {
           </DialogHeader>
           
           <div className="space-y-4">
+            {editError && (
+              <SquircleSurface radius="control" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3">
+                {editError}
+              </SquircleSurface>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="title">제목 *</Label>

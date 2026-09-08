@@ -1,7 +1,6 @@
 import React from "react";
 import Header from "./layout/Header";
 import LeftHeadWrapper from "./layout/LeftHeadWrapper";
-import RightHeadWrapper from "./layout/RightHeadWrapper";
 import UnifiedRankList from "./components/UnifiedRankList";
 import ActivitySection from "./components/ActivitySection";
 import StatsSection from "./stats/StatsSection";
@@ -35,8 +34,7 @@ const Home: React.FC = () => {
 
         <EventSection />
 
-        {/* 사용자 검색 섹션: 2-column */}
-        {/*<section className="py-16 px-4 lg:px-6">
+        <section className="py-16 px-4 lg:px-6">
           <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             <div className="order-2 lg:order-1">
               <UserSearch wide />
@@ -45,7 +43,7 @@ const Home: React.FC = () => {
               <UserSearchGuide />
             </div>
           </div>
-        </section>*/}
+        </section>
 
         <Footer />
       </Background>
