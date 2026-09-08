@@ -1,6 +1,6 @@
 # Jungol 전용 DB 스키마 검토안
 
-[실행 SQL](../../migrations/002_create_jungol_bada.sql)이 이 문서의 산출물이다. 새 MySQL 8.4 논리 DB `jungol_bada`만 생성한다. 기존 DB 수정·복사와 운영 적용은 하지 않았다. SQL은 운영자가 서버에 직접 적용하며 애플리케이션, Compose, CI와 배포 workflow는 스키마 적용이나 버전 관리를 수행하지 않는다.
+[실행 SQL](../../migrations/002_create_jungol_bada.sql)이 이 문서의 산출물이다. 새 MySQL 8.4 논리 DB `jungol_bada`만 생성하며 기존 DB를 수정·복사하지 않는다. 현재 stage/production의 일반 Compose up과 production workflow가 활성 `migrations/*.sql`을 순방향 적용하고, `migrations` 테이블에 버전·파일명·SHA-256 checksum을 기록한다. 개발 Compose는 자동 적용하지 않는다.
 
 ## 원칙
 
@@ -176,15 +176,15 @@ GRANT UPDATE (ignored) ON jungol_bada.hook TO 'jungol_collector'@'collector_host
 -- END COLLECTOR GRANTS
 ```
 
-## 수동 적용과 복구 한계
+## 현재 적용과 복구 한계
 
-1. 승인된 서버의 hostname/version/timezone과 스키마 목록을 조회한다. MySQL 8.4이며 jungol_bada가 존재하지 않아야 한다.
-2. 검토한 SQL 해시를 기록하고 보호된 mysql login-path/옵션 파일로 접속한다. `mysql --login-path=approved-target --batch < migrations/002_create_jungol_bada.sql`을 운영자가 수동 실행한다. `--force`는 금지하며 CI/앱 시작 자동 적용은 하지 않는다.
-3. 프로세스 exit 0과 정확한 9개 테이블·컬럼·FK·CHECK를 직접 확인한다. 별도의 스키마 버전 표식은 없다.
-4. 후속 코드 마이그레이션·권한·UTC 연결 검증을 마친 뒤에만 서비스 연결 전환을 별도로 판단한다.
+1. 승인된 서버의 hostname/version/timezone, external network와 DB 상태를 조회한다. stage/production Compose는 MySQL healthcheck 성공 뒤에 migrator를 실행한다.
+2. `docker compose --env-file .env -f docker-compose.stage.yaml up -d --build --wait --wait-timeout 180` 또는 production 동등 명령을 사용한다. migrator 성공 종료 뒤에만 앱이 시작하며 `migrations`에 없는 기존 `jungol_bada`는 변경 없이 실패한다.
+3. `SELECT version, filename, checksum_sha256, applied_at FROM jungol_bada.migrations ORDER BY version;`으로 version 2와 checksum을 확인하고, 업무 9개 테이블·컬럼·FK·CHECK를 직접 확인한다.
+4. 적용 기록의 파일명 또는 checksum이 현재 SQL과 다르면 migrator는 변경 없이 실패한다. 수정이 필요하면 기존 파일을 바꾸지 않고 새 순방향 버전을 추가한다.
 
-DDL은 암묵적 커밋이므로 전체 ROLLBACK은 불가능하다. 기존 목적지가 있으면 첫 CREATE DATABASE에서 실패한다. 부분 생성 후 재실행은 복구가 아니다. 서비스를 시작하지 말고 실제 생성물을 조사한다. 새 목적지를 폐기하려면 비어 있는 전용 대상임을 운영자가 확인하고 별도 승인해야 한다. 이 SQL에는 DROP/ALTER/옛 데이터 복사가 없다. 새 DB 데이터를 옛 DB로 합치는 자동 rollback도 없다.
+DDL은 암묵적 커밋이므로 자동 rollback은 없다. migrator 실패 뒤 Compose는 종속 앱을 시작하지 않는다. 실제 생성물과 `migrations` 상태를 조사한다. 새 목적지를 폐기하려면 비어 있는 전용 대상임을 운영자가 확인하고 별도 승인해야 한다. 이 SQL에는 DROP/ALTER/옛 데이터 복사가 없으며 새 DB 데이터를 옛 DB로 합치는 자동 rollback도 없다.
 
 ## 검증 범위
 
-전용 migration 자동 검증기는 두지 않는다. SQL 변경은 운영자가 검토한 뒤 서버에 수동 적용한다. collector의 MySQL 통합 테스트는 운영 연결을 사용하지 않고 일회용 테스트 DB에 필요한 스키마를 fixture로 구성할 수 있지만, 운영·stage·dev Compose와 배포 workflow는 이 SQL을 자동 적용하지 않는다.
+전용 migrator는 unit/typecheck/lint/build, 실제 disposable MySQL 8.4/image integration, CI Compose topology와 startup-order 검증을 거친다. collector의 MySQL 통합 테스트는 운영 연결을 사용하지 않고 일회용 DB fixture를 구성한다. stage/production 일반 Compose up과 production workflow는 migration 성공 뒤에만 앱 rollout을 시작하며, dev Compose는 자동 적용하지 않는다.

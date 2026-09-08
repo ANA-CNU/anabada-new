@@ -1,6 +1,6 @@
--- Jungol 수집 데이터를 저장할 새 논리 데이터베이스를 만드는 수동 마이그레이션이다.
--- 반드시 mysql batch mode에서 --force 없이 실행한다. 중간에 오류가 나면 즉시 실행이 중단되어야 한다.
--- jungol_bada가 존재하지 않는 빈 환경만 대상으로 한다. 이미 존재하면 CREATE DATABASE 단계에서 실패한다.
+-- Jungol 수집 데이터를 저장할 새 논리 데이터베이스를 만드는 자동 마이그레이션이다.
+-- migrator가 mysql batch mode와 같은 fail-fast 방식으로 실행하며, 중간 오류 뒤에는 기록하지 않는다.
+-- jungol_bada가 존재하지 않는 빈 환경에서만 최초 실행된다. 이미 존재하면 migrator가 관리 상태를 확인한다.
 -- 이 파일은 기존 데이터베이스를 수정·복사·삭제하지 않으며, 부분 적용된 스키마를 자동 복구하지 않는다.
 CREATE DATABASE `jungol_bada` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;
 USE `jungol_bada`;
