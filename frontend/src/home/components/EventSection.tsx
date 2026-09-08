@@ -118,7 +118,7 @@ function EventSection() {
                           {/* 문제 번호 목록 */}
                           <div tabIndex={0} aria-label="이벤트 문제 목록" className="flex min-w-0 flex-1 items-center gap-1 max-w-md overflow-x-auto scrollbar-thin scrollbar-thumb-blue-400/30 scrollbar-track-transparent">
                             {event.problems.split(',').map((problem, idx) => (
-                              <SquircleSurface key={idx} radius="compact" asChild><span className="text-xs text-blue-300 bg-blue-400/10 px-2 py-1 border border-blue-400/20 whitespace-nowrap flex-shrink-0">
+                              <SquircleSurface key={idx} radius="compact" asChild><span className="text-xs text-white bg-white/10 px-2 py-1 border-0 whitespace-nowrap flex-shrink-0">
                                 {problem.trim()}
                               </span></SquircleSurface>
                             ))}
