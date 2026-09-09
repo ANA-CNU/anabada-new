@@ -56,8 +56,8 @@ mysql --defaults-extra-file="$MYSQL_OPERATOR_CNF" --batch --execute="SELECT @@ho
 stage/production의 일반 Compose 실행은 MySQL healthcheck 뒤 migrator를 한 번 실행하고, 성공 종료(`Exited (0)`) 후에만 frontend·middleware·backend·collector를 시작합니다. `--build`는 현재 migration image를 포함하도록 필수입니다.
 
 ```sh
-docker compose --env-file .env -f docker-compose.stage.yaml up -d --build --wait --wait-timeout 180
-docker compose --env-file .env -f docker-compose.prod.yaml up -d --build --wait --wait-timeout 180
+COMPOSE_BAKE=false docker compose --env-file .env -f docker-compose.stage.yaml up -d --build --wait --wait-timeout 180
+COMPOSE_BAKE=false docker compose --env-file .env -f docker-compose.prod.yaml up -d --build --wait --wait-timeout 180
 mysql --defaults-extra-file="$MYSQL_OPERATOR_CNF" --database=jungol_bada --batch --execute="SELECT DATABASE(); SELECT COUNT(*) AS table_count FROM information_schema.tables WHERE table_schema=DATABASE(); SELECT COUNT(*) AS users FROM user; SELECT COUNT(*) AS attempts FROM problem; SELECT COUNT(*) AS awards FROM score_history;"
 ```
 
@@ -133,7 +133,7 @@ docker compose --env-file .env -f docker-compose.dev.yaml -p jungol-dev ps
 운영 rollout 순서:
 
 1. 이전 backend/config 복구 경로와 DB 백업을 확보하고 기존 레거시 수집/sync 작업을 정지합니다.
-2. stage에서 `docker compose --env-file .env -f docker-compose.stage.yaml up -d --build --wait --wait-timeout 180`를 성공시킨 뒤 status SELECT와 9개 업무 테이블을 검증합니다. production workflow도 하나의 Compose `up -d --build --remove-orphans --wait` 안에서 migrator 성공 뒤에만 앱을 시작합니다.
+2. stage에서 `COMPOSE_BAKE=false docker compose --env-file .env -f docker-compose.stage.yaml up -d --build --wait --wait-timeout 180`를 성공시킨 뒤 status SELECT와 9개 업무 테이블을 검증합니다. CI에서 확인된 구버전 Compose/Bake 조합 호환성을 위해 Bake 위임만 끄며 BuildKit 캐시·단일 `up`·migration 의존성은 유지합니다. production workflow도 `COMPOSE_BAKE=false`인 하나의 Compose `up -d --build --remove-orphans --wait` 안에서 migrator 성공 뒤에만 앱을 시작합니다.
 3. GitHub production Environment에 아래 필수 secrets를 등록합니다. workflow가 서버 루트 `.env`를 생성합니다. 기존 MySQL root 비밀번호와 `DB_PASSWORD`가 일치하고 backend/collector가 `anabada-mysql:3306/jungol_bada`에 접속하는지 확인합니다.
 4. `.env`와 profile 권한, external networks, MySQL image 호환성을 확인합니다. 운영자가 통제하는 단일 one-shot으로 초기 적재·점수·재실행을 검증합니다.
 5. backend와 collector를 배포하고 health 및 사용자별 적재 결과를 확인합니다. 초기 empty 응답과 나중의 projection 노출을 구분합니다.

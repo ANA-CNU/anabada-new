@@ -10,6 +10,9 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # CI에서 확인된 구버전 Compose/Bake 조합의 이미지 선택 결함만 피한다. BuildKit 캐시와 단일 Compose up의 의존성은 유지한다.
+    env:
+      COMPOSE_BAKE: "false"
     # 운영 DB나 실제 계정을 사용하지 않고 스키마·트랜잭션을 검증하는 일회용 MySQL이다.
     services:
       mysql:

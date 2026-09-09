@@ -43,6 +43,8 @@ expected = {
 }
 
 ci = YAML.load_file('.github/workflows/ci.yaml')
+verify_environment = ci.fetch('jobs').fetch('verify').fetch('env')
+check(verify_environment.fetch('COMPOSE_BAKE') == 'false', 'CI must disable Compose Bake delegation')
 backend_step = ci.fetch('jobs').fetch('verify').fetch('steps').find do |step|
   step['name'] == 'Backend unit, type, build, and migrated MySQL contracts'
 end
@@ -52,6 +54,11 @@ backend_commands = backend_step.fetch('run')
   check(backend_commands.include?(command), "CI backend gate is missing: #{command}")
 end
 check(!backend_commands.match?(/backend_qa|TEST_DATABASE_URL|CREATE DATABASE/), 'CI backend gate must not use the legacy shared MySQL flow')
+
+remote_deploy = /<<'DEPLOY'\n(?<script>.*?)\nDEPLOY\n\z/m.match(deploy)&.[](:script)
+check(!remote_deploy.nil?, 'Deployment must retain the remote deployment shell')
+check(remote_deploy.include?('export COMPOSE_BAKE=false'), 'Remote deployment shell must disable Compose Bake delegation')
+check(remote_deploy.index('export COMPOSE_BAKE=false') < remote_deploy.index('docker compose --env-file .env -f docker-compose.prod.yaml up '), 'Remote deployment shell must disable Compose Bake before its canonical Compose up')
 
 %w[dev stage prod].each do |mode|
   config = YAML.load_file("docker-compose.#{mode}.yaml")

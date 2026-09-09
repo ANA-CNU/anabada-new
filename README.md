@@ -48,16 +48,16 @@ stage와 production의 일반 Compose 실행은 MySQL healthcheck 뒤 일회성 
 docker compose --env-file .env -f docker-compose.dev.yaml up -d --build --wait
 ```
 
-개발 접속 주소는 `http://localhost:20050`입니다. stage/production에는 루트 `.env`와 미리 생성한 external network가 필요합니다. 배포에는 반드시 `--build`를 포함한 일반 Compose 실행을 사용합니다.
+개발 접속 주소는 `http://localhost:20050`입니다. stage/production에는 루트 `.env`와 미리 생성한 external network가 필요합니다. 배포에는 반드시 `COMPOSE_BAKE=false`와 `--build`를 포함한 일반 Compose 실행을 사용합니다. 이는 CI에서 확인된 구버전 Compose/Bake 조합의 이미지 선택 결함을 피하기 위한 호환성 설정으로, Bake 위임만 끄고 BuildKit 캐시·단일 `up`·migration 의존성은 유지합니다. 근거는 [Compose v2.38.2](https://github.com/docker/compose/blob/v2.38.2/pkg/compose/build_bake.go#L333-L343)와 [v2.39.4](https://github.com/docker/compose/blob/v2.39.4/pkg/compose/build_bake.go#L376-L388)의 이미지 결과 매핑 변경입니다.
 
 ```sh
-docker compose --env-file .env -f docker-compose.stage.yaml up -d --build --wait --wait-timeout 180
-docker compose --env-file .env -f docker-compose.prod.yaml up -d --build --wait --wait-timeout 180
+COMPOSE_BAKE=false docker compose --env-file .env -f docker-compose.stage.yaml up -d --build --wait --wait-timeout 180
+COMPOSE_BAKE=false docker compose --env-file .env -f docker-compose.prod.yaml up -d --build --wait --wait-timeout 180
 ```
 
 `docker compose ... ps`와 `docker compose ... logs jungol-migrator`로 상태와 실패 원인을 확인합니다. 마이그레이터는 성공 시 `Exited (0)`이 정상이며 재시작하지 않습니다. migration 실패는 Compose 명령을 실패시키고 종속 앱을 시작하지 않습니다. 자동 rollback은 없습니다. 동일 checkout에서 stage와 prod를 동시에 실행하지 마세요. 두 환경은 bind mount와 external network를 공유하는 배포 대상입니다.
 
-운영 배포는 GitHub `production` Environment의 Secrets에서 필수 여섯 값과 선택 Kakao 키·`WEBHOOK_URL`을 받아 서버 루트 `.env` 하나를 생성합니다. SSH 배포 Secrets는 `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PORT`, `DEPLOY_KEY`입니다. GitHub Actions의 일회성 runner는 첫 SSH 연결에서 서버 host key를 자동 수락합니다. workflow는 한 번의 Compose `up -d --build --remove-orphans --wait`으로 MySQL → migrator → apps 순서를 적용하며, migration 실패 시 종속 앱 rollout을 시작하지 않습니다.
+운영 배포는 GitHub `production` Environment의 Secrets에서 필수 여섯 값과 선택 Kakao 키·`WEBHOOK_URL`을 받아 서버 루트 `.env` 하나를 생성합니다. SSH 배포 Secrets는 `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PORT`, `DEPLOY_KEY`입니다. GitHub Actions의 일회성 runner는 첫 SSH 연결에서 서버 host key를 자동 수락합니다. workflow는 `COMPOSE_BAKE=false`로 한 번의 Compose `up -d --build --remove-orphans --wait`을 실행해 MySQL → migrator → apps 순서를 적용하며, migration 실패 시 종속 앱 rollout을 시작하지 않습니다.
 
 ```sh
 docker compose --env-file .env -f docker-compose.prod.yaml config --quiet

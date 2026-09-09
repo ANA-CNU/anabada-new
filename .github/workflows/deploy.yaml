@@ -93,6 +93,8 @@ jobs:
           # shellcheck disable=SC2029
           ssh "${ssh_options[@]}" "$target" "bash -se -- '$remote_dir' '$DEPLOY_SHA'" <<'DEPLOY'
           set -euo pipefail
+          # CI에서 확인된 구버전 Compose/Bake 조합의 이미지 선택 결함만 피한다. BuildKit 캐시와 단일 Compose up의 의존성은 유지한다.
+          export COMPOSE_BAKE=false
           transit=$1
           cleanup() { rm -f "$transit/.env" .env.next; rmdir "$transit" 2>/dev/null || true; }
           cd /home/ana/Desktop/ana/anabada-new
