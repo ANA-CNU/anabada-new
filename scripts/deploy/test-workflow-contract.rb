@@ -2,6 +2,7 @@
 require 'yaml'
 require 'tmpdir'
 require 'open3'
+require 'fileutils'
 
 def check(condition, message)
   raise message unless condition
@@ -28,12 +29,12 @@ deploy = steps.find { |step| step['name'] == 'Render root environment and deploy
 check(!validate.match?(/\bWEBHOOK_URL\b/), 'Optional webhook must not become a required GitHub secret')
 check(!deploy.match?(/runtime-secrets|\.secrets|\bsource\b|JUNGOL_DB_PASSWORD/), 'Obsolete secret provisioning')
 %w[StrictHostKeyChecking=accept-new BatchMode=yes].each { |text| check(deploy.include?(text), "Missing SSH safety: #{text}") }
-['repository=/home/ana/Desktop/ana/anabada-new', 'git clone --branch main --single-branch https://github.com/ANA-CNU/anabada-new.git "$repository"', 'git checkout main', 'git pull --ff-only origin main', 'install -m 0600 "$1/.env" .env.next', 'mv -f .env.next .env', 'docker compose --env-file .env -f docker-compose.prod.yaml config --quiet', 'docker compose --env-file .env -f docker-compose.prod.yaml up -d --build --remove-orphans --wait --wait-timeout 180'].each do |text|
+['repository=/home/ana/Desktop/ana/anabada-new', 'git clone --depth 1 --branch main --single-branch https://github.com/ANA-CNU/anabada-new.git "$repository"', 'git fetch --depth 1 origin main', 'git reset --hard origin/main', 'install -m 0600 "$1/.env" .env.next', 'mv -f .env.next .env', 'docker compose --env-file .env -f docker-compose.prod.yaml config --quiet', 'docker compose --env-file .env -f docker-compose.prod.yaml up -d --build --remove-orphans --wait --wait-timeout 180'].each do |text|
   check(deploy.include?(text), "Missing deployment gate: #{text}")
 end
 check(deploy.scan(/docker compose --env-file \.env -f docker-compose\.prod\.yaml up /).length == 1, 'Deployment must have one canonical Compose-up path')
 check(!deploy.match?(/run-migrations|--no-deps|--profile|--scale/), 'Deployment must not bypass Compose migration dependencies')
-check(!deploy.match?(/DEPLOY_SHA|git status --porcelain|git merge --ff-only|git fetch origin main/), 'Deployment must not require an exact SHA or clean checkout')
+check(!deploy.match?(/DEPLOY_SHA|git status --porcelain|git merge --ff-only|git pull --ff-only/), 'Deployment must not require an exact SHA or clean checkout')
 
 expected = {
   'anabada-frontend' => ['VITE_KAKAO_MAP_API_KEY'], 'anabada-mysql' => ['DB_PASSWORD'],
@@ -144,7 +145,7 @@ Dir.mktmpdir('deployment-git-contract-') do |dir|
   File.chmod(0700, docker)
   File.write(timeout, "#!/usr/bin/env bash\nshift\nexec \"$@\"\n")
   File.chmod(0700, timeout)
-  fixture = remote_deploy.sub('/home/ana/Desktop/ana/anabada-new', repository).sub('https://github.com/ANA-CNU/anabada-new.git', origin)
+  fixture = remote_deploy.sub('/home/ana/Desktop/ana/anabada-new', repository).sub('https://github.com/ANA-CNU/anabada-new.git', "file://#{origin}")
   write_transit = lambda do
     Dir.mkdir(transit)
     File.write(File.join(transit, '.env'), "DB_PASSWORD=fixture\n")
@@ -155,18 +156,26 @@ Dir.mktmpdir('deployment-git-contract-') do |dir|
   _, errors, status = Open3.capture3(command_env, 'bash', '-se', '--', transit, stdin_data: fixture)
   check(status.success?, "Fresh clone deployment fixture failed: #{errors}")
   check(File.exist?(File.join(repository, '.git')), 'Fresh deployment did not clone main')
+  history, _, history_status = Open3.capture3('git', '-C', repository, 'rev-list', '--count', 'HEAD')
+  check(history_status.success? && history.strip == '1', 'Fresh deployment is not shallow')
   check(File.readlines(compose_log).length == 3, 'Fresh clone did not reach exactly one Compose deployment sequence')
 
   File.write(File.join(repository, 'local-untracked'), "preserve\n")
+  FileUtils.mkdir_p(File.join(repository, 'database', 'mysql_data'))
+  File.write(File.join(repository, 'database', 'mysql_data', 'sentinel'), "preserve\n")
+  File.write(File.join(repository, 'README.md'), "local change\n")
   File.write(File.join(seed, 'README.md'), "second\n")
   check(system('git', '-C', seed, 'add', 'README.md'), 'Cannot stage disposable update')
   check(system('git', '-C', seed, '-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'second'), 'Cannot commit disposable update')
   check(system('git', '-C', seed, 'push', 'origin', 'main'), 'Cannot push disposable update')
   write_transit.call
   _, errors, status = Open3.capture3(command_env, 'bash', '-se', '--', transit, stdin_data: fixture)
-  check(status.success?, 'Existing checkout fast-forward fixture failed')
-  check(File.read(File.join(repository, 'README.md')) == "second\n", 'Existing checkout did not fast-forward main')
+  check(status.success?, 'Existing checkout reset fixture failed')
+  check(File.read(File.join(repository, 'README.md')) == "second\n", 'Existing checkout did not reset tracked code to main')
+  history, _, history_status = Open3.capture3('git', '-C', repository, 'rev-list', '--count', 'HEAD')
+  check(history_status.success? && history.strip == '1', 'Existing deployment is not shallow after reset')
   check(File.read(File.join(repository, 'local-untracked')) == "preserve\n", 'Existing checkout lost an untracked file')
+  check(File.read(File.join(repository, 'database', 'mysql_data', 'sentinel')) == "preserve\n", 'Existing checkout lost untracked database data')
 
   non_git = File.join(dir, 'non-git')
   Dir.mkdir(non_git)

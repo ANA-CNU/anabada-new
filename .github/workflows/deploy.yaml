@@ -95,11 +95,11 @@ jobs:
               exit 1
             fi
             cd "$repository"
-            git checkout main
-            git pull --ff-only origin main
+            git fetch --depth 1 origin main
+            git reset --hard origin/main
           else
             mkdir -p "$(dirname "$repository")"
-            git clone --branch main --single-branch https://github.com/ANA-CNU/anabada-new.git "$repository"
+            git clone --depth 1 --branch main --single-branch https://github.com/ANA-CNU/anabada-new.git "$repository"
             cd "$repository"
           fi
           # 완성된 파일만 0600으로 설치하고 rename하여 부분 작성된 .env가 노출되지 않게 한다.
