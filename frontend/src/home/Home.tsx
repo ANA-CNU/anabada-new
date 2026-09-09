@@ -9,7 +9,8 @@ import Background from "./stats/Background";
 import UserSearch from "./components/UserSearch";
 import UserSearchGuide from "./components/UserSearchGuide";
 import Footer from "./components/Footer";
-import LastMonthRanking from "./components/LastMonthRanking";
+// 지난달 최종 추첨 결과가 확정될 때까지 임시로 숨긴다.
+// import LastMonthRanking from "./components/LastMonthRanking";
 import ContestEndNotice from "./components/ContestEndNotice";
 
 const Home: React.FC = () => {
@@ -24,7 +25,8 @@ const Home: React.FC = () => {
           </div>
         </div>
 
-        <LastMonthRanking />
+        {/* 지난달 최종 추첨 결과가 확정될 때까지 임시로 숨긴다. */}
+        {/* <LastMonthRanking /> */}
         <ContestEndNotice />
 
         {/* 10.01자 부터 추첨판 고정 시키고 컴포넌트 언락 */}
