@@ -25,8 +25,12 @@ const plan = (solvedCount: number) =>
     solvedCount,
     1,
   );
-const account = (matched: string, links: string) =>
-  `<main><div><span>맞은 문제</span><strong>${matched}</strong></div><section><p>해결한 문제</p><div><div>${links}</div></div><p>틀린 문제</p><div><a href="/problem/999" role="button">999</a></div></section><a href="/problem/888">888</a></main>`;
+const account = (
+  matched: string,
+  links: string,
+  wrongLinks = '<a href="/problem/999">999</a>',
+) =>
+  `<main><div><span>맞은 문제</span><strong>${matched}</strong></div><section class="card"><header><p class="section-title"><span>check</span>해결한 문제</p></header><div class="problem-list"><div class="problems collapsed">${links}</div></div></section><section class="card"><p class="section-title">틀린 문제</p><div class="problem-list"><div class="problems collapsed">${wrongLinks}</div></div></section><a href="/problem/888">888</a></main>`;
 const wire = (ids: readonly number[], more = false) =>
   Buffer.from(
     serialize({
