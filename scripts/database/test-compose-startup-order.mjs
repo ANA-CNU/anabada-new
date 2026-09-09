@@ -30,6 +30,60 @@ function inspect(service) {
 function sql(statement) {
   return run([...base, "exec", "-T", "anabada-mysql", "mysql", "-uroot", `-p${password}`, "-Nse", statement], "SQL assertion");
 }
+function bounded(value, limit = 4096) {
+  return value.replaceAll(password, "[REDACTED]").slice(-limit);
+}
+function containerDiagnostic(service) {
+  const container = docker([...base, "ps", "--all", "-q", service]);
+  const id = container.stdout.trim();
+  if (container.status !== 0 || id === "") return null;
+  const inspected = docker([
+    "inspect",
+    "--format",
+    "{{.Id}}\t{{.Image}}\t{{.State.Status}}\t{{.State.ExitCode}}\t{{.State.StartedAt}}\t{{.State.FinishedAt}}",
+    id,
+  ]);
+  if (inspected.status !== 0) return null;
+  const [containerId, image, status, exitCode, startedAt, finishedAt] = inspected.stdout.trim().split("\t");
+  return { containerId, image, status, exitCode, startedAt, finishedAt };
+}
+function commandDiagnostic(args) {
+  const result = docker(args);
+  return {
+    status: result.status,
+    output: bounded(`${result.stdout}${result.stderr}`),
+  };
+}
+function startupDiagnostics() {
+  const migrator = containerDiagnostic("jungol-migrator");
+  const pendingProbe = containerDiagnostic("pending-probe");
+  const composeVersion = docker(["compose", "version", "--short"]).stdout.trim();
+  const imageMigrations = migrator === null
+    ? null
+    : commandDiagnostic(["run", "--rm", "--network", "none", "--entrypoint", "sh", migrator.image, "-ec", "ls -1 /migrations | sort"]);
+  const ledger = docker([...base, "exec", "-T", "anabada-mysql", "mysql", "-uroot", `-p${password}`, "-Nse", "SELECT version FROM jungol_bada.migrations ORDER BY version"]);
+  const logs = Object.fromEntries(
+    ["jungol-migrator", "pending-probe"].map((service) => [
+      service,
+      commandDiagnostic([...base, "logs", "--no-color", "--tail", "100", service]),
+    ]),
+  );
+  return {
+    composeVersion,
+    migrator,
+    pendingProbe,
+    imageMigrations,
+    ledgerVersions: ledger.status === 0 ? bounded(ledger.stdout) : null,
+    logs,
+  };
+}
+function reportStartupDiagnostics() {
+  try {
+    console.error(JSON.stringify(startupDiagnostics()));
+  } catch {
+    console.error("startup diagnostics unavailable");
+  }
+}
 function timestamp(value) { return Date.parse(value); }
 function copy(source, target) {
   cpSync(join(root, source), join(context, target), { recursive: true });
@@ -39,6 +93,7 @@ function addMigration(name, contents) {
 }
 
 try {
+  console.log(`Docker Compose ${docker(["compose", "version", "--short"]).stdout.trim()}`);
   mkdirSync(join(context, "database", "migrator"), { recursive: true });
   for (const file of ["Dockerfile", "Dockerfile.dockerignore", "package.json", "package-lock.json", "tsconfig.json", "tsconfig.build.json"]) {
     copy(`database/migrator/${file}`, `database/migrator/${file}`);
@@ -62,7 +117,12 @@ try {
   check(sql("SELECT COUNT(*) FROM jungol_bada.user WHERE jungol_name='compose_sentinel'") === "1", "no-op startup lost sentinel");
 
   addMigration("003_pending_probe.sql", "CREATE TABLE pending_probe (id INT PRIMARY KEY);\n");
-  run([...base, "--profile", "pending", "up", "-d", "--build", "--wait", "--wait-timeout", "90"], "pending migration and new probe startup");
+  try {
+    run([...base, "--profile", "pending", "up", "-d", "--build", "--wait", "--wait-timeout", "90"], "pending migration and new probe startup");
+  } catch (error) {
+    reportStartupDiagnostics();
+    throw error;
+  }
   const pendingMigrator = inspect("jungol-migrator");
   const pendingProbe = inspect("pending-probe");
   check(pendingMigrator.Id !== migrator.Id, "pending migration did not recreate migrator container");
