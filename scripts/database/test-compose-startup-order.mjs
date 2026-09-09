@@ -1,5 +1,5 @@
-import { randomUUID } from "node:crypto";
-import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -40,18 +40,45 @@ function containerDiagnostic(service) {
   const inspected = docker([
     "inspect",
     "--format",
-    "{{.Id}}\t{{.Image}}\t{{.State.Status}}\t{{.State.ExitCode}}\t{{.State.StartedAt}}\t{{.State.FinishedAt}}",
+    "{{.Id}}\t{{.Image}}\t{{.Config.Image}}\t{{.State.Status}}\t{{.State.ExitCode}}\t{{.State.StartedAt}}\t{{.State.FinishedAt}}",
     id,
   ]);
   if (inspected.status !== 0) return null;
-  const [containerId, image, status, exitCode, startedAt, finishedAt] = inspected.stdout.trim().split("\t");
-  return { containerId, image, status, exitCode, startedAt, finishedAt };
+  const [containerId, image, imageTag, status, exitCode, startedAt, finishedAt] = inspected.stdout.trim().split("\t");
+  return { containerId, image, imageTag, status, exitCode, startedAt, finishedAt };
 }
 function commandDiagnostic(args) {
   const result = docker(args);
   return {
     status: result.status,
     output: bounded(`${result.stdout}${result.stderr}`),
+  };
+}
+function sourceMigrationInputs() {
+  return readdirSync(join(context, "migrations"))
+    .filter((filename) => filename.endsWith(".sql"))
+    .sort()
+    .map((filename) => ({
+      filename,
+      sha256: createHash("sha256").update(readFileSync(join(context, "migrations", filename))).digest("hex"),
+    }));
+}
+function resolvedMigratorBuildContext() {
+  const config = docker([...base, "config", "--format", "json"]);
+  if (config.status !== 0) return null;
+  try {
+    return JSON.parse(config.stdout).services?.["jungol-migrator"]?.build?.context ?? null;
+  } catch {
+    return null;
+  }
+}
+function taggedImageDiagnostic(tag) {
+  if (tag === undefined || tag === "") return null;
+  const id = docker(["image", "inspect", "--format", "{{.Id}}", tag]);
+  return {
+    tag,
+    imageId: id.status === 0 ? id.stdout.trim() : null,
+    migrations: commandDiagnostic(["run", "--rm", "--network", "none", "--entrypoint", "sh", tag, "-ec", "ls -1 /migrations | sort"]),
   };
 }
 function startupDiagnostics() {
@@ -70,9 +97,15 @@ function startupDiagnostics() {
   );
   return {
     composeVersion,
+    engineVersion: docker(["version", "--format", "{{.Server.Version}}"]).stdout.trim(),
+    buildxVersion: docker(["buildx", "version"]).stdout.trim(),
+    dockerContext: docker(["context", "show"]).stdout.trim(),
+    resolvedMigratorBuildContext: resolvedMigratorBuildContext(),
+    sourceMigrations: sourceMigrationInputs(),
     migrator,
     pendingProbe,
     imageMigrations,
+    taggedMigratorImage: migrator === null ? null : taggedImageDiagnostic(migrator.imageTag),
     ledgerVersions: ledger.status === 0 ? bounded(ledger.stdout) : null,
     logs,
   };
@@ -93,7 +126,12 @@ function addMigration(name, contents) {
 }
 
 try {
-  console.log(`Docker Compose ${docker(["compose", "version", "--short"]).stdout.trim()}`);
+  console.log(JSON.stringify({
+    composeVersion: docker(["compose", "version", "--short"]).stdout.trim(),
+    engineVersion: docker(["version", "--format", "{{.Server.Version}}"]).stdout.trim(),
+    buildxVersion: docker(["buildx", "version"]).stdout.trim(),
+    dockerContext: docker(["context", "show"]).stdout.trim(),
+  }));
   mkdirSync(join(context, "database", "migrator"), { recursive: true });
   for (const file of ["Dockerfile", "Dockerfile.dockerignore", "package.json", "package-lock.json", "tsconfig.json", "tsconfig.build.json"]) {
     copy(`database/migrator/${file}`, `database/migrator/${file}`);
@@ -118,7 +156,7 @@ try {
 
   addMigration("003_pending_probe.sql", "CREATE TABLE pending_probe (id INT PRIMARY KEY);\n");
   try {
-    run([...base, "--profile", "pending", "up", "-d", "--build", "--wait", "--wait-timeout", "90"], "pending migration and new probe startup");
+    run([...base, "--progress", "plain", "--profile", "pending", "up", "-d", "--build", "--wait", "--wait-timeout", "90"], "pending migration and new probe startup");
   } catch (error) {
     reportStartupDiagnostics();
     throw error;
