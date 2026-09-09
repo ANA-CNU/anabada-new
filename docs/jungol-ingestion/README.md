@@ -44,7 +44,7 @@ backend와 collector는 새 `jungol_bada`를 사용합니다. 기존 `anabada`�
 
 ## 자동 마이그레이션과 DB 권한
 
-stage/production은 [마이그레이터](../../database/migrator/)가 활성 `migrations/NNN_snake_case.sql`을 순방향으로만 적용합니다. `migrations` 테이블은 버전·파일명·SHA-256 checksum을 기록합니다. 이미 적용한 파일은 절대 수정하지 말고 새 버전을 추가합니다. `jungol_bada`가 이미 있으나 `migrations` 테이블이 없으면 관리되지 않은 DB로 판단하여 변경 없이 실패합니다. 자동 rollback은 없습니다.
+stage/production은 [마이그레이터](../../migrations/)가 활성 `migrations/NNN_snake_case.sql`을 순방향으로만 적용합니다. `migrations` 테이블은 버전·파일명·SHA-256 checksum을 기록합니다. 이미 적용한 파일은 절대 수정하지 말고 새 버전을 추가합니다. `jungol_bada`가 이미 있으나 `migrations` 테이블이 없으면 관리되지 않은 DB로 판단하여 변경 없이 실패합니다. 자동 rollback은 없습니다.
 
 승인된 운영 DB 관리자 접속 정보를 담은 저장소 밖의 제한된 client option 파일을 준비합니다. 아래 `MYSQL_OPERATOR_CNF`는 이 문서의 로컬 shell 변수이며 애플리케이션 환경 변수가 아닙니다. 파일 경로만 지정하고 비밀번호는 명령행에 넣지 않습니다. 실제 서버에 실행하기 전 백업과 대상 hostname/port를 확인합니다.
 

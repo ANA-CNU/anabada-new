@@ -1,7 +1,7 @@
 services:
   # 배포 전 새 스키마만 순방향으로 적용하는 일회성 작업이다.
   jungol-migrator:
-    build: {context: ., dockerfile: database/migrator/Dockerfile}
+    build: {context: ./migrations, dockerfile: Dockerfile}
     environment:
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
     networks: [bada-network]

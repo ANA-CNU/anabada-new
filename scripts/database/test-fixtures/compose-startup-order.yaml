@@ -13,7 +13,7 @@ services:
   jungol-migrator:
     build:
       context: ${MIGRATOR_CONTEXT:?Set MIGRATOR_CONTEXT}
-      dockerfile: database/migrator/Dockerfile
+      dockerfile: Dockerfile
     environment:
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
     depends_on:

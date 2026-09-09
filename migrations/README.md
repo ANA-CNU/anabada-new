@@ -2,6 +2,8 @@
 
 이 디렉터리의 `NNN_snake_case.sql`만 자동 마이그레이터가 읽습니다. 현재 활성 버전은 `002`부터 연속되어야 하며, 새 변경은 마지막 버전보다 정확히 1 큰 세 자리 번호로 추가합니다.
 
+활성 SQL과 runner 소스는 이 디렉터리에 함께 있으며, stage/production의 이미지 build context도 이 디렉터리만 사용합니다. 따라서 저장소의 MySQL 데이터 디렉터리는 build context에 포함되지 않습니다.
+
 한 번 적용 기록에 남은 SQL 파일의 파일명과 내용은 **불변**입니다. 수정하면 SHA-256 checksum 불일치로 마이그레이터가 실패하며, DB에는 추가 변경을 하지 않습니다. 수정이 필요하면 새 버전의 순방향 SQL을 추가합니다.
 
 `legacy/000_initial_schema.sql`, `legacy/001_new_schema.sql`은 역사 기록일 뿐 자동 실행 대상이 아닙니다. 이미지에도 포함되지 않습니다. 기존에 `jungol_bada`가 있지만 `migrations` 테이블이 없는 DB는 관리되지 않은 DB로 보고 자동 변경 없이 실패합니다. 자동 rollback은 제공하지 않습니다.

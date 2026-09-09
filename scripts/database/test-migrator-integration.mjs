@@ -73,7 +73,7 @@ function runMigratorAsync(extra = []) {
 }
 
 try {
-  output(["build", "-t", image, "-f", "database/migrator/Dockerfile", "."]);
+  output(["build", "-t", image, "-f", "migrations/Dockerfile", "migrations"]);
   output(["network", "create", network]);
   output([
     "run", "-d", "--name", mysql, "--network", network,
@@ -106,14 +106,18 @@ try {
 
   cpSync(join(root, "migrations/002_create_jungol_bada.sql"), join(fixture, "002_create_jungol_bada.sql"));
   cpSync(join(root, "scripts/database/test-fixtures/003_fail_after_sentinel.sql"), join(fixture, "003_fail_after_sentinel.sql"));
-  check(runMigrator(["-v", `${fixture}:/migrations:ro`]).status !== 0, "failing pending migration unexpectedly succeeded");
+  const fixtureMounts = [
+    "-v", `${join(fixture, "002_create_jungol_bada.sql")}:/app/002_create_jungol_bada.sql:ro`,
+    "-v", `${join(fixture, "003_fail_after_sentinel.sql")}:/app/003_fail_after_sentinel.sql:ro`,
+  ];
+  check(runMigrator(fixtureMounts).status !== 0, "failing pending migration unexpectedly succeeded");
   check(sql("SELECT COUNT(*) FROM jungol_bada.migration_failure_probe") === "1", "failing migration did not execute its probe");
   check(sql("SELECT COUNT(*) FROM jungol_bada.migrations WHERE version=3") === "0", "failed migration was recorded");
   check(sql("SELECT COUNT(*) FROM jungol_bada.user WHERE jungol_name='sentinel_after_reset'") === "1", "failed migration lost sentinel");
   writeFileSync(join(fixture, "003_fail_after_sentinel.sql"), "SELECT SLEEP(2); CREATE TABLE lock_probe (id INT PRIMARY KEY);\n");
   const [first, second] = await Promise.all([
-    runMigratorAsync(["-v", `${fixture}:/migrations:ro`]),
-    runMigratorAsync(["-v", `${fixture}:/migrations:ro`]),
+    runMigratorAsync(fixtureMounts),
+    runMigratorAsync(fixtureMounts),
   ]);
   check(
     first.code === 0 && second.code === 0,
@@ -121,7 +125,7 @@ try {
   );
   check(sql("SELECT COUNT(*) FROM jungol_bada.migrations WHERE version=3") === "1", "concurrent migration was not recorded once");
   check(output(["image", "inspect", image, "--format", "{{.Config.User}}"] ) === "node", "migrator image is not non-root");
-  check(docker(["run", "--rm", "--entrypoint", "sh", image, "-ec", "test -z \"$(find /migrations -type f \\( -name '000_*' -o -name '001_*' \\) -print -quit)\""]).status === 0, "migrator image contains legacy SQL");
+  check(docker(["run", "--rm", "--entrypoint", "sh", image, "-ec", "test -z \"$(find /app -type f \\( -name '000_*' -o -name '001_*' \\) -print -quit)\""]).status === 0, "migrator image contains legacy SQL");
 } finally {
   docker(["rm", "-f", mysql]);
   docker(["network", "rm", network]);

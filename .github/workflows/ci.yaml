@@ -40,14 +40,14 @@ jobs:
         with:
           bun-version: "1.4.2"
       - name: Migrator checks, image build, and disposable MySQL integration
-        working-directory: database/migrator
+        working-directory: migrations
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
           npm test
           npm run typecheck
           npm run lint
           npm run build
-          cd ../..
+          cd ..
           node scripts/database/test-migrator-integration.mjs
           node scripts/database/test-compose-startup-order.mjs
       # 브라우저 테스트가 설치 단계 누락으로 조용히 약화되지 않도록 CI 명령 순서를 계약으로 고정한다.
@@ -150,7 +150,8 @@ jobs:
                   $root.services["jungol-migrator"] as $m |
                   ($m.profiles == null) and
                   ($m.build.context | type == "string" and length > 0) and
-                  ($m.build.dockerfile == "database/migrator/Dockerfile") and
+                  ($m.build.context | endswith("/migrations")) and
+                  ($m.build.dockerfile == "Dockerfile") and
                   ($m.environment | keys == ["DB_PASSWORD"]) and
                   ($m.networks | has("bada-network")) and
                   ($m.depends_on["anabada-mysql"].condition == "service_healthy") and

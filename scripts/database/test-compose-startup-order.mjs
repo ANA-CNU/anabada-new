@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -8,9 +8,10 @@ const root = resolve(import.meta.dirname, "../..");
 const fixture = "scripts/database/test-fixtures/compose-startup-order.yaml";
 const project = `jungol-startup-${randomUUID().replaceAll("-", "")}`;
 const context = mkdtempSync(join(tmpdir(), "jungol-compose-context-"));
+const unreadableSibling = join(context, "database", "mysql_data", "#innodb_redo");
 const password = "compose-startup-test-password";
 const base = ["compose", "--project-name", project, "--env-file", "/dev/null", "-f", fixture];
-const env = { ...process.env, DB_PASSWORD: password, MIGRATOR_CONTEXT: context };
+const env = { ...process.env, DB_PASSWORD: password, MIGRATOR_CONTEXT: join(context, "migrations") };
 
 function docker(args, options = {}) {
   return spawnSync("docker", args, { cwd: root, encoding: "utf8", env, ...options });
@@ -78,7 +79,7 @@ function taggedImageDiagnostic(tag) {
   return {
     tag,
     imageId: id.status === 0 ? id.stdout.trim() : null,
-    migrations: commandDiagnostic(["run", "--rm", "--network", "none", "--entrypoint", "sh", tag, "-ec", "ls -1 /migrations | sort"]),
+    migrations: commandDiagnostic(["run", "--rm", "--network", "none", "--entrypoint", "sh", tag, "-ec", "find /app -maxdepth 1 -type f -name '*.sql' -exec basename {} \\; | sort"]),
   };
 }
 function startupDiagnostics() {
@@ -87,7 +88,7 @@ function startupDiagnostics() {
   const composeVersion = docker(["compose", "version", "--short"]).stdout.trim();
   const imageMigrations = migrator === null
     ? null
-    : commandDiagnostic(["run", "--rm", "--network", "none", "--entrypoint", "sh", migrator.image, "-ec", "ls -1 /migrations | sort"]);
+    : commandDiagnostic(["run", "--rm", "--network", "none", "--entrypoint", "sh", migrator.image, "-ec", "find /app -maxdepth 1 -type f -name '*.sql' -exec basename {} \\; | sort"]);
   const ledger = docker([...base, "exec", "-T", "anabada-mysql", "mysql", "-uroot", `-p${password}`, "-Nse", "SELECT version FROM jungol_bada.migrations ORDER BY version"]);
   const logs = Object.fromEntries(
     ["jungol-migrator", "pending-probe"].map((service) => [
@@ -132,13 +133,14 @@ try {
     buildxVersion: docker(["buildx", "version"]).stdout.trim(),
     dockerContext: docker(["context", "show"]).stdout.trim(),
   }));
-  mkdirSync(join(context, "database", "migrator"), { recursive: true });
+  mkdirSync(join(context, "migrations"), { recursive: true });
   for (const file of ["Dockerfile", "Dockerfile.dockerignore", "package.json", "package-lock.json", "tsconfig.json", "tsconfig.build.json"]) {
-    copy(`database/migrator/${file}`, `database/migrator/${file}`);
+    copy(`migrations/${file}`, `migrations/${file}`);
   }
-  copy("database/migrator/src", "database/migrator/src");
-  mkdirSync(join(context, "migrations"));
+  copy("migrations/src", "migrations/src");
   copy("migrations/002_create_jungol_bada.sql", "migrations/002_create_jungol_bada.sql");
+  mkdirSync(unreadableSibling, { recursive: true });
+  chmodSync(unreadableSibling, 0o000);
   run([...base, "up", "-d", "--build"], "fresh Compose startup");
   const migrator = inspect("jungol-migrator");
   check(migrator.State.Status === "exited" && migrator.State.ExitCode === 0, "migrator did not exit successfully");
@@ -179,6 +181,7 @@ try {
   check(failingProbe.stdout.trim() === "", "dependent probe started after migration failure");
   check(sql("SELECT COUNT(*) FROM jungol_bada.migrations WHERE version=4") === "0", "failed migration version was recorded");
 } finally {
+  if (existsSync(unreadableSibling)) chmodSync(unreadableSibling, 0o700);
   docker([...base, "--profile", "pending", "--profile", "failing", "down", "--volumes", "--remove-orphans"]);
   rmSync(context, { force: true, recursive: true });
 }
