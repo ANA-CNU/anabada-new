@@ -28,11 +28,12 @@ deploy = steps.find { |step| step['name'] == 'Render root environment and deploy
 check(!validate.match?(/\bWEBHOOK_URL\b/), 'Optional webhook must not become a required GitHub secret')
 check(!deploy.match?(/runtime-secrets|\.secrets|\bsource\b|JUNGOL_DB_PASSWORD/), 'Obsolete secret provisioning')
 %w[StrictHostKeyChecking=accept-new BatchMode=yes].each { |text| check(deploy.include?(text), "Missing SSH safety: #{text}") }
-['git status --porcelain --untracked-files=all', 'git merge --ff-only "$2"', 'test "$(git rev-parse HEAD)" = "$2"', 'test "$(git rev-parse origin/main)" = "$1"', 'install -m 0600 "$1/.env" .env.next', 'mv -f .env.next .env', 'docker compose --env-file .env -f docker-compose.prod.yaml config --quiet', 'docker compose --env-file .env -f docker-compose.prod.yaml up -d --build --remove-orphans --wait --wait-timeout 180'].each do |text|
+['repository=/home/ana/Desktop/ana/anabada-new', 'git clone --branch main --single-branch https://github.com/ANA-CNU/anabada-new.git "$repository"', 'git checkout main', 'git pull --ff-only origin main', 'install -m 0600 "$1/.env" .env.next', 'mv -f .env.next .env', 'docker compose --env-file .env -f docker-compose.prod.yaml config --quiet', 'docker compose --env-file .env -f docker-compose.prod.yaml up -d --build --remove-orphans --wait --wait-timeout 180'].each do |text|
   check(deploy.include?(text), "Missing deployment gate: #{text}")
 end
 check(deploy.scan(/docker compose --env-file \.env -f docker-compose\.prod\.yaml up /).length == 1, 'Deployment must have one canonical Compose-up path')
 check(!deploy.match?(/run-migrations|--no-deps|--profile|--scale/), 'Deployment must not bypass Compose migration dependencies')
+check(!deploy.match?(/DEPLOY_SHA|git status --porcelain|git merge --ff-only|git fetch origin main/), 'Deployment must not require an exact SHA or clean checkout')
 
 expected = {
   'anabada-frontend' => ['VITE_KAKAO_MAP_API_KEY'], 'anabada-mysql' => ['DB_PASSWORD'],
@@ -59,6 +60,8 @@ remote_deploy = /<<'DEPLOY'\n(?<script>.*?)\nDEPLOY\n\z/m.match(deploy)&.[](:scr
 check(!remote_deploy.nil?, 'Deployment must retain the remote deployment shell')
 check(remote_deploy.include?('export COMPOSE_BAKE=false'), 'Remote deployment shell must disable Compose Bake delegation')
 check(remote_deploy.index('export COMPOSE_BAKE=false') < remote_deploy.index('docker compose --env-file .env -f docker-compose.prod.yaml up '), 'Remote deployment shell must disable Compose Bake before its canonical Compose up')
+check(remote_deploy.include?('git -C "$repository" rev-parse --is-inside-work-tree'), 'Existing deployment path must be a Git working tree')
+check(remote_deploy.include?('Deployment repository path is not a Git working tree'), 'Non-Git deployment path must fail safely')
 
 %w[dev stage prod].each do |mode|
   config = YAML.load_file("docker-compose.#{mode}.yaml")
@@ -86,7 +89,7 @@ Dir.mktmpdir('workflow-contract-') do |dir|
   File.write(mock, <<~'SH')
     #!/usr/bin/env bash
     set -euo pipefail
-    printf 'ssh-preflight\n' >> "$MOCK_LOG"
+    printf 'ssh-deploy\n' >> "$MOCK_LOG"
     [[ "$1" == '-i' ]]
     env_file="${2%/key}/.env"
     test -f "$env_file"
@@ -98,7 +101,7 @@ Dir.mktmpdir('workflow-contract-') do |dir|
   SH
   File.chmod(0700, mock)
   env = (runtime + ssh).to_h { |key| [key, 'fake-workflow-value'] }
-  env.merge!('DEPLOY_PORT' => '22', 'DEPLOY_SHA' => 'a' * 40, 'VITE_KAKAO_MAP_API_KEY' => nil, 'WEBHOOK_URL' => nil,
+  env.merge!('DEPLOY_PORT' => '22', 'VITE_KAKAO_MAP_API_KEY' => nil, 'WEBHOOK_URL' => nil,
              'EXPECTED_WEBHOOK' => '', 'PATH' => "#{dir}:#{ENV.fetch('PATH')}", 'MOCK_LOG' => "#{dir}/calls", 'MOCK_TEMP' => "#{dir}/transit")
   combined = validate + "\n" + deploy
   _, errors, status = Open3.capture3('bash', '-n', stdin_data: combined)
@@ -112,13 +115,68 @@ Dir.mktmpdir('workflow-contract-') do |dir|
   check(!status.success? && !File.exist?(env['MOCK_LOG']), 'Malformed runtime secret reached SSH')
   [nil, 'fake-kakao'].each do |kakao|
     output, errors, status = Open3.capture3(env.merge('VITE_KAKAO_MAP_API_KEY' => kakao, 'WEBHOOK_URL' => nil, 'EXPECTED_WEBHOOK' => '', 'JUNGOL_PASSWORD' => '$(touch /tmp/forbidden-workflow-command); `id` # literal'), 'bash', '-c', combined)
-    check(status.exitstatus == 73 && output.empty? && errors.empty?, 'Valid fake secrets did not stop at mock preflight')
+    check(status.exitstatus == 73 && output.empty? && errors.empty?, 'Valid fake secrets did not stop at mock deployment')
     check(!Dir.exist?(File.read(env['MOCK_TEMP'])), 'Runner transit directory leaked')
   end
   webhook = 'https://discord.com/api/webhooks/000000000000000000/placeholder-not-live'
   output, errors, status = Open3.capture3(env.merge('WEBHOOK_URL' => webhook, 'EXPECTED_WEBHOOK' => webhook), 'bash', '-c', combined)
-  check(status.exitstatus == 73 && output.empty? && errors.empty?, 'Optional webhook did not reach mock preflight without logs')
+  check(status.exitstatus == 73 && output.empty? && errors.empty?, 'Optional webhook did not reach mock deployment without logs')
   check(!Dir.exist?(File.read(env['MOCK_TEMP'])), 'Runner transit directory leaked after webhook render')
-  check(File.readlines(env['MOCK_LOG']).length == 3, 'Unexpected SSH calls beyond preflight')
+  check(File.readlines(env['MOCK_LOG']).length == 3, 'Unexpected SSH calls beyond mock deployment')
 end
-puts 'Workflow contract passed: 10 missing secrets, malformed input, optional Kakao/webhook, literal secret values, mock preflight/config, cleanup, and static topology.'
+
+Dir.mktmpdir('deployment-git-contract-') do |dir|
+  origin = File.join(dir, 'origin.git')
+  seed = File.join(dir, 'seed')
+  repository = File.join(dir, 'checkout', 'anabada-new')
+  docker = File.join(dir, 'docker')
+  timeout = File.join(dir, 'timeout')
+  compose_log = File.join(dir, 'compose-calls')
+  transit = File.join(dir, 'transit')
+  check(system('git', 'init', '--bare', origin), 'Cannot create disposable bare repository')
+  check(system('git', 'init', '-b', 'main', seed), 'Cannot create disposable source repository')
+  File.write(File.join(seed, 'README.md'), "first\n")
+  check(system('git', '-C', seed, 'add', 'README.md'), 'Cannot stage disposable source repository')
+  check(system('git', '-C', seed, '-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'first'), 'Cannot commit disposable source repository')
+  check(system('git', '-C', seed, 'remote', 'add', 'origin', origin), 'Cannot add disposable source remote')
+  check(system('git', '-C', seed, 'push', 'origin', 'main'), 'Cannot push disposable source repository')
+  File.write(docker, "#!/usr/bin/env bash\nprintf '%s\\n' \"$*\" >> \"$COMPOSE_LOG\"\n")
+  File.chmod(0700, docker)
+  File.write(timeout, "#!/usr/bin/env bash\nshift\nexec \"$@\"\n")
+  File.chmod(0700, timeout)
+  fixture = remote_deploy.sub('/home/ana/Desktop/ana/anabada-new', repository).sub('https://github.com/ANA-CNU/anabada-new.git', origin)
+  write_transit = lambda do
+    Dir.mkdir(transit)
+    File.write(File.join(transit, '.env'), "DB_PASSWORD=fixture\n")
+  end
+  command_env = { 'PATH' => "#{dir}:#{ENV.fetch('PATH')}", 'COMPOSE_LOG' => compose_log }
+
+  write_transit.call
+  _, errors, status = Open3.capture3(command_env, 'bash', '-se', '--', transit, stdin_data: fixture)
+  check(status.success?, "Fresh clone deployment fixture failed: #{errors}")
+  check(File.exist?(File.join(repository, '.git')), 'Fresh deployment did not clone main')
+  check(File.readlines(compose_log).length == 3, 'Fresh clone did not reach exactly one Compose deployment sequence')
+
+  File.write(File.join(repository, 'local-untracked'), "preserve\n")
+  File.write(File.join(seed, 'README.md'), "second\n")
+  check(system('git', '-C', seed, 'add', 'README.md'), 'Cannot stage disposable update')
+  check(system('git', '-C', seed, '-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'second'), 'Cannot commit disposable update')
+  check(system('git', '-C', seed, 'push', 'origin', 'main'), 'Cannot push disposable update')
+  write_transit.call
+  _, errors, status = Open3.capture3(command_env, 'bash', '-se', '--', transit, stdin_data: fixture)
+  check(status.success?, 'Existing checkout fast-forward fixture failed')
+  check(File.read(File.join(repository, 'README.md')) == "second\n", 'Existing checkout did not fast-forward main')
+  check(File.read(File.join(repository, 'local-untracked')) == "preserve\n", 'Existing checkout lost an untracked file')
+
+  non_git = File.join(dir, 'non-git')
+  Dir.mkdir(non_git)
+  File.write(File.join(non_git, 'sentinel'), "preserve\n")
+  non_git_fixture = fixture.sub(repository, non_git)
+  write_transit.call
+  calls_before = File.readlines(compose_log).length
+  _, errors, status = Open3.capture3(command_env, 'bash', '-se', '--', transit, stdin_data: non_git_fixture)
+  check(!status.success? && errors.include?('Deployment repository path is not a Git working tree'), 'Non-Git path must fail before deployment')
+  check(File.read(File.join(non_git, 'sentinel')) == "preserve\n", 'Non-Git path was modified')
+  check(File.readlines(compose_log).length == calls_before, 'Non-Git path reached Compose')
+end
+puts 'Workflow contract passed: 10 missing secrets, malformed input, optional Kakao/webhook, literal secret values, mock deployment/config, cleanup, and static topology.'

@@ -167,7 +167,7 @@ workflow는 필수 값을 검증하고 Compose dotenv 형식으로 서버 루트
 
 별도의 `DEPLOY_KNOWN_HOSTS` Secret은 사용하지 않습니다. GitHub Actions의 일회성 runner는 `StrictHostKeyChecking=accept-new`로 첫 SSH 연결의 host key를 자동 수락합니다. 설정은 간단하지만 사전에 등록한 fingerprint와 서버 신원을 대조하는 방식은 아니므로, production Secrets를 관리할 수 있는 권한과 배포 대상 주소를 엄격하게 제한해야 합니다.
 
-workflow는 checkout 상태와 배포 SHA를 확인한 후 `.env` 설치, Compose validation, 단일 `up --build --remove-orphans --wait` 순서로 수행합니다. migration이 실패하면 Compose가 nonzero로 끝나고 새 앱 rollout은 시작하지 않습니다.
+workflow는 고정 경로에 저장소가 없으면 public `main`을 clone하고, Git working tree가 있으면 `main`을 fast-forward pull한 후 `.env` 설치, Compose validation, 단일 `up --build --remove-orphans --wait` 순서로 수행합니다. 기존 경로가 Git working tree가 아니면 삭제·reset·clean 없이 실패합니다. migration이 실패하면 Compose가 nonzero로 끝나고 새 앱 rollout은 시작하지 않습니다.
 
 ### 안전한 secret 회전
 
