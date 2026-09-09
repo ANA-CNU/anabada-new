@@ -1,0 +1,19 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.2.2/schema.json",
+  "files": { "includes": ["src/**", "test/**"] },
+  "formatter": { "indentStyle": "space" },
+  "linter": {
+    "rules": {
+      "recommended": true,
+      "complexity": {
+        "useLiteralKeys": "off"
+      },
+      "style": {
+        "noDefaultExport": "error",
+        "noNonNullAssertion": "error",
+        "useImportType": "error",
+        "noParameterAssign": "error"
+      }
+    }
+  }
+}

@@ -1,0 +1,77 @@
+services:
+  anabada-mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+    tmpfs: [/var/lib/mysql]
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin --protocol=TCP -h127.0.0.1 -uroot ping --silent"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  jungol-migrator:
+    build:
+      context: ${MIGRATOR_CONTEXT:?Set MIGRATOR_CONTEXT}
+      dockerfile: database/migrator/Dockerfile
+    environment:
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+    depends_on:
+      anabada-mysql: {condition: service_healthy}
+    restart: "no"
+
+  frontend-probe:
+    image: mysql:8.4
+    entrypoint: [sh, -ec]
+    command: ["MYSQL_PWD=\"$$DB_PASSWORD\" mysql --protocol=TCP -hanabada-mysql -uroot -Nse 'SELECT version FROM jungol_bada.migrations WHERE version=2' | grep -qx 2; exec sleep infinity"]
+    environment:
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+    depends_on:
+      jungol-migrator: {condition: service_completed_successfully}
+
+  middleware-probe:
+    image: mysql:8.4
+    entrypoint: [sh, -ec]
+    command: ["MYSQL_PWD=\"$$DB_PASSWORD\" mysql --protocol=TCP -hanabada-mysql -uroot -Nse 'SELECT version FROM jungol_bada.migrations WHERE version=2' | grep -qx 2; exec sleep infinity"]
+    environment:
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+    depends_on:
+      jungol-migrator: {condition: service_completed_successfully}
+
+  backend-probe:
+    image: mysql:8.4
+    entrypoint: [sh, -ec]
+    command: ["MYSQL_PWD=\"$$DB_PASSWORD\" mysql --protocol=TCP -hanabada-mysql -uroot -Nse 'SELECT version FROM jungol_bada.migrations WHERE version=2' | grep -qx 2; exec sleep infinity"]
+    environment:
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+    depends_on:
+      anabada-mysql: {condition: service_healthy}
+      jungol-migrator: {condition: service_completed_successfully}
+
+  collector-probe:
+    image: mysql:8.4
+    entrypoint: [sh, -ec]
+    command: ["MYSQL_PWD=\"$$DB_PASSWORD\" mysql --protocol=TCP -hanabada-mysql -uroot -Nse 'SELECT version FROM jungol_bada.migrations WHERE version=2' | grep -qx 2; exec sleep infinity"]
+    environment:
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+    depends_on:
+      anabada-mysql: {condition: service_healthy}
+      jungol-migrator: {condition: service_completed_successfully}
+
+  pending-probe:
+    profiles: [pending]
+    image: mysql:8.4
+    entrypoint: [sh, -ec]
+    command: ["MYSQL_PWD=\"$$DB_PASSWORD\" mysql --protocol=TCP -hanabada-mysql -uroot -Nse 'SELECT version FROM jungol_bada.migrations WHERE version=3' | grep -qx 3; exec sleep infinity"]
+    environment:
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+    depends_on:
+      jungol-migrator: {condition: service_completed_successfully}
+
+  failing-probe:
+    profiles: [failing]
+    image: mysql:8.4
+    entrypoint: [sh, -ec]
+    command: ["exec sleep infinity"]
+    depends_on:
+      jungol-migrator: {condition: service_completed_successfully}

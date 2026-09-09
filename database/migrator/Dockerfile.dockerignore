@@ -1,0 +1,11 @@
+**
+!database
+!database/migrator
+!database/migrator/package.json
+!database/migrator/package-lock.json
+!database/migrator/tsconfig.json
+!database/migrator/tsconfig.build.json
+!database/migrator/src
+!database/migrator/src/**
+!migrations
+!migrations/*.sql

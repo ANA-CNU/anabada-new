@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar } from "lucide-react";
 import { getProblemCountColor, getTotalSolvedColor, type MonthlyProblem } from './types';
 import { URL } from "@/resource/constant";
+import type { MonthlySolvedRanking } from "@/types";
 
 interface MonthlyProblemsTableProps {
   problems?: MonthlyProblem[];
@@ -12,12 +13,7 @@ interface MonthlyProblemsTableProps {
 
 interface ApiResponse {
   success: boolean;
-  data: {
-    username: string;
-    tier: number;
-    solved: number;
-    total_solved: number;
-  }[];
+  data: MonthlySolvedRanking[];
   message: string;
 }
 
@@ -31,7 +27,6 @@ interface MonthlyProblemRow {
 
 function MonthlyProblemsTable({ problems: initialProblems }: MonthlyProblemsTableProps) {
   const [problems, setProblems] = useState<MonthlyProblemRow[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchMonthlyProblems = async () => {
@@ -39,11 +34,12 @@ function MonthlyProblemsTable({ problems: initialProblems }: MonthlyProblemsTabl
         const response = await fetch(`${URL}/api/ranking/monthly-solved`);
         const result: ApiResponse = await response.json();
         
-        if (result.success) {
+        if (!response.ok || !result.success) throw new Error(result.message || "조회 실패");
+        if (result.data) {
           // API 응답을 테이블용 형식으로 변환
           const convertedProblems: MonthlyProblemRow[] = result.data.map((item, index) => ({
             id: (index + 1).toString(),
-            user: item.username,
+            user: item.display_name,
             problemCount: item.solved,
             totalSolved: item.total_solved,
           }));
@@ -62,8 +58,6 @@ function MonthlyProblemsTable({ problems: initialProblems }: MonthlyProblemsTabl
             }))
           );
         }
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -155,4 +149,4 @@ function MonthlyProblemsTable({ problems: initialProblems }: MonthlyProblemsTabl
   );
 }
 
-export default MonthlyProblemsTable; 
+export default MonthlyProblemsTable;

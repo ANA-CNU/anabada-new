@@ -1,3 +1,4 @@
+import { SquircleSurface } from "@/components/ui/squircle";
 import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 
@@ -9,14 +10,14 @@ interface TermsOfServiceModalProps {
 const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({ isOpen, onClose }) => {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-gray-900 border-gray-700 text-white no-scrollbar">
+      <DialogContent className="max-w-2xl max-h-[80vh] grid-rows-[auto_minmax(0,1fr)] bg-gray-900 border-gray-700 text-white no-scrollbar">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-white">
             이용약관
           </DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-6 text-sm leading-relaxed">
+        <div className="space-y-6 text-sm leading-relaxed break-keep [overflow-wrap:anywhere] min-h-0 overflow-y-auto no-scrollbar pr-2">
           <section>
             <h3 className="text-lg font-semibold text-blue-400 mb-3">1. 서비스 이용 목적</h3>
             <p className="text-gray-300 mb-2">
@@ -119,7 +120,7 @@ const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({ isOpen, onClo
             <p className="text-gray-300 mb-2">
               서비스 이용 중 문제가 발생하거나 위반 행위를 발견한 경우:
             </p>
-            <div className="bg-gray-800 p-4 rounded-lg">
+            <SquircleSurface radius="surface" className="bg-gray-800 p-4">
               <p className="text-gray-300 mb-2">
                 <strong>GitHub Issues:</strong> 
                 <a 
@@ -134,7 +135,7 @@ const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({ isOpen, onClo
               <p className="text-gray-300 text-xs">
                 * 긴급한 보안 문제는 제목에 "[보안]"을 포함해 주시기 바랍니다.
               </p>
-            </div>
+            </SquircleSurface>
           </section>
 
           <section>

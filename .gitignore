@@ -17,6 +17,11 @@ dist-ssr
 !.vscode/extensions.json
 .idea
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+ehthumbs.db
 *.suo
 *.ntvs*
 *.njsproj
@@ -24,6 +29,10 @@ dist-ssr
 *.sw?
  
 .env*
+!.env.example
+.secrets/
+.auth/
+*.tsbuildinfo
 
 database/mysql_data/*
 !database/mysql_data/.gitkeep
@@ -33,3 +42,12 @@ querys/main.py
 querys/*
 
 TODO
+
+.omo
+test-output/
+coverage/
+.cache/
+.eslintcache
+.playwright/
+playwright-report/
+blob-report/

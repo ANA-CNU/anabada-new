@@ -7,9 +7,11 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "check:corners": "node scripts/check-squircle-usage.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@lisse/core": "0.7.2",
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-navigation-menu": "^1.2.13",

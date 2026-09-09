@@ -15,10 +15,8 @@ build
 .git
 .gitignore
 README.md
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env*
+!.env.example
 
 # IDE 설정
 .vscode
@@ -54,8 +52,7 @@ coverage
 Dockerfile*
 docker-compose*
 .dockerignore
-package-lock.json
 
 # 기타
 .eslintcache
-.stylelintcache 
+.stylelintcache

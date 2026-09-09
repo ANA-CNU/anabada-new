@@ -1,0 +1,6 @@
+**
+!frontend
+!frontend/test
+!frontend/test/package.json
+!frontend/test/package-lock.json
+!frontend/test/browser-smoke.mjs

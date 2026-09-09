@@ -1,10 +1,6 @@
 import React, { useRef } from "react";
+import { SquircleSurface } from "@/components/ui/squircle";
 import "./SpotlightCard.css";
-
-interface Position {
-  x: number;
-  y: number;
-}
 
 interface SpotlightCardProps extends React.PropsWithChildren {
   className?: string;
@@ -31,6 +27,7 @@ const SpotlightCard: React.FC<SpotlightCardProps> = ({
   };
 
   return (
+    <SquircleSurface asChild>
     <div
       ref={divRef}
       onMouseMove={handleMouseMove}
@@ -38,6 +35,7 @@ const SpotlightCard: React.FC<SpotlightCardProps> = ({
     >
       {children}
     </div>
+    </SquircleSurface>
   );
 };
 

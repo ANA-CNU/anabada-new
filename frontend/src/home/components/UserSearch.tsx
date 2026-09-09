@@ -1,33 +1,23 @@
+import { SquircleSurface } from "@/components/ui/squircle";
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { Search, User } from 'lucide-react';
 import { URL } from '@/resource/constant';
 import { getTierName } from '../../lib/utils';
-import { useNavigate } from 'react-router-dom';
-
-interface User {
-  id: number;
-  name: string;
-  kr_name?: string;
-  corrects: number;
-  submissions: number;
-  solution: number;
-  tier: number;
-  atcoder_handle?: string;
-  codeforces_handle?: string;
-}
+import type { User as JungolUser } from '@/types';
 
 interface UserSearchProps {
-  onUserSelect?: (user: User) => void;
+  onUserSelect?: (user: JungolUser) => void;
   wide?: boolean;
 }
 
 const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect, wide = false }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState<User[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<JungolUser[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   const handleSearch = async () => {
     if (!searchTerm.trim()) return;
@@ -35,10 +25,9 @@ const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect, wide = false }) =
     setIsSearching(true);
     try {
       const response = await fetch(`${URL}/api/user/search?q=${encodeURIComponent(searchTerm)}`);
-      if (response.ok) {
-        const data = await response.json();
-        setSearchResults(data);
-      }
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || '검색에 실패했습니다.');
+      setSearchResults(data as JungolUser[]);
     } catch (error) {
       console.error('사용자 검색 중 오류 발생:', error);
     } finally {
@@ -63,15 +52,19 @@ const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect, wide = false }) =
   };
 
   const containerClass = wide
-    ? 'w-full p-6 bg-white/5 backdrop-blur-sm rounded-lg border border-white/10'
-    : 'w-full max-w-2xl mx-auto p-6 bg-white/5 backdrop-blur-sm rounded-lg border border-white/10';
+    ? 'w-full p-6 bg-white/5 backdrop-blur-sm border border-white/10'
+    : 'w-full max-w-2xl mx-auto p-6 bg-white/5 backdrop-blur-sm border border-white/10';
 
-  const goProfile = (user: User) => {
-    if (onUserSelect) onUserSelect(user);
+  const goProfile = (user: JungolUser) => {
+    if (onUserSelect) {
+      onUserSelect(user);
+      return;
+    }
+    navigate(`/user/${user.id}`);
   };
 
   return (
-    <div className={containerClass}>
+    <SquircleSurface radius="panel" className={containerClass}>
       <h2 className="text-2xl font-bold text-white mb-6">사용자 검색</h2>
       
       <div className="flex gap-2 mb-6">
@@ -100,38 +93,40 @@ const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect, wide = false }) =
           <h3 className="text-lg font-semibold text-white mb-3">검색 결과</h3>
           <div className="space-y-3 max-h-96 overflow-y-auto no-scrollbar pr-1">
             {searchResults.map((user) => (
-              <div
-                key={user.id}
-                onClick={() => goProfile(user)}
-                className="p-4 bg-white/10 rounded-lg border border-white/20 transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-                      <User className="w-5 h-5 text-white" />
+              <SquircleSurface asChild radius="surface" key={user.id}>
+                <button
+                  type="button"
+                  onClick={() => goProfile(user)}
+                  className="w-full p-4 bg-white/10 border border-white/20 text-left transition-colors hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0 flex items-center gap-3">
+                      <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+                        <User className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-white">{user.jungol_name}</span>
+                          {user.korean_name && (
+                            <span className="text-sm text-gray-300">({user.korean_name})</span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-gray-300">
+                          <span className="whitespace-nowrap">정답: {user.corrects}</span>
+                          <span className="whitespace-nowrap">제출: {user.submissions}</span>
+                          <span className="whitespace-nowrap">솔루션: {user.solution}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-white">{user.name}</span>
-                        {user.kr_name && (
-                          <span className="text-sm text-gray-300">({user.kr_name})</span>
-                        )}
+                    <div className="shrink-0 whitespace-nowrap text-right">
+                      <div className={`text-sm font-bold sm:text-base ${getTierColor(user.tier)}`}>
+                        {getTierName(user.tier)}
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-gray-300">
-                        <span>정답: {user.corrects}</span>
-                        <span>제출: {user.submissions}</span>
-                        <span>솔루션: {user.solution}</span>
-                      </div>
+                      <div className="text-xs text-gray-400 sm:text-sm">Tier {user.tier}</div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className={`font-bold ${getTierColor(user.tier)}`}>
-                      {getTierName(user.tier)}
-                    </div>
-                    <div className="text-sm text-gray-400">Tier {user.tier}</div>
-                  </div>
-                </div>
-              </div>
+                </button>
+              </SquircleSurface>
             ))}
           </div>
         </div>
@@ -142,7 +137,7 @@ const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect, wide = false }) =
           검색 결과가 없습니다.
         </div>
       )}
-    </div>
+    </SquircleSurface>
   );
 };
 

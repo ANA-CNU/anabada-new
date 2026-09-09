@@ -1,34 +1,34 @@
 import { useState, useEffect, useRef } from "react";
+import { SquircleSurface } from "@/components/ui/squircle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { X, Plus, Users, Award, Settings, Copy } from "lucide-react";
+import { X, Plus, Users, Award, Settings } from "lucide-react";
 import { URL } from "@/resource/constant";
+import type { User } from "@/types";
 
 interface ScoreEntry {
   id: string;
   displayUsername: string; // 화면 표시용 (예: 황현석 (hyensok))
-  actualUsername: string;  // 백엔드 전송용 영문 고유 ID
+  userId: number;
   weight: number;
   reason: string;
 }
 
 interface ScoreManagementProps {
-  userList: { id: number; kr_name: string | null; name: string }[];
+  userList: User[];
 }
 
 function ScoreManagement({ userList }: ScoreManagementProps) {
   const [entries, setEntries] = useState<ScoreEntry[]>([]);
   const [currentInput, setCurrentInput] = useState("");
-  const [suggestions, setSuggestions] = useState<{ id: number; kr_name: string | null; name: string; display: string }[]>([]);
+  const [suggestions, setSuggestions] = useState<(User & { display: string })[]>([]);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [bulkWeight, setBulkWeight] = useState("");
   const [bulkReason, setBulkReason] = useState("");
-  const [isAddingEntry, setIsAddingEntry] = useState(false);
   
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -43,10 +43,10 @@ function ScoreManagement({ userList }: ScoreManagementProps) {
 
     const filtered = userList.map(u => ({
       ...u,
-      display: `${u.kr_name || u.name} (${u.name})`
+      display: `${u.korean_name || u.jungol_name} (${u.jungol_name})`
     })).filter(u =>
       u.display.toLowerCase().includes(currentInput.toLowerCase()) || 
-      (u.kr_name && u.kr_name.toLowerCase().includes(currentInput.toLowerCase()))
+      (u.korean_name && u.korean_name.toLowerCase().includes(currentInput.toLowerCase()))
     );
     setSuggestions(filtered.slice(0, 5)); // 최대 5개 제안
     setShowSuggestions(filtered.length > 0);
@@ -85,7 +85,7 @@ function ScoreManagement({ userList }: ScoreManagementProps) {
     }
   };
 
-  const selectSuggestion = (user: { display: string; name: string }) => {
+  const selectSuggestion = (user: { display: string }) => {
     setCurrentInput(user.display);
     setShowSuggestions(false);
     setSelectedSuggestionIndex(-1);
@@ -95,18 +95,18 @@ function ScoreManagement({ userList }: ScoreManagementProps) {
     if (!currentInput.trim()) return;
     
     // 현재 입력값과 일치하는 유저 찾기 (자동완성 선택으로 입력된 경우 display와 일치)
-    const matchedUser = userList.find(u => `${u.kr_name || u.name} (${u.name})` === currentInput.trim()) || 
-                        userList.find(u => u.name === currentInput.trim() || u.kr_name === currentInput.trim());
+    const matchedUser = userList.find(u => `${u.korean_name || u.jungol_name} (${u.jungol_name})` === currentInput.trim()) ||
+                        userList.find(u => u.jungol_name === currentInput.trim() || u.korean_name === currentInput.trim());
 
     if (!matchedUser) {
       alert("존재하지 않는 유저입니다. 자동완성 목록에서 선택해주세요.");
       return;
     }
 
-    const displayUsername = `${matchedUser.kr_name || matchedUser.name} (${matchedUser.name})`;
+    const displayUsername = `${matchedUser.korean_name || matchedUser.jungol_name} (${matchedUser.jungol_name})`;
 
     // 이미 추가된 유저인지 확인
-    if (entries.some(e => e.actualUsername === matchedUser.name)) {
+    if (entries.some(e => e.userId === matchedUser.id)) {
       alert("이미 목록에 추가된 유저입니다.");
       return;
     }
@@ -114,14 +114,13 @@ function ScoreManagement({ userList }: ScoreManagementProps) {
     const newEntry: ScoreEntry = {
       id: Date.now().toString(),
       displayUsername,
-      actualUsername: matchedUser.name,
+      userId: matchedUser.id,
       weight: 0,
       reason: ""
     };
     
     setEntries(prev => [...prev, newEntry]);
     setCurrentInput("");
-    setIsAddingEntry(false);
   };
 
   const removeEntry = (id: string) => {
@@ -155,9 +154,11 @@ function ScoreManagement({ userList }: ScoreManagementProps) {
   const handleSubmit = () => {
 
     const records = entries.map(e => ({
-      username: e.actualUsername, // 백엔드에는 고유한 영문 ID를 보냄
+      user_id: e.userId,
       bias: Number(e.weight) || 0,
-      desc: e.reason ?? ""
+      desc: e.reason || null,
+      event_id: null,
+      problem_id: null,
     }));
 
     fetch(`${URL}/api/score-history/bulk`, {
@@ -201,7 +202,7 @@ function ScoreManagement({ userList }: ScoreManagementProps) {
             <Settings className="h-5 w-5" />
             일괄 설정
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="break-keep">
             모든 항목에 동일한 가중치나 이유를 한 번에 적용할 수 있습니다.
           </CardDescription>
         </CardHeader>
@@ -242,8 +243,9 @@ function ScoreManagement({ userList }: ScoreManagementProps) {
       </Card>
 
       {/* 사용자 추가 카드 */}
-      <Card>
-        <CardHeader>
+      <div data-slot="card" className="relative flex flex-col gap-6 overflow-visible border border-transparent py-6 text-card-foreground">
+        <SquircleSurface radius="surface" aria-hidden="true" className="pointer-events-none absolute -inset-px z-0 border bg-card shadow-sm" />
+        <CardHeader className="relative z-10">
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
             사용자 추가
@@ -252,7 +254,7 @@ function ScoreManagement({ userList }: ScoreManagementProps) {
             점수 관리를 적용할 사용자를 추가하세요.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="relative z-10">
           <div className="space-y-4">
             <div className="relative">
               <Label htmlFor="username">사용자 이름</Label>
@@ -270,10 +272,12 @@ function ScoreManagement({ userList }: ScoreManagementProps) {
                   
                   {/* 자동완성 드롭다운 */}
                   {showSuggestions && suggestions.length > 0 && (
+                    <SquircleSurface asChild radius="surface">
                     <div
                       ref={suggestionsRef}
-                      className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto"
+                      className="absolute z-10 w-full mt-1 bg-white border border-gray-200 shadow-lg"
                     >
+                      <div className="max-h-48 overflow-y-auto">
                       {suggestions.map((suggestion, index) => (
                         <div
                           key={suggestion.id}
@@ -285,7 +289,9 @@ function ScoreManagement({ userList }: ScoreManagementProps) {
                           {suggestion.display}
                         </div>
                       ))}
+                      </div>
                     </div>
+                    </SquircleSurface>
                   )}
                 </div>
                 <Button onClick={addEntry} disabled={!currentInput.trim()}>
@@ -295,7 +301,7 @@ function ScoreManagement({ userList }: ScoreManagementProps) {
             </div>
           </div>
         </CardContent>
-      </Card>
+      </div>
 
       {/* 점수 관리 목록 */}
       {entries.length > 0 && (
@@ -309,7 +315,7 @@ function ScoreManagement({ userList }: ScoreManagementProps) {
           <CardContent>
             <div className="space-y-4">
               {entries.map((entry) => (
-                <div key={entry.id} className="border rounded-lg p-4 space-y-3">
+                <SquircleSurface key={entry.id} radius="surface" className="border p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <Badge variant="secondary" className="text-sm">
                       {entry.displayUsername}
@@ -345,7 +351,7 @@ function ScoreManagement({ userList }: ScoreManagementProps) {
                       />
                     </div>
                   </div>
-                </div>
+                </SquircleSurface>
               ))}
             </div>
           </CardContent>
@@ -367,4 +373,4 @@ function ScoreManagement({ userList }: ScoreManagementProps) {
   );
 }
 
-export default ScoreManagement; 
+export default ScoreManagement;

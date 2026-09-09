@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import type { RecentProblem } from './types';
 import { formatRelativeTime, formatExactTime } from './types';
 import { URL } from "@/resource/constant";
+import type { RecentSolved } from "@/types";
 
 interface RecentProblemsTableProps {
   problems?: RecentProblem[];
@@ -14,11 +15,7 @@ interface RecentProblemsTableProps {
 
 interface ApiResponse {
   success: boolean;
-  data: {
-    username: string;
-    problem: number;
-    solvedAt: string;
-  }[];
+  data: RecentSolved[];
   message: string;
 }
 
@@ -33,13 +30,14 @@ function RecentProblemsTable({ problems: initialProblems }: RecentProblemsTableP
         const response = await fetch(`${URL}/api/statistics/recently-solved`);
         const result: ApiResponse = await response.json();
         
-        if (result.success) {
+        if (!response.ok || !result.success) throw new Error(result.message || "조회 실패");
+        if (result.data) {
           // API 응답을 RecentProblem 형식으로 변환
           const convertedProblems: RecentProblem[] = result.data.map((item, index) => ({
             id: (index + 1).toString(),
-            user: item.username,
+            user: item.display_name,
             problemNumber: item.problem,
-            solvedAt: item.solvedAt
+            solvedAt: item.submitted_at
           }));
           setProblems(convertedProblems);
         }
@@ -159,4 +157,4 @@ function RecentProblemsTable({ problems: initialProblems }: RecentProblemsTableP
   );
 }
 
-export default RecentProblemsTable; 
+export default RecentProblemsTable;

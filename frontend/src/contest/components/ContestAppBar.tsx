@@ -2,7 +2,7 @@ import React from "react";
 
 const ContestAppBar: React.FC = () => {
   return (
-    <header className="w-full bg-transparent rounded-xl flex items-center justify-between px-4 md:px-8 mx-auto mb-4">
+    <header className="w-full bg-transparent flex items-center justify-between px-4 md:px-8 mx-auto mb-4">
       <a href="https://bada.anacnu.kr" className="flex items-center gap-2" aria-label="ANA 홈으로 이동">
         <span className="text-lg md:text-xl font-bold tracking-widest text-white cursor-pointer">ANA</span>
       </a>

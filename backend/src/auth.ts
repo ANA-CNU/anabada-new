@@ -1,48 +1,34 @@
-import jwt from 'jsonwebtoken';
-import { logger } from '.';
+import jwt from "jsonwebtoken";
 
-export function checkAdminAuth(request: Request): { isAuthenticated: boolean; user: any } {
-  // httpOnly 쿠키에서 accessToken 추출
-  const cookieHeader = request.headers.get('cookie');
-  if (!cookieHeader) {
-    return { isAuthenticated: false, user: null };
-  }
+export interface AdminAuthorizer {
+  isAdmin(request: Request): boolean;
+}
 
-  // accessToken=Bearer <token> 형식에서 토큰 추출
-  const accessTokenMatch = cookieHeader.match(/accessToken=([^;]+)/);
-  if (!accessTokenMatch) {
-    return { isAuthenticated: false, user: null };
-  }
+function tokenFromCookie(cookie: string | null): string | undefined {
+  if (!cookie) return undefined;
+  const value = cookie
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith("accessToken="))
+    ?.slice("accessToken=".length);
+  if (!value) return undefined;
+  const decoded = decodeURIComponent(value);
+  return decoded.startsWith("Bearer ")
+    ? decoded.slice("Bearer ".length)
+    : undefined;
+}
 
+export class AdminAuthenticator implements AdminAuthorizer {
+  constructor(private readonly secret: string) {}
 
-  const accessToken = decodeURIComponent(accessTokenMatch[1]);
-  if (!accessToken.startsWith('Bearer ')) {
-    return { isAuthenticated: false, user: null };
-  } 
-
-
-  const token = accessToken.substring(7); // "Bearer " 제거
-  const jwtSecret = process.env.JWT_SECRET;
-  
-  if (!jwtSecret) {
-    logger.error('JWT_SECRET이 설정되지 않았습니다.');
-    return { isAuthenticated: false, user: null };
-  }
-
-
-  try {
-    const decoded = jwt.verify(token, jwtSecret) as any;
-
-    return { 
-      isAuthenticated: true, 
-      user: {
-        username: decoded.username || 'admin',
-        role: decoded.role || 'admin',
-      }
-    };
-  } catch (error) {
-    logger.debug('JWT 검증 실패:');
-    logger.debug(error);
-    return { isAuthenticated: false, user: null };
+  isAdmin(request: Request): boolean {
+    const token = tokenFromCookie(request.headers.get("cookie"));
+    if (!token) return false;
+    try {
+      const payload = jwt.verify(token, this.secret);
+      return typeof payload !== "string" && payload.role === "admin";
+    } catch {
+      return false;
+    }
   }
 }

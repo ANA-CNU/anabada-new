@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ScoreRecord } from './types';
 import { formatRelativeTime, formatExactTime, getScoreColor } from './types';
 import { URL } from "@/resource/constant";
+import type { RecentScore } from "@/types";
 
 interface ScoreRecordsTableProps {
   records: ScoreRecord[];
@@ -22,12 +23,7 @@ function ScoreRecordsTable({ records }: ScoreRecordsTableProps) {
 
   interface ApiResponse {
     success: boolean;
-    data: Array<{
-      username: string;
-      desc: string;
-      bias: number;
-      createdAt: string;
-    }>;
+    data: RecentScore[];
     message: string;
     summary?: {
       count?: number;
@@ -39,18 +35,18 @@ function ScoreRecordsTable({ records }: ScoreRecordsTableProps) {
   useEffect(() => {
     let cancelled = false;
     const fetchPage = async () => {
-      if (loading) return;
       setLoading(true);
       try {
         const res = await fetch(`${URL}/api/statistics/recently-score?page=${page}&limit=${limit}`);
         const json: ApiResponse = await res.json();
-        if (!cancelled && json.success) {
+        if (!res.ok || !json.success) throw new Error(json.message || "점수 기록을 가져오지 못했습니다.");
+        if (!cancelled) {
           const mapped: ScoreRecord[] = json.data.map((d, idx) => ({
-            id: `${page}-${idx}-${d.username}-${d.createdAt}`,
-            user: d.username,
-            reason: d.desc,
+            id: `${page}-${idx}-${d.id}-${d.created_at}`,
+            user: d.display_name,
+            reason: d.desc ?? "",
             score: d.bias,
-            time: d.createdAt
+            time: d.created_at
           }));
           setItems(prev => page === 1 ? mapped : [...prev, ...mapped]);
           // 더 가져올 수 있는지 판단: 반환 개수가 limit 미만이면 더 없음
@@ -68,7 +64,7 @@ function ScoreRecordsTable({ records }: ScoreRecordsTableProps) {
     };
     fetchPage();
     return () => { cancelled = true; };
-  }, [page]);
+  }, [page, records]);
 
   const handleScroll = () => {
     const el = scrollRef.current;
@@ -138,7 +134,7 @@ function ScoreRecordsTable({ records }: ScoreRecordsTableProps) {
                     <TableCell className="text-white font-medium">{record.user}</TableCell>
                     <TableCell>
                       <Badge className={getScoreColor(record.score, record.user)}>
-                        +{record.score}
+                        {record.score > 0 ? "+" : ""}{record.score}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-white/60 text-xs">
@@ -184,4 +180,4 @@ function ScoreRecordsTable({ records }: ScoreRecordsTableProps) {
   );
 }
 
-export default ScoreRecordsTable; 
+export default ScoreRecordsTable;

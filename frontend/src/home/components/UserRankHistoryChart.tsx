@@ -1,7 +1,9 @@
+import { ChartTooltip } from "./ChartTooltip";
+import { SquircleSurface } from "@/components/ui/squircle";
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { URL } from '@/resource/constant';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, BarChart, Bar } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, BarChart, Bar, type TooltipContentProps } from 'recharts';
 
 interface RankPoint {
   board_id: number;
@@ -78,15 +80,15 @@ const UserRankHistoryChart: React.FC<Props> = ({ userId }) => {
     return Object.entries(buckets).map(([label, count]) => ({ label, count }));
   }, [data]);
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload }: TooltipContentProps<number, string>) => {
     if (active && payload && payload.length) {
       const d = payload[0].payload;
       return (
-        <div className="bg-black/80 border border-white/20 rounded-lg p-3 text-white">
+        <SquircleSurface radius="control" className="bg-black/80 border border-white/20 p-3 text-white">
           <p className="font-medium">날짜: {d.fullDate}</p>
           <p className="text-blue-400">랭킹: {d.rank}위</p>
           <p className="text-gray-300 text-sm">보드 ID: {d.boardId}</p>
-        </div>
+        </SquircleSurface>
       );
     }
     return null;
@@ -106,22 +108,22 @@ const UserRankHistoryChart: React.FC<Props> = ({ userId }) => {
           <>
             {/* 통계 카드 */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-              <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+              <SquircleSurface radius="surface" className="p-3 bg-white/5 border border-white/10">
                 <div className="text-gray-400 text-xs">평균 순위</div>
                 <div className="text-2xl font-semibold">{stats.avg.toFixed(1)}위</div>
-              </div>
-              <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+              </SquircleSurface>
+              <SquircleSurface radius="surface" className="p-3 bg-white/5 border border-white/10">
                 <div className="text-gray-400 text-xs">1위 달성</div>
                 <div className="text-2xl font-semibold text-yellow-300">{stats.rank1Count}회</div>
-              </div>
-              <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+              </SquircleSurface>
+              <SquircleSurface radius="surface" className="p-3 bg-white/5 border border-white/10">
                 <div className="text-gray-400 text-xs">TOP 3 비율</div>
                 <div className="text-2xl font-semibold text-green-300">{stats.top3Ratio.toFixed(0)}%</div>
-              </div>
-              <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+              </SquircleSurface>
+              <SquircleSurface radius="surface" className="p-3 bg-white/5 border border-white/10">
                 <div className="text-gray-400 text-xs">최고 / 최저</div>
                 <div className="text-2xl font-semibold"><span className="text-blue-300">{stats.best}위</span> / <span className="text-red-300">{stats.worst}위</span></div>
-              </div>
+              </SquircleSurface>
             </div>
 
             {/* 라인 차트 */}
@@ -148,7 +150,7 @@ const UserRankHistoryChart: React.FC<Props> = ({ userId }) => {
                   />
                   {/* 평균 기준선 */}
                   <ReferenceLine y={stats.avg} stroke="#f59e0b" strokeDasharray="4 4" label={{ value: `평균 ${stats.avg.toFixed(1)}위`, position: 'insideTopRight', fill: '#fbbf24', fontSize: 12 }} />
-                  <Tooltip content={<CustomTooltip />} />
+                  <Tooltip content={CustomTooltip} />
                   <Line
                     type="monotone"
                     dataKey="rank"
@@ -170,7 +172,7 @@ const UserRankHistoryChart: React.FC<Props> = ({ userId }) => {
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" vertical={false} />
                   <XAxis dataKey="label" tick={{ fill: '#94a3b8' }} tickLine={false} axisLine={{ stroke: 'rgba(255,255,255,0.2)' }} />
                   <YAxis allowDecimals={false} tick={{ fill: '#94a3b8' }} tickLine={false} axisLine={{ stroke: 'rgba(255,255,255,0.2)' }} />
-                  <Tooltip contentStyle={{ background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff' }} />
+                  <Tooltip content={<ChartTooltip />} />
                   <Bar dataKey="count" fill="#34d399" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>

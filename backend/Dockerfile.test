@@ -1,0 +1,12 @@
+FROM oven/bun:1.4.2-alpine
+
+WORKDIR /app
+COPY backend/package.json backend/bun.lock ./
+COPY backend/tsconfig.json backend/biome.json ./
+RUN bun install --frozen-lockfile
+COPY backend/src ./src
+COPY backend/test ./test
+COPY backend/tests ./tests
+RUN chown -R bun:bun /app
+USER bun
+CMD ["bun", "run", "test:mysql"]

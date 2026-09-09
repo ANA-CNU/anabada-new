@@ -140,7 +140,6 @@ function RankedList({ list, showBias = false }: RankedListProps) {
       `}</style>
       {list.map((item, idx) => {
         const borderClass = idx < 3 ? borderColors[idx] : "border-white/20 hover:scale-[1.02] hover:shadow-lg";
-        const usernameClass = idx < 3 ? "text-white" : "text-inherit";
         return (
           <Card
             key={item.username}

@@ -1,8 +1,10 @@
+import { ChartTooltip } from "./ChartTooltip";
+import { SquircleSurface } from "@/components/ui/squircle";
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
-import { ArrowLeft, Trophy, Target, TrendingUp, Calendar, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Trophy, Target, TrendingUp, Calendar } from 'lucide-react';
 import { URL } from '@/resource/constant';
 import UserRankHistoryChart from './UserRankHistoryChart';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
@@ -34,16 +36,16 @@ const UserProfile: React.FC = () => {
   const [rankHistory, setRankHistory] = useState<RankPoint[]>([]);
   const [monthly, setMonthly] = useState<MonthlySummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const userId = user?.id;
 
   useEffect(() => {
     const fetchAll = async () => {
       setIsLoading(true);
       try {
         const userRes = await fetch(`${URL}/api/users/${id}`);
-        if (userRes.ok) {
-          const json = await userRes.json();
-          setUser(json.data);
-        }
+        const json = await userRes.json();
+        if (!userRes.ok || !json?.success) throw new Error(json?.error || "사용자 정보를 가져오지 못했습니다.");
+        setUser(json.data);
       } catch (e) {
         console.error(e);
       } finally {
@@ -55,31 +57,31 @@ const UserProfile: React.FC = () => {
 
   useEffect(() => {
     const fetchUserData = async () => {
-      if (!user) return;
+      if (!userId) return;
       try {
         // 점수 히스토리
-        const historyResponse = await fetch(`${URL}/api/score_history/user/${user.id}`);
+        const historyResponse = await fetch(`${URL}/api/score_history/user/${userId}`);
         if (historyResponse.ok) {
           const historyData = await historyResponse.json();
           setScoreHistory(historyData);
         }
 
         // 최근 문제
-        const problemsResponse = await fetch(`${URL}/api/user/${user.id}/problems`);
+        const problemsResponse = await fetch(`${URL}/api/user/${userId}/problems`);
         if (problemsResponse.ok) {
           const problemsData = await problemsResponse.json();
           setRecentProblems(problemsData);
         }
 
         // 랭킹 히스토리
-        const rankRes = await fetch(`${URL}/api/board/user/${user.id}/rank-history`);
+        const rankRes = await fetch(`${URL}/api/board/user/${userId}/rank-history`);
         if (rankRes.ok) {
           const rankData = await rankRes.json();
           setRankHistory(rankData);
         }
 
         // 월별 요약
-        const monthlyRes = await fetch(`${URL}/api/user/${user.id}/monthly-summary`);
+        const monthlyRes = await fetch(`${URL}/api/user/${userId}/monthly-summary`);
         if (monthlyRes.ok) {
           const monthlyData = await monthlyRes.json();
           setMonthly(monthlyData['data']);
@@ -92,7 +94,7 @@ const UserProfile: React.FC = () => {
     };
 
     fetchUserData();
-  }, [user?.id]);
+  }, [userId]);
 
   // 랭크 분포 및 확률 계산 (1~8위 + 9위 이상)
   const rankCounts: Record<string, number> = {};
@@ -149,39 +151,17 @@ const UserProfile: React.FC = () => {
           <Card className="bg-white/5 border-white/20 text-white mb-8">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-2xl flex items-center gap-3">
-                    {user.name}
-                    {user.kr_name && (
-                      <span className="text-lg text-gray-300">({user.kr_name})</span>
+                <div className="min-w-0 w-full">
+                  <CardTitle className="text-2xl flex flex-wrap items-center gap-3">
+                    <span className="min-w-0 [overflow-wrap:anywhere]">{user.jungol_name}</span>
+                    {user.korean_name && (
+                      <span className="min-w-0 text-lg text-gray-300 break-keep [overflow-wrap:anywhere]">({user.korean_name})</span>
                     )}
                   </CardTitle>
-                  <div className="flex items-center gap-4 mt-2">
+                  <div className="flex flex-wrap items-center gap-4 mt-2">
                     <Badge className={`text-lg px-3 py-1 ${getTierColor(user.tier)} bg-transparent border-current`}>
                       {getTierName(user.tier)} (Tier {user.tier})
                     </Badge>
-                    {user.atcoder_handle && (
-                      <a
-                        href={`https://atcoder.jp/users/${user.atcoder_handle}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-blue-400 hover:text-blue-300"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                        AtCoder
-                      </a>
-                    )}
-                    {user.codeforces_handle && (
-                      <a
-                        href={`https://codeforces.com/profile/${user.codeforces_handle}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-blue-400 hover:text-blue-300"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                        Codeforces
-                      </a>
-                    )}
                   </div>
                 </div>
               </div>
@@ -225,12 +205,15 @@ const UserProfile: React.FC = () => {
           {monthly && (
             <Card className="bg-white/5 border-white/20 text-white mb-8">
               <CardHeader>
-                <CardTitle className="text-xl">이번 달 요약 ({monthly.start_date} ~ {monthly.end_date})</CardTitle>
+                <CardTitle className="flex flex-col gap-1 text-lg sm:flex-row sm:items-baseline sm:gap-2 sm:text-xl">
+                  <span className="break-keep">이번 달 요약</span>
+                  <span className="whitespace-nowrap text-base sm:text-xl">({monthly.start_date} ~ {monthly.end_date})</span>
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* 이번 달 푼 문제 */}
-                  <div className="p-6 rounded-lg bg-white/5 border border-white/10">
+                  <SquircleSurface radius="surface" className="p-6 bg-white/5 border border-white/10">
                     <div className="flex items-center gap-4">
                       <Target className="w-12 h-12 text-green-400" />
                       <div>
@@ -238,10 +221,10 @@ const UserProfile: React.FC = () => {
                         <div className="text-3xl font-bold text-green-400">{monthly.total_solved || 0}문제</div>
                       </div>
                     </div>
-                  </div>
+                  </SquircleSurface>
 
                   {/* 이번 달 점수 합 */}
-                  <div className="p-6 rounded-lg bg-white/5 border border-white/10">
+                  <SquircleSurface radius="surface" className="p-6 bg-white/5 border border-white/10">
                     <div className="flex items-center gap-4">
                       <TrendingUp className="w-12 h-12 text-blue-400" />
                       <div>
@@ -249,7 +232,7 @@ const UserProfile: React.FC = () => {
                         <div className="text-3xl font-bold text-blue-400">{monthly.total_score || 0}</div>
                       </div>
                     </div>
-                  </div>
+                  </SquircleSurface>
                 </div>
               </CardContent>
             </Card>
@@ -269,7 +252,7 @@ const UserProfile: React.FC = () => {
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
                       <XAxis dataKey="label" tick={{ fill: '#94a3b8' }} tickLine={false} axisLine={{ stroke: 'rgba(255,255,255,0.2)' }} />
                       <YAxis allowDecimals={false} tick={{ fill: '#94a3b8' }} tickLine={false} axisLine={{ stroke: 'rgba(255,255,255,0.2)' }} />
-                      <Tooltip contentStyle={{ background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff' }} />
+                      <Tooltip content={<ChartTooltip />} />
                       <Bar dataKey="count" fill="#60a5fa" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -309,9 +292,9 @@ const UserProfile: React.FC = () => {
               <CardContent>
                 <div className="space-y-3 max-h-96 overflow-y-auto no-scrollbar">
                   {scoreHistory.slice(0, 10).map((record) => (
-                    <div
+                    <SquircleSurface radius="surface"
                       key={record.id}
-                      className="flex items-center justify-between p-3 bg-white/5 rounded-lg"
+                      className="flex items-center justify-between p-3 bg-white/5"
                     >
                       <div className="flex-1">
                         <div className="text-sm text-gray-300">{record.desc}</div>
@@ -325,7 +308,7 @@ const UserProfile: React.FC = () => {
                       >
                         {record.bias >= 0 ? '+' : ''}{record.bias}
                       </Badge>
-                    </div>
+                    </SquircleSurface>
                   ))}
                   {scoreHistory.length === 0 && (
                     <div className="text-center text-gray-400 py-8">
@@ -344,24 +327,24 @@ const UserProfile: React.FC = () => {
               <CardContent>
                 <div className="space-y-3 max-h-96 overflow-y-auto no-scrollbar">
                   {recentProblems.slice(0, 10).map((problem) => (
-                    <div
+                    <SquircleSurface radius="surface"
                       key={problem.id}
-                      className="p-3 bg-white/5 rounded-lg"
+                      className="p-3 bg-white/5"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
-                          <div className="font-medium">{problem.name}</div>
+                          <div className="font-medium">{problem.problem_name ?? `JUNGOL #${problem.problem}`}</div>
                           <div className="text-sm text-gray-300">
                             Difficulty {problem.level} • Problem Tier {problem.problem_tier}
                           </div>
                         </div>
                         <div className="text-right">
                           <div className="text-sm text-gray-400">
-                            {formatDate(problem.time)}
+                            {formatDate(problem.submitted_at)}
                           </div>
                         </div>
                       </div>
-                    </div>
+                    </SquircleSurface>
                   ))}
                   {recentProblems.length === 0 && (
                     <div className="text-center text-gray-400 py-8">

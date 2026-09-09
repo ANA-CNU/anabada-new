@@ -1,3 +1,4 @@
+import { SquircleSurface } from "@/components/ui/squircle";
 import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 
@@ -7,18 +8,16 @@ interface PrivacyPolicyModalProps {
 }
 
 const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ isOpen, onClose }) => {
-  const currentYear = new Date().getFullYear();
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-gray-900 border-gray-700 text-white no-scrollbar">
+      <DialogContent className="max-w-2xl max-h-[80vh] grid-rows-[auto_minmax(0,1fr)] bg-gray-900 border-gray-700 text-white no-scrollbar">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-white">
             개인정보처리방침
           </DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-6 text-sm leading-relaxed">
+        <div className="space-y-6 text-sm leading-relaxed break-keep [overflow-wrap:anywhere] min-h-0 overflow-y-auto no-scrollbar pr-2">
           <section>
             <h3 className="text-lg font-semibold text-blue-400 mb-3">1. 개인정보 수집 및 이용 목적</h3>
             <p className="text-gray-300 mb-2">
@@ -110,7 +109,7 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ isOpen, onClose
               개인정보 처리와 관련된 문의사항이 있으시면 
               다음 경로를 통해 연락해 주시기 바랍니다:
             </p>
-            <div className="bg-gray-800 p-4 rounded-lg">
+            <SquircleSurface radius="surface" className="bg-gray-800 p-4">
               <p className="text-gray-300 mb-2">
                 <strong>GitHub Issues:</strong> 
                 <a 
@@ -125,7 +124,7 @@ const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ isOpen, onClose
               <p className="text-gray-300 text-xs">
                 * 개인정보 관련 문의 시 제목에 "[개인정보]"를 포함해 주시기 바랍니다.
               </p>
-            </div>
+            </SquircleSurface>
           </section>
 
           <section>

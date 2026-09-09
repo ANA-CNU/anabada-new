@@ -1,9 +1,9 @@
-FROM oven/bun:1-alpine AS builder
+FROM oven/bun:1.4.2-alpine AS builder
 
 WORKDIR /app
 
-# package.json과 package-lock.json 복사
-COPY package*.json ./
+# Install against the exact lockfile used by this service.
+COPY package.json bun.lock ./
 
 # 의존성 설치
 RUN bun install --frozen-lockfile
@@ -16,13 +16,13 @@ ENV NODE_ENV=production
 RUN bun run build
 
 # 2단계: 런타임 스테이지
-FROM oven/bun:1-alpine AS runtime
+FROM oven/bun:1.4.2-alpine AS runtime
 
 WORKDIR /app
 
 # 프로덕션 의존성만 설치
 RUN apk add --no-cache curl
-COPY package*.json ./
+COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile --production
 
 # 빌드된 파일 복사
@@ -39,5 +39,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3000/health || exit 1
 
-# 애플리케이션 실행
-CMD ["bun", "run", "dist/index.js"]
+# 빌드 산출물의 실제 CLI 진입점으로 실행한다. bootstrap이 DB 연결과 listen을 명시적으로 시작한다.
+CMD ["bun", "run", "dist/cli.js"]

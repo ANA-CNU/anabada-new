@@ -1,0 +1,124 @@
+#!/usr/bin/env ruby
+require 'yaml'
+require 'tmpdir'
+require 'open3'
+
+def check(condition, message)
+  raise message unless condition
+end
+
+root = File.expand_path('../..', __dir__)
+Dir.chdir(root)
+runtime = %w[DB_PASSWORD JWT_SECRET ADMIN_USERNAME ADMIN_PASSWORD JUNGOL_USERNAME JUNGOL_PASSWORD]
+ssh = %w[DEPLOY_HOST DEPLOY_USER DEPLOY_PORT DEPLOY_KEY]
+optional = %w[VITE_KAKAO_MAP_API_KEY WEBHOOK_URL]
+example = File.read('.env.example')
+check(example.scan(/^([A-Z_]+)=/).flatten.sort == (runtime + optional).sort, 'Unexpected .env.example assignments')
+inventory = example.lines.grep(/^#/).join.scan(/\b[A-Z][A-Z_]+\b/)
+(runtime + ssh + optional).each { |key| check(inventory.include?(key), "Missing secret inventory: #{key}") }
+
+workflow = YAML.load_file('.github/workflows/deploy.yaml')
+deploy_environment = workflow.fetch('jobs').fetch('deploy').fetch('env')
+check(deploy_environment.fetch('WEBHOOK_URL') == '${{ secrets.WEBHOOK_URL }}', 'Optional webhook must reach renderer environment')
+steps = workflow.fetch('jobs').fetch('deploy').fetch('steps')
+check(steps.first['name'] == 'Validate required GitHub secrets', 'Validation must be first')
+check(steps[1]['uses'] == 'actions/checkout@v4', 'Checkout must follow validation')
+validate = steps.first.fetch('run')
+deploy = steps.find { |step| step['name'] == 'Render root environment and deploy' }.fetch('run')
+check(!validate.match?(/\bWEBHOOK_URL\b/), 'Optional webhook must not become a required GitHub secret')
+check(!deploy.match?(/runtime-secrets|\.secrets|\bsource\b|JUNGOL_DB_PASSWORD/), 'Obsolete secret provisioning')
+%w[StrictHostKeyChecking=accept-new BatchMode=yes].each { |text| check(deploy.include?(text), "Missing SSH safety: #{text}") }
+['git status --porcelain --untracked-files=all', 'git merge --ff-only "$2"', 'test "$(git rev-parse HEAD)" = "$2"', 'test "$(git rev-parse origin/main)" = "$1"', 'install -m 0600 "$1/.env" .env.next', 'mv -f .env.next .env', 'docker compose --env-file .env -f docker-compose.prod.yaml config --quiet', 'docker compose --env-file .env -f docker-compose.prod.yaml up -d --build --remove-orphans --wait --wait-timeout 180'].each do |text|
+  check(deploy.include?(text), "Missing deployment gate: #{text}")
+end
+check(deploy.scan(/docker compose --env-file \.env -f docker-compose\.prod\.yaml up /).length == 1, 'Deployment must have one canonical Compose-up path')
+check(!deploy.match?(/run-migrations|--no-deps|--profile|--scale/), 'Deployment must not bypass Compose migration dependencies')
+
+expected = {
+  'anabada-frontend' => ['VITE_KAKAO_MAP_API_KEY'], 'anabada-mysql' => ['DB_PASSWORD'],
+  'anabada-backend' => %w[DB_PASSWORD JWT_SECRET WEBHOOK_URL],
+  'anabada-middleware' => %w[JWT_SECRET ADMIN_USERNAME ADMIN_PASSWORD],
+  'jungol-migrator' => ['DB_PASSWORD'],
+  'jungol-collector' => %w[DB_PASSWORD JUNGOL_USERNAME JUNGOL_PASSWORD WEBHOOK_URL], 'bada-nginx' => []
+}
+
+ci = YAML.load_file('.github/workflows/ci.yaml')
+verify_environment = ci.fetch('jobs').fetch('verify').fetch('env')
+check(verify_environment.fetch('COMPOSE_BAKE') == 'false', 'CI must disable Compose Bake delegation')
+backend_step = ci.fetch('jobs').fetch('verify').fetch('steps').find do |step|
+  step['name'] == 'Backend unit, type, build, and migrated MySQL contracts'
+end
+check(!backend_step.nil?, 'CI backend migrated-MySQL gate is missing')
+backend_commands = backend_step.fetch('run')
+%w[bun\ run\ test:unit bun\ run\ typecheck bun\ run\ lint bun\ run\ build sh\ backend/test/run-mysql.sh].each do |command|
+  check(backend_commands.include?(command), "CI backend gate is missing: #{command}")
+end
+check(!backend_commands.match?(/backend_qa|TEST_DATABASE_URL|CREATE DATABASE/), 'CI backend gate must not use the legacy shared MySQL flow')
+
+remote_deploy = /<<'DEPLOY'\n(?<script>.*?)\nDEPLOY\n\z/m.match(deploy)&.[](:script)
+check(!remote_deploy.nil?, 'Deployment must retain the remote deployment shell')
+check(remote_deploy.include?('export COMPOSE_BAKE=false'), 'Remote deployment shell must disable Compose Bake delegation')
+check(remote_deploy.index('export COMPOSE_BAKE=false') < remote_deploy.index('docker compose --env-file .env -f docker-compose.prod.yaml up '), 'Remote deployment shell must disable Compose Bake before its canonical Compose up')
+
+%w[dev stage prod].each do |mode|
+  config = YAML.load_file("docker-compose.#{mode}.yaml")
+  check(!config.key?('secrets'), 'Top-level secrets forbidden')
+  config.fetch('services').each do |name, service|
+    check(!service.key?('env_file') && !service.key?('secrets'), "Secret injection forbidden: #{name}")
+    keys = service.to_yaml.scan(/\$\{([A-Z_]+)/).flatten.uniq.sort
+    check(keys == expected.fetch(name).sort, "Wrong secret distribution: #{mode}/#{name}")
+  end
+  collector = config.fetch('services').fetch('jungol-collector')
+  check(collector.fetch('environment').keys.sort == %w[DB_PASSWORD JUNGOL_PASSWORD JUNGOL_USERNAME WEBHOOK_URL], 'Collector settings must be static')
+  if mode == 'dev'
+    check(!config.fetch('services').key?('jungol-migrator'), 'Dev must not include the automatic migrator')
+  else
+    migrator = config.fetch('services').fetch('jungol-migrator')
+    check(!migrator.key?('profiles'), "#{mode} migrator must be included in normal Compose up")
+    %w[anabada-frontend anabada-middleware anabada-backend jungol-collector].each do |service|
+      check(config.fetch('services').fetch(service).fetch('depends_on').fetch('jungol-migrator').fetch('condition') == 'service_completed_successfully', "#{mode}/#{service} must wait for migrator success")
+    end
+  end
+end
+
+Dir.mktmpdir('workflow-contract-') do |dir|
+  mock = File.join(dir, 'ssh')
+  File.write(mock, <<~'SH')
+    #!/usr/bin/env bash
+    set -euo pipefail
+    printf 'ssh-preflight\n' >> "$MOCK_LOG"
+    [[ "$1" == '-i' ]]
+    env_file="${2%/key}/.env"
+    test -f "$env_file"
+    grep -Fqx "WEBHOOK_URL=\"${EXPECTED_WEBHOOK}\"" "$env_file"
+    printf '%s' "${2%/key}" > "$MOCK_TEMP"
+    docker compose --env-file "$env_file" -f docker-compose.prod.yaml config --quiet
+    cat > /dev/null
+    exit 73
+  SH
+  File.chmod(0700, mock)
+  env = (runtime + ssh).to_h { |key| [key, 'fake-workflow-value'] }
+  env.merge!('DEPLOY_PORT' => '22', 'DEPLOY_SHA' => 'a' * 40, 'VITE_KAKAO_MAP_API_KEY' => nil, 'WEBHOOK_URL' => nil,
+             'EXPECTED_WEBHOOK' => '', 'PATH' => "#{dir}:#{ENV.fetch('PATH')}", 'MOCK_LOG' => "#{dir}/calls", 'MOCK_TEMP' => "#{dir}/transit")
+  combined = validate + "\n" + deploy
+  _, errors, status = Open3.capture3('bash', '-n', stdin_data: combined)
+  check(status.success?, "Invalid deployment shell: #{errors}")
+  (runtime + ssh).each do |key|
+    output, errors, status = Open3.capture3(env.merge(key => ''), 'bash', '-c', combined)
+    check(!status.success? && output.empty? && errors == "Missing required GitHub secret: #{key}\n", "Missing-secret failure: #{key}")
+    check(!File.exist?(env['MOCK_LOG']), 'SSH ran before validation')
+  end
+  _, _, status = Open3.capture3(env.merge('DB_PASSWORD' => "bad\nvalue"), 'bash', '-c', combined)
+  check(!status.success? && !File.exist?(env['MOCK_LOG']), 'Malformed runtime secret reached SSH')
+  [nil, 'fake-kakao'].each do |kakao|
+    output, errors, status = Open3.capture3(env.merge('VITE_KAKAO_MAP_API_KEY' => kakao, 'WEBHOOK_URL' => nil, 'EXPECTED_WEBHOOK' => '', 'JUNGOL_PASSWORD' => '$(touch /tmp/forbidden-workflow-command); `id` # literal'), 'bash', '-c', combined)
+    check(status.exitstatus == 73 && output.empty? && errors.empty?, 'Valid fake secrets did not stop at mock preflight')
+    check(!Dir.exist?(File.read(env['MOCK_TEMP'])), 'Runner transit directory leaked')
+  end
+  webhook = 'https://discord.com/api/webhooks/000000000000000000/placeholder-not-live'
+  output, errors, status = Open3.capture3(env.merge('WEBHOOK_URL' => webhook, 'EXPECTED_WEBHOOK' => webhook), 'bash', '-c', combined)
+  check(status.exitstatus == 73 && output.empty? && errors.empty?, 'Optional webhook did not reach mock preflight without logs')
+  check(!Dir.exist?(File.read(env['MOCK_TEMP'])), 'Runner transit directory leaked after webhook render')
+  check(File.readlines(env['MOCK_LOG']).length == 3, 'Unexpected SSH calls beyond preflight')
+end
+puts 'Workflow contract passed: 10 missing secrets, malformed input, optional Kakao/webhook, literal secret values, mock preflight/config, cleanup, and static topology.'

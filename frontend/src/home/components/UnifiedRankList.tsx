@@ -1,20 +1,11 @@
+import { SquircleSurface } from "@/components/ui/squircle";
 import { URL } from "@/resource/constant";
 import React, { useEffect, useRef, useState } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Spool, Spotlight } from "lucide-react";
-import SpotlightCard from "@/react_bits/SpotlightCard/SpotlightCard";
 import LastUpdateTime from "./LastUpdateTime";
+import type { LatestBiasRanking } from "@/types";
 
 // API 응답 타입 (/api/v2/ranking/bias)
-interface RankingItemV2 {
-  username: string;
-  tier: number;
-  rank: number;
-  delta: number;
-  total_problem: number;
-  bias: number;
-  monthly_problem: number;
-}
+type RankingItemV2 = LatestBiasRanking;
 
 interface ApiV2Response {
   success: boolean;
@@ -29,7 +20,7 @@ const trophyByRank: Record<number, { src: string; alt: string; fallback: string 
 };
 
 const rowBaseClass =
-  "flex items-center justify-between w-full rounded-2xl px-5 mb-3 py-4 bg-white/5 border border-white/10";
+  "flex items-center justify-between w-full px-5 mb-3 py-4 bg-white/5 border border-white/10";
 
 const highlightFirstClass =
   "bg-gradient-to-r from-amber-400/25 via-amber-200/15 to-white/5 outline outline-1 outline-amber-300/30 outline-offset-0";
@@ -62,7 +53,7 @@ export default function UnifiedRankList() {
         } else {
           setError(json.message || "랭킹 데이터를 가져오지 못했습니다.");
         }
-      } catch (err) {
+      } catch {
         setError("서버 연결 실패");
       } finally {
         if (mounted) setLoading(false);
@@ -94,7 +85,7 @@ export default function UnifiedRankList() {
         {Array.from({ length: 8 }).map((_, index) => (
           <div
             key={`loading-${index}`}
-            className="flex items-center justify-between w-full rounded-2xl px-5 mb-3 py-4 bg-transparent border border-transparent"
+            className="flex items-center justify-between w-full px-5 mb-3 py-4 bg-transparent border border-transparent"
             style={{ height: '72px' }} // 실제 카드와 동일한 높이
           />
         ))}
@@ -143,7 +134,7 @@ export default function UnifiedRankList() {
           ? highlightThirdClass
           : "";
         const rowClass = isTopThree 
-          ? `flex items-center justify-between w-full rounded-2xl px-4 mb-3 py-4 ${highlightClass} box-border overflow-visible`
+          ? `flex items-center justify-between w-full px-4 mb-3 py-4 ${highlightClass} box-border overflow-visible`
           : `${rowBaseClass} ${highlightClass}`;
         const deltaBadge = (u.delta || 0) === 0 ? (
           <span className="text-xs text-gray-300">-</span>
@@ -161,10 +152,11 @@ export default function UnifiedRankList() {
         const motionClass = animate ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3";
         return (
           <div
-            key={u.username}
-            className={`${rowClass} transition-opacity transition-transform duration-500 ease-out ${motionClass}`}
+            key={u.jungol_name}
+            className={`transition-opacity transition-transform duration-500 ease-out ${motionClass}`}
             style={{ transitionDelay: `${(u.rank - 1) * 60}ms` }}
           >
+            <SquircleSurface className={rowClass}>
             {/* Left - Rank & Trophy & Username */}
             <div className="flex items-center gap-4 min-w-0">
               <div className={leftSlotClass}>
@@ -192,7 +184,7 @@ export default function UnifiedRankList() {
                 <span 
                   className="text-white font-semibold truncate block"
                 >
-                  {u.username}
+                  {u.display_name}
                 </span>
                 <div className="text-xs text-white/60 flex items-center gap-2">
                   <span>티어: {u.tier}</span>
@@ -217,6 +209,7 @@ export default function UnifiedRankList() {
                 <span className="hidden sm:inline">누적 풀이: {u.total_problem}</span>
               </div>
             </div>
+            </SquircleSurface>
           </div>
         
         );
@@ -224,4 +217,3 @@ export default function UnifiedRankList() {
     </div>
   );
 }
-

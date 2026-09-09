@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>ANABADA Monthly Draw — 독립 PoC</title>
+    <style>
+      :root { --surface-alpha: .045; --radius: 28px; --ink: #f6f7fb; --muted: #aab5c9; --mint: #8ff0bb; --line: rgba(181, 204, 240, .20); --navy: #050b16; }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-width: 320px; color: var(--ink); font-family: Pretendard, "Noto Sans KR", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--navy); }
+      .canvas { min-height: 100vh; overflow: clip; padding: clamp(28px, 5.5vw, 84px) clamp(18px, 4.4vw, 68px) 48px; background: radial-gradient(80% 58% at 61% -12%, rgba(69, 93, 138, .38) 0%, rgba(10, 19, 35, 0) 62%), radial-gradient(62% 47% at -4% 45%, rgba(26, 45, 77, .36) 0%, transparent 68%), #050b16; }
+      .wrap { width: min(1120px, 100%); margin: 0 auto; }
+      .poc-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: clamp(38px, 6vw, 72px); padding-bottom: 14px; border-bottom: 1px solid rgba(188, 209, 243, .16); color: var(--muted); font-size: 12px; }
+      .poc-controls strong { color: #dbe8ff; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
+      .poc-controls label { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+      .poc-controls input { accent-color: #f3c75d; }
+      .poc-controls output { min-width: 32px; color: #fff0b9; font-variant-numeric: tabular-nums; }
+      .intro { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 24px; margin-bottom: clamp(42px, 6vw, 76px); }
+      .eyebrow { margin: 0 0 16px; color: #aebbd3; font-size: clamp(17px, 2vw, 28px); letter-spacing: -.025em; }
+      h1 { max-width: 760px; margin: 0; font-size: clamp(38px, 6.1vw, 72px); line-height: 1.14; letter-spacing: -.072em; }
+      .intro p:not(.eyebrow) { margin: 22px 0 0; color: #c4cede; font-size: clamp(16px, 2.2vw, 26px); line-height: 1.55; letter-spacing: -.035em; }
+      .wordmark { padding-bottom: 8px; color: #98a6bd; font-size: clamp(14px, 1.6vw, 19px); line-height: 1.55; letter-spacing: .015em; text-align: right; }
+      .wordmark span { display: block; font-size: .82em; }
+      .podium { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: clamp(12px, 2.2vw, 24px); }
+      .winner { position: relative; min-width: 0; height: 418px; padding: 42px 30px 30px; border: 1px solid var(--line); border-radius: var(--radius); corner-shape: squircle; background: rgba(255,255,255,var(--surface-alpha)); box-shadow: 0 14px 34px rgba(0,0,0,.16); text-align: center; }
+      .winner.rank-1 { grid-column: 1; grid-row: 1; height: 458px; border-color: rgba(247, 208, 103, .88); box-shadow: 0 0 25px rgba(239, 190, 65, .18), 0 20px 42px rgba(0,0,0,.22); }
+      .winner.rank-2 { grid-column: 2; grid-row: 1; border-color: rgba(194, 211, 234, .56); }
+      .winner.rank-3 { grid-column: 3; grid-row: 1; border-color: rgba(208, 132, 79, .58); }
+      .crown { display: block; width: 78px; height: 78px; margin: 0 auto 12px; object-fit: contain; filter: drop-shadow(0 5px 12px rgba(255, 197, 55, .26)); }
+      .rank-2 .crown { width: 66px; height: 66px; filter: grayscale(1) brightness(1.75) contrast(.75) drop-shadow(0 5px 10px rgba(210, 221, 241, .22)); }
+      .rank-3 .crown { width: 66px; height: 66px; filter: sepia(.86) saturate(1.48) hue-rotate(336deg) brightness(.91) drop-shadow(0 5px 10px rgba(214, 125, 69, .2)); }
+      .rank { margin: 0; color: #dce6f8; font-size: clamp(32px, 4vw, 47px); font-weight: 800; letter-spacing: -.085em; }
+      .rank-1 .rank { color: #f6ce5b; font-size: clamp(42px, 5.1vw, 60px); }
+      .rank-3 .rank { color: #ffd29b; }
+      .rule { height: 1px; margin: 28px 0 30px; background: rgba(214, 226, 247, .31); }
+      .rank-1 .rule { background: rgba(249, 213, 113, .42); }
+      .rank-3 .rule { background: rgba(238, 164, 112, .38); }
+      .name { overflow-wrap: anywhere; margin: 0 0 26px; font-size: clamp(25px, 3.3vw, 38px); font-weight: 750; letter-spacing: -.065em; }
+      .stats { display: grid; justify-content: center; gap: 11px; color: #dce5f5; font-size: 19px; letter-spacing: -.045em; }
+      .stats div { display: grid; grid-template-columns: 45px auto; align-items: center; justify-content: start; gap: 12px; text-align: left; }
+      .count { display: inline-block; min-width: 54px; padding: 7px 10px; border-radius: 14px; background: rgba(166, 181, 211, .15); text-align: center; }
+      .score { color: var(--mint); font-weight: 750; }
+      .others { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(12px, 2vw, 22px); margin-top: clamp(28px, 4vw, 42px); }
+      .compact { min-width: 0; min-height: 238px; padding: 28px 28px 24px; border: 1px solid rgba(117, 147, 195, .25); border-radius: var(--radius); corner-shape: squircle; background: rgba(255,255,255,var(--surface-alpha)); box-shadow: 0 12px 26px rgba(0,0,0,.11); text-align: left; }
+      .compact .rank { font-size: 29px; text-align: left; }
+      .compact .name { margin: 16px 0 21px; font-size: 28px; }
+      .compact .stats { justify-content: start; gap: 8px; font-size: 17px; }
+      .compact .stats div { grid-template-columns: 42px auto; gap: 9px; }
+      .compact .count { min-width: 48px; padding: 6px 8px; }
+      footer { display: flex; align-items: center; justify-content: center; gap: 20px; margin-top: clamp(48px, 7vw, 74px); color: #b3bfd2; font-size: clamp(13px, 1.7vw, 17px); letter-spacing: -.035em; text-align: center; }
+      footer::before, footer::after { content: ""; width: 76px; height: 1px; background: #6c7f9e; opacity: .72; }
+      .fallback-note { margin: 18px 0 0; color: #8090a9; font-size: 11px; text-align: center; }
+      @supports not (corner-shape: squircle) { .winner, .compact { border-radius: 28px; } }
+      @media (min-width: 701px) { .winner.rank-2 { grid-column: 1; } .winner.rank-1 { grid-column: 2; } .winner.rank-3 { grid-column: 3; } }
+      @media (max-width: 700px) { .canvas { padding-top: 24px; } .intro { grid-template-columns: 1fr; gap: 8px; margin-bottom: 38px; } .wordmark { padding: 0; text-align: left; } .podium { grid-template-columns: 1fr; gap: 16px; } .winner, .winner.rank-1 { height: auto; min-height: 0; padding: 30px 24px; } .winner.rank-1, .winner.rank-2, .winner.rank-3 { grid-column: 1; } .winner.rank-1 { grid-row: 1; } .winner.rank-2 { grid-row: 2; } .winner.rank-3 { grid-row: 3; } .crown { width: 62px; height: 62px; } .rank-2 .crown, .rank-3 .crown { width: 56px; height: 56px; } .rule { margin: 20px 0; } .name { margin-bottom: 18px; } .others { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; } .compact { min-height: 212px; padding: 21px 18px; } .compact .name { font-size: clamp(21px, 6.5vw, 28px); } footer { gap: 12px; } footer::before, footer::after { width: 32px; flex: 0 0 32px; } }
+      @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }
+    </style>
+  </head>
+  <body>
+    <main class="canvas">
+      <div class="wrap">
+        <aside class="poc-controls" aria-label="PoC 검토용 제어">
+          <strong>PoC controls · production 제외</strong>
+          <label>카드 투명도 <input id="alpha" type="range" min="0.035" max="0.060" value="0.045" step="0.005" /><output id="alpha-value">.045</output></label>
+          <label><input id="long-name" type="checkbox" /> 긴 이름 확인</label>
+          <label><input id="two-winners" type="checkbox" /> 2명 데이터 확인</label>
+        </aside>
+        <header class="intro">
+          <div>
+            <p class="eyebrow">Last Month</p>
+            <h1>지난 달 최종 추첨 결과</h1>
+            <p>지난 달 가중치를 고려하여 최종적으로 추첨된 사용자들입니다.</p>
+          </div>
+          <div class="wordmark">ANABADA<span>Monthly Draw</span></div>
+        </header>
+        <section class="podium" aria-label="상위 세 명 추첨 결과">
+          <article class="winner rank-1" data-rank="1"><img class="crown" src="crown-gold.png?v=flat2" width="78" height="78" alt="" /><p class="rank">1등</p><div class="rule"></div><h2 class="name">가나다</h2><div class="stats"><div><span>문제</span><span class="count">0개</span></div><div><span>점수</span><span class="score">0</span></div></div></article>
+          <article class="winner rank-2" data-rank="2"><img class="crown" src="crown-gold.png?v=flat2" width="66" height="66" alt="" /><p class="rank">2등</p><div class="rule"></div><h2 class="name">beta</h2><div class="stats"><div><span>문제</span><span class="count">1개</span></div><div><span>점수</span><span class="score">1</span></div></div></article>
+          <article class="winner rank-3" data-rank="3"><img class="crown" src="crown-gold.png?v=flat2" width="66" height="66" alt="" /><p class="rank">3등</p><div class="rule"></div><h2 class="name">스모크삼</h2><div class="stats"><div><span>문제</span><span class="count">1개</span></div><div><span>점수</span><span class="score">3</span></div></div></article>
+        </section>
+        <section class="others" aria-label="그 외 추첨 결과">
+          <article class="compact" data-rank="4"><p class="rank">4등</p><h2 class="name">스모크사</h2><div class="stats"><div><span>문제</span><span class="count">1개</span></div><div><span>점수</span><span class="score">4</span></div></div></article>
+          <article class="compact" data-rank="5"><p class="rank">5등</p><h2 class="name">스모크오</h2><div class="stats"><div><span>문제</span><span class="count">1개</span></div><div><span>점수</span><span class="score">5</span></div></div></article>
+          <article class="compact" data-rank="6"><p class="rank">6등</p><h2 class="name">스모크육</h2><div class="stats"><div><span>문제</span><span class="count">1개</span></div><div><span>점수</span><span class="score">6</span></div></div></article>
+          <article class="compact" data-rank="7"><p class="rank">7등</p><h2 class="name">스모크칠</h2><div class="stats"><div><span>문제</span><span class="count">1개</span></div><div><span>점수</span><span class="score">7</span></div></div></article>
+        </section>
+        <footer>랭킹은 그 달의 마지막 추첨기록을 기준으로 결정됩니다.</footer>
+        <p class="fallback-note">PoC: 지원 브라우저에서는 native <code>corner-shape: squircle</code>, 그 외에는 28px radius fallback. 제품 적용 시 <code>SquircleSurface</code>를 사용합니다.</p>
+      </div>
+    </main>
+    <script>
+      const alpha = document.querySelector('#alpha'); const output = document.querySelector('#alpha-value');
+      const names = [...document.querySelectorAll('.name')]; const original = names.map((node) => node.textContent);
+      const toggle = (selector, fn) => document.querySelector(selector).addEventListener('change', fn);
+      alpha.addEventListener('input', () => { document.documentElement.style.setProperty('--surface-alpha', alpha.value); output.textContent = Number(alpha.value).toFixed(3).replace(/^0/, ''); });
+      toggle('#long-name', (event) => names.forEach((node, index) => { node.textContent = event.target.checked && index === 0 ? '가나다라마바사아자차카타파하최장표시이름' : original[index]; }));
+      toggle('#two-winners', (event) => { const isTwoWinners = event.target.checked; document.querySelectorAll('[data-rank="3"], [data-rank="4"], [data-rank="5"], [data-rank="6"], [data-rank="7"]').forEach((node) => { node.hidden = isTwoWinners; }); document.querySelector('.others').hidden = isTwoWinners; });
+    </script>
+  </body>
+</html>

@@ -17,7 +17,6 @@ export const frontendProxy = createProxyMiddleware({
   headers: {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
     'Accept-Language': 'ko-KR,ko;q=0.9,en;q=0.8',
-    'Accept-Encoding': 'gzip, deflate, br',
     'Cache-Control': isProduction ? 'public, max-age=3600' : 'no-cache',
     ...(isProduction ? {} : { 'Pragma': 'no-cache' })
   }
@@ -93,4 +92,4 @@ export const proxyLogging = (req: Request, res: Response, next: NextFunction) =>
     console.log(`🎯 프론트엔드 URL: ${frontendUrl}`);
   }
   next();
-}; 
+};

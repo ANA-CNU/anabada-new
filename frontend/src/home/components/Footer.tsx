@@ -40,7 +40,7 @@ function Footer() {
 
   return (
     <>
-      <footer className="w-full bg-black/20 backdrop-blur-md border-t border-white/10 mt-20">
+      <footer className="w-full break-keep [overflow-wrap:anywhere] bg-black/20 backdrop-blur-md border-t border-white/10 mt-20">
         <div className="max-w-7xl mx-auto px-4 py-8">
           {/* 메인 Footer 콘텐츠 */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
@@ -166,4 +166,4 @@ function Footer() {
   );
 }
 
-export default Footer; 
+export default Footer;

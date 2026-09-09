@@ -1,184 +1,282 @@
-import { Elysia } from "elysia";
-import { swagger } from "@elysiajs/swagger";
 import { cors } from "@elysiajs/cors";
-import dotenv from "dotenv";
-import pino from "pino";
-import { cron } from "@elysiajs/cron";
-import { runFullSyncCycle } from "./api/sync/aoj.service.js";
+import { swagger } from "@elysiajs/swagger";
+import { Elysia } from "elysia";
+import { AdminRankingBoardService } from "./api/admin/ranking-board-service.js";
+import { createAdminRankingBoardRoutes } from "./api/admin/ranking-boards.js";
+import { EventService } from "./api/event/event-service.js";
+import { createEventRoute } from "./api/event/event.js";
+import { BoundedHealthTimeout, createHealthRoute } from "./api/health.js";
+import { createHookRoutes } from "./api/hook/hook.js";
+import { createRankingRoutes } from "./api/rank.js";
+import {
+  type ScoreHistoryRouteDependencies,
+  createScoreHistoryRoutes,
+} from "./api/score_history/ScoreHistory.js";
+import { ScoreHistoryService } from "./api/score_history/score-history-service.js";
+import { createStatisticsRoutes } from "./api/statistics/monthly-stats.js";
+import { createActivityRoutes } from "./api/statistics/recently-solve.js";
+import { UserService, createUserRoutes } from "./api/user/User.js";
+import { createUserMonthlyRoutes } from "./api/user/monthly.js";
+import { createUserProblemRoutes } from "./api/user/problems.js";
+import { createUserSearchRoutes } from "./api/user/search.js";
+import { createBiasRoutes } from "./api/user_total_bias/Bias.js";
+import { BiasService } from "./api/user_total_bias/bias-service.js";
+import type { AdminAuthorizer } from "./auth.js";
+import type { BackendConfig } from "./config/backend-config.js";
+import type { InternalIncidentReporter } from "./emergency-webhook.js";
+import {
+  ClientInputError,
+  DatabaseContractError,
+  DatabaseQueryError,
+  DatabaseTransactionError,
+} from "./infrastructure/errors.js";
+import type { DatabasePool } from "./infrastructure/mysql/database-session.js";
+import { ActivityRepository } from "./infrastructure/mysql/repositories/activity-repository.js";
+import { EventRepository } from "./infrastructure/mysql/repositories/event-repository.js";
+import { HealthRepository } from "./infrastructure/mysql/repositories/health-repository.js";
+import { RankingRepository } from "./infrastructure/mysql/repositories/ranking-repository.js";
+import { UserRepository } from "./infrastructure/mysql/repositories/user-repository.js";
+import { type Clock, KstCalendar, SystemClock } from "./infrastructure/time.js";
+import { logger } from "./logger.js";
 
-// API 플러그인들
-import { monthlyStats } from "./api/statistics/monthly-stats.js";
-import { recentlySolve } from "./api/statistics/recently-solve.js";
-import { recentlyScore } from "./api/statistics/recently-score.js";
-import { event } from "./api/event/event.js";
-import { rank } from "./api/rank.js";
-import { board } from "./api/ranking_boards/board.js";
-import { scoreHistory } from "./api/score_history/ScoreHistory.js";
-import { users } from "./api/user/User.js";
-import { bias } from "./api/user_total_bias/Bias.js";
-import { userSearch } from "./api/user/search.js";
-import { userScoreHistory } from "./api/score_history/user.js";
-import { userProblems } from "./api/user/problems.js";
-import { userRankHistory } from "./api/ranking_boards/user-rank-history.js";
-import { topGainers } from "./api/ranking_boards/top-gainers.js";
-import { lastMonthBoard } from "./api/ranking_boards/selected-month-board.js";
-import { userMonthly } from "./api/user/monthly.js";
-import { hook } from "./api/hook/hook.js";
+export { logger };
 
-// 설정
-dotenv.config();
-const isProduction = process.env.NODE_ENV === "production";
+export type ApplicationDependencies = Readonly<{
+  readonly databasePool: DatabasePool;
+  readonly authorizer: AdminAuthorizer;
+  readonly incidentReporter: InternalIncidentReporter;
+  readonly clock?: Clock;
+  readonly calendar?: KstCalendar;
+  readonly config: Pick<BackendConfig, "NODE_ENV" | "ALLOWED_ORIGIN">;
+}>;
 
-// 허용된 Origin 설정
-const allowedOrigins: string[] = [process.env.ALLOWED_ORIGIN!];
-// 로거 설정
-export const logger = pino({
-  level: isProduction ? "info" : "debug",
-  transport: {
-    target: "pino-pretty",
-    options: { colorize: true },
-  },
-});
+const json = (status: number, body: object): Response =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
 
-// CORS 설정
-const corsConfig = isProduction
-  ? {
-      origin: allowedOrigins,
-      credentials: true,
-      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-      allowedHeaders: [
-        "Content-Type",
-        "Authorization",
-        "X-Requested-With",
-        "Cookie",
-      ],
-    }
-  : {
-      origin: true,
-      credentials: true,
-      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-      allowedHeaders: [
-        "Content-Type",
-        "Authorization",
-        "X-Requested-With",
-        "Cookie",
-      ],
-    };
-
-// API 플러그인 배열
-const apiPlugins = [
-  rank,
-  monthlyStats,
-  recentlySolve,
-  recentlyScore,
-  event,
-  board,
-  scoreHistory,
-  users,
-  bias,
-  userSearch,
-  userScoreHistory,
-  userProblems,
-  userRankHistory,
-  topGainers,
-  lastMonthBoard,
-  userMonthly,
-  hook,
-];
-
-// 앱 생성
-const app = new Elysia()
-  .use(cors(corsConfig))
-  .onRequest(({ request, set }) => {
-    // Origin 체크 (프로덕션에서만)
-    if (isProduction) {
-      const origin = request.headers.get("origin");
-
-      // Origin이 있고 허용되지 않은 경우 차단
-      if (origin && !allowedOrigins.includes(origin)) {
-        logger.warn(`차단된 Origin 접근 시도: ${origin}`);
-        set.status = 403;
-        return {
-          error: "Origin not allowed",
-          message: "허용되지 않은 Origin에서의 접근입니다.",
-        };
-      }
-
-      // 허용된 Origin이면 CORS 헤더 설정
-      if (origin && allowedOrigins.includes(origin)) {
-        set.headers["Access-Control-Allow-Origin"] = origin;
-        set.headers["Access-Control-Allow-Methods"] =
-          "GET, POST, PUT, DELETE, OPTIONS";
-        set.headers["Access-Control-Allow-Headers"] =
-          "Content-Type, Authorization, X-Requested-With, Cookie";
-        set.headers["Access-Control-Allow-Credentials"] = "true";
-      }
-    }
-
-    logger.info(`요청 수신: ${request.method} ${request.url}`);
-    logger.debug(`Origin: ${request.headers.get("origin")}`);
-    logger.debug(`User-Agent: ${request.headers.get("user-agent")}`);
-  })
-  .onError(({ error, request }) => {
-    logger.error(`에러 발생: ${request.method} ${request.url}`, error as any);
-  })
-  .use(
-    swagger({
-      documentation: {
-        info: {
-          title: "ANABADA Backend API",
-          version: "1.0.0",
-          description: "ANABADA 프로젝트 백엔드 API 서버",
-        },
-        tags: [
-          { name: "Health", description: "서버 상태 확인" },
-          { name: "Auth", description: "인증 관련 API" },
-          { name: "User", description: "사용자 관련 API" },
-          { name: "Statistics", description: "통계 관련 API" },
-          { name: "Event", description: "이벤트 관련 API" },
-        ],
-      },
-    }),
-  )
-  .get("/", () => ({
-    message: "Hello Elysia",
-    timestamp: new Date().toISOString(),
-    status: "running",
-  }))
-  .get("/health", async () => ({
-    status: "healthy",
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  }))
-  .get("/api/version", () => ({
-    version: "1.0.0",
-    framework: "Elysia",
-    runtime: "Bun",
-  }))
-  .use(
-    cron({
-      name: "aoj-sync",
-      pattern: "*/5 * * * *",
-      run() {
-        logger.info("[CRON] 5분 주기 동기화 잡(AOJ-Sync) 시작");
-        runFullSyncCycle().catch((err) => {
-          logger.error("[CRON] 동기화 중 에러 발생:", err);
-        });
-      },
-    }),
+function isInfrastructureError(
+  error: unknown,
+): error is
+  | DatabaseQueryError
+  | DatabaseContractError
+  | DatabaseTransactionError {
+  return (
+    error instanceof DatabaseQueryError ||
+    error instanceof DatabaseContractError ||
+    error instanceof DatabaseTransactionError
   );
+}
 
-// API 플러그인들 등록
-apiPlugins.forEach((plugin) => app.use(plugin));
+function incidentApi(request: Request): string {
+  return `${request.method} ${new URL(request.url).pathname}`;
+}
 
-// 서버 시작
-app.listen(3000);
+function sessionServices(pool: DatabasePool) {
+  const withRepository = <T>(
+    work: (repository: UserRepository) => Promise<T>,
+  ) => pool.withSession((session) => work(new UserRepository(session)));
+  const userService = new UserService({
+    list: () => withRepository((repository) => repository.list()),
+    find: (id) => withRepository((repository) => repository.find(id)),
+    search: (term) => withRepository((repository) => repository.search(term)),
+    update: (id, patch) =>
+      withRepository((repository) => repository.update(id, patch)),
+    remove: (id) => withRepository((repository) => repository.remove(id)),
+  });
+  const activities = {
+    findUser: (id: number) =>
+      withRepository((repository) => repository.find(id)),
+    problemsForUser: (id: number) =>
+      pool.withSession((session) =>
+        new ActivityRepository(session).problemsForUser(id),
+      ),
+    monthlySummary: (
+      id: number,
+      start: Date,
+      end: Date,
+      startDate: string,
+      endDate: string,
+    ) =>
+      pool.withSession((session) =>
+        new ActivityRepository(session).monthlySummary(
+          id,
+          start,
+          end,
+          startDate,
+          endDate,
+        ),
+      ),
+    monthlyStats: (
+      buckets: readonly import("./infrastructure/time.js").KstMonthBucket[],
+    ) =>
+      pool.withSession((session) =>
+        new ActivityRepository(session).monthlyStats(buckets),
+      ),
+    totalProblems: () =>
+      pool.withSession((session) =>
+        new ActivityRepository(session).totalProblems(),
+      ),
+    recentlySolved: (limit: number, offset: number) =>
+      pool.withSession((session) =>
+        new ActivityRepository(session).recentlySolved(limit, offset),
+      ),
+  };
+  return { userService, activities };
+}
 
-logger.info(`ELYSIA Server 3000번 포트에서 실행합니다.`);
-logger.info(`ANABADA용 백엔드 서버`);
-logger.info(`환경: ${process.env.NODE_ENV || "undefined"}`);
-logger.info(`허용된 Origin: ${allowedOrigins.join(", ")}`);
-logger.info(
-  `CORS 설정: ${isProduction ? `제한됨 (${allowedOrigins.join(", ")})` : "모든 origin 허용"}`,
-);
-logger.info(`Swagger UI: http://localhost:3000/swagger`);
+export function createApplication(dependencies: ApplicationDependencies) {
+  const clock = dependencies.clock ?? new SystemClock();
+  const calendar = dependencies.calendar ?? new KstCalendar();
+  const { databasePool, authorizer, incidentReporter, config } = dependencies;
+  const { userService, activities } = sessionServices(databasePool);
+  const scoreService = new ScoreHistoryService(databasePool, databasePool);
+  const biasService = new BiasService(databasePool, databasePool);
+  const eventService = {
+    unitOfWork: <T>(work: (repository: EventRepository) => Promise<T>) =>
+      databasePool.unitOfWork((session) => work(new EventRepository(session))),
+  };
+  const eventReads = {
+    withSession: <T>(work: (repository: EventRepository) => Promise<T>) =>
+      databasePool.withSession((session) => work(new EventRepository(session))),
+  };
+  const scoreRoutes: ScoreHistoryRouteDependencies = {
+    service: scoreService,
+    authorize: (request) => authorizer.isAdmin(request),
+  };
+  const origins =
+    config.NODE_ENV === "production" ? [config.ALLOWED_ORIGIN] : true;
+  const app = new Elysia()
+    .use(cors({ origin: origins, credentials: true }))
+    .onRequest(({ request }) => {
+      logger.info(
+        { method: request.method, path: new URL(request.url).pathname },
+        "backend.request_received",
+      );
+    })
+    .onError(async ({ error, request, set }) => {
+      if (error instanceof ClientInputError)
+        return json(400, { error: "Invalid request" });
+      const unavailable = isInfrastructureError(error);
+      const status = unavailable ? 503 : 500;
+      set.status = status;
+      logger.error(
+        {
+          code: unavailable ? error.code : "http_request_failed",
+          operationId: unavailable ? error.operationId : undefined,
+          method: request.method,
+          path: new URL(request.url).pathname,
+        },
+        "backend.request_failed",
+      );
+      try {
+        await incidentReporter.report({
+          code: unavailable ? error.code : "http_request_failed",
+          occurredAt: clock.now(),
+          operationId: unavailable
+            ? error.operationId
+            : "http.error.http_request_failed",
+          routeTemplate: incidentApi(request),
+        });
+      } catch {
+        logger.warn(
+          { method: request.method, path: new URL(request.url).pathname },
+          "backend.incident_report_failed",
+        );
+      }
+      return json(status, {
+        error: unavailable ? "Service unavailable" : "Internal server error",
+      });
+    })
+    .use(
+      swagger({
+        documentation: {
+          info: { title: "ANABADA Backend API", version: "1.0.0" },
+        },
+      }),
+    )
+    .get("/", () => ({
+      message: "Hello Elysia",
+      timestamp: clock.now().toISOString(),
+      status: "running",
+    }))
+    .get("/api/version", () => ({
+      version: "1.0.0",
+      framework: "Elysia",
+      runtime: "Bun",
+    }))
+    .use(
+      createHealthRoute(
+        {
+          check: () =>
+            databasePool.withSession((session) =>
+              new HealthRepository(session).check(),
+            ),
+        },
+        clock,
+        incidentReporter,
+        new BoundedHealthTimeout(),
+      ),
+    )
+    .use(
+      createEventRoute({
+        service: new EventService(eventService, calendar),
+        reads: eventReads,
+        authorizer,
+      }),
+    )
+    .use(
+      createUserRoutes({
+        service: userService,
+        adminAuthorizer: {
+          authorize: (request) => authorizer.isAdmin(request),
+        },
+      }),
+    )
+    .use(createUserSearchRoutes(userService))
+    .use(createUserProblemRoutes(activities))
+    .use(createUserMonthlyRoutes({ service: activities, calendar, clock }))
+    .use(createActivityRoutes(activities))
+    .use(createStatisticsRoutes({ service: activities, calendar, clock }))
+    .use(
+      createRankingRoutes({
+        withRepository: (work) =>
+          databasePool.withSession((session) =>
+            work(new RankingRepository(session)),
+          ),
+        clock,
+        calendar,
+      }),
+    )
+    .use(
+      createAdminRankingBoardRoutes({
+        withRepository: (work) =>
+          databasePool.withSession((session) =>
+            work(new RankingRepository(session)),
+          ),
+        service: new AdminRankingBoardService({
+          unitOfWork: (work) =>
+            databasePool.unitOfWork((session) =>
+              work(new RankingRepository(session)),
+            ),
+        }),
+        authorizer,
+      }),
+    )
+    .use(createScoreHistoryRoutes(scoreRoutes))
+    .use(
+      createBiasRoutes({
+        service: biasService,
+        authorize: (request) => authorizer.isAdmin(request),
+      }),
+    )
+    .use(
+      createHookRoutes({
+        withSession: (work) =>
+          databasePool.withSession((session) => work(session)),
+        authorizer: (request) => authorizer.isAdmin(request),
+      }),
+    );
+  return app;
+}

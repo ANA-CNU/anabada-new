@@ -1,10 +1,11 @@
+import { SquircleSurface } from "@/components/ui/squircle";
 import React from 'react';
 
 const UserSearchGuide: React.FC = () => {
   return (
-    <div className="w-full p-6 bg-white/5 rounded-lg border border-white/10 text-white">
+    <SquircleSurface radius="panel" className="w-full p-6 bg-white/5 border border-white/10 text-white">
       <h3 className="text-xl font-semibold mb-2">사용자 검색 가이드</h3>
-      <p className="text-gray-300 mb-4">사용자 BOJ 핸들 또는 한국어 이름으로 검색 후 결과를 클릭하면 프로필 페이지로 이동합니다.</p>
+      <p className="text-gray-300 mb-4">Jungol 계정명 또는 한국어 이름으로 검색 후 결과를 선택하면 프로필 페이지로 이동합니다.</p>
       <div className="space-y-2 text-sm text-gray-300">
         <div>
           <span className="text-white font-medium">프로필에서 볼 수 있는 정보</span>
@@ -13,7 +14,7 @@ const UserSearchGuide: React.FC = () => {
             <li>최근 점수 기록(변동 사유·점수·일자)</li>
             <li>최근 해결한 문제(레벨·티어·해결 일자)</li>
             <li>기본 통계(정답 수, 정답률, 평균 점수 등)</li>
-            <li>외부 핸들(AtCoder, Codeforces) 링크</li>
+            <li>Jungol 계정명, AC Rating과 티어</li>
           </ul>
         </div>
         <div className="pt-2">
@@ -24,7 +25,7 @@ const UserSearchGuide: React.FC = () => {
           </ul>
         </div>
       </div>
-    </div>
+    </SquircleSurface>
   );
 };
 
