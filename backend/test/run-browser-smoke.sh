@@ -19,4 +19,5 @@ $compose up --build -d --wait --wait-timeout 90 anabada-mysql
 $compose run --rm --no-deps jungol-migrator
 $compose run --rm --no-deps browser-smoke-seed
 $compose up --build -d anabada-backend anabada-frontend anabada-middleware bada-nginx
-$compose run --rm --no-deps browser-smoke
+# Linux CI의 bind mount는 runner 소유이므로 같은 UID/GID로 테스트 산출물을 기록한다.
+$compose run --rm --no-deps --user "$(id -u):$(id -g)" browser-smoke

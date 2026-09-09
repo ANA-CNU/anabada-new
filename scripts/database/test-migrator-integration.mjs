@@ -1,7 +1,14 @@
 import { spawn, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { createHash } from "node:crypto";
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  cpSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -11,6 +18,8 @@ const network = `jungol-migrator-${id}`;
 const mysql = `mysql-${id}`;
 const image = `jungol-migrator-test:${id}`;
 const fixture = mkdtempSync(join(tmpdir(), "jungol-migrator-"));
+// GitHub runner UID와 image의 non-root node UID 모두 SQL fixture를 traverse해야 한다.
+chmodSync(fixture, 0o755);
 const password = "migrator-test-password";
 const migration = readFileSync(join(root, "migrations/002_create_jungol_bada.sql"));
 const checksum = createHash("sha256").update(migration).digest("hex");
@@ -47,8 +56,19 @@ function runMigratorAsync(extra = []) {
     const child = spawn("docker", [
       "run", "--rm", "--network", network, "-e", `DB_PASSWORD=${password}`,
       ...extra, image,
-    ], { cwd: root, stdio: "ignore" });
-    child.once("exit", (code) => resolveRun(code));
+    ], { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+    let outputText = "";
+    const collect = (chunk) => {
+      outputText = `${outputText}${chunk}`.slice(-8192);
+    };
+    child.stdout.on("data", collect);
+    child.stderr.on("data", collect);
+    child.once("close", (code) =>
+      resolveRun({
+        code,
+        errorCode: /"code":"([a-z_]+)"/.exec(outputText)?.[1] ?? null,
+      }),
+    );
   });
 }
 
@@ -87,6 +107,7 @@ try {
   cpSync(join(root, "migrations/002_create_jungol_bada.sql"), join(fixture, "002_create_jungol_bada.sql"));
   cpSync(join(root, "scripts/database/test-fixtures/003_fail_after_sentinel.sql"), join(fixture, "003_fail_after_sentinel.sql"));
   check(runMigrator(["-v", `${fixture}:/migrations:ro`]).status !== 0, "failing pending migration unexpectedly succeeded");
+  check(sql("SELECT COUNT(*) FROM jungol_bada.migration_failure_probe") === "1", "failing migration did not execute its probe");
   check(sql("SELECT COUNT(*) FROM jungol_bada.migrations WHERE version=3") === "0", "failed migration was recorded");
   check(sql("SELECT COUNT(*) FROM jungol_bada.user WHERE jungol_name='sentinel_after_reset'") === "1", "failed migration lost sentinel");
   writeFileSync(join(fixture, "003_fail_after_sentinel.sql"), "SELECT SLEEP(2); CREATE TABLE lock_probe (id INT PRIMARY KEY);\n");
@@ -94,7 +115,10 @@ try {
     runMigratorAsync(["-v", `${fixture}:/migrations:ro`]),
     runMigratorAsync(["-v", `${fixture}:/migrations:ro`]),
   ]);
-  check(first === 0 && second === 0, "concurrent migrators did not serialize");
+  check(
+    first.code === 0 && second.code === 0,
+    `concurrent migrators did not serialize: ${first.errorCode ?? first.code},${second.errorCode ?? second.code}`,
+  );
   check(sql("SELECT COUNT(*) FROM jungol_bada.migrations WHERE version=3") === "1", "concurrent migration was not recorded once");
   check(output(["image", "inspect", image, "--format", "{{.Config.User}}"] ) === "node", "migrator image is not non-root");
   check(docker(["run", "--rm", "--entrypoint", "sh", image, "-ec", "test -z \"$(find /migrations -type f \\( -name '000_*' -o -name '001_*' \\) -print -quit)\""]).status === 0, "migrator image contains legacy SQL");
