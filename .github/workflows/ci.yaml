@@ -38,7 +38,7 @@ jobs:
           cache-dependency-path: collector/package-lock.json
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.3.10"
+          bun-version: "1.4.2"
       - name: Migrator checks, image build, and disposable MySQL integration
         working-directory: database/migrator
         run: |
