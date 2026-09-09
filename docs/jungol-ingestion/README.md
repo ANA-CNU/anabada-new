@@ -126,7 +126,7 @@ docker compose --env-file .env -f docker-compose.dev.yaml -p jungol-dev ps
 
 ## production 파일·배포 순서
 
-[운영 Compose](../../docker-compose.prod.yaml)와 [stage Compose](../../docker-compose.stage.yaml)는 기존 `./database/mysql_data` bind mount를 유지하고 SQL init mount를 사용하지 않습니다. 기존 서버의 MySQL 버전과 8.4 이미지 호환성은 별도 검증해야 합니다. stage와 production의 external network `bada-network`, `dmoj_nginx_network`는 Compose 실행 전에 서버에 미리 존재해야 합니다. 같은 checkout에서 stage와 prod를 동시에 실행하지 않습니다. collector는 외부 포트를 열지 않으며 non-root image, init, 1GB shared memory, dropped capabilities, no-new-privileges를 사용합니다.
+[운영 Compose](../../docker-compose.prod.yaml)와 [stage Compose](../../docker-compose.stage.yaml)는 기존 `./database/mysql_data` bind mount를 유지하고 SQL init mount를 사용하지 않습니다. 두 환경은 `mysql:9.3.0`을 사용하므로 기존 data directory의 9.3 호환성은 별도 운영 acceptance가 필요합니다. stage와 production의 external network `bada-network`, `dmoj_nginx_network`는 Compose 실행 전에 서버에 미리 존재해야 합니다. 같은 checkout에서 stage와 prod를 동시에 실행하지 않습니다. collector는 외부 포트를 열지 않으며 non-root image, init, 1GB shared memory, dropped capabilities, no-new-privileges를 사용합니다.
 
 `jungol-profile`은 project 이름에 종속됩니다. 운영 Compose project 이름/작업 경로를 변경하면 다른 profile volume을 만들 수 있으므로 이름을 유지합니다. profile에는 인증 상태가 있으므로 백업·접근 권한을 제한하고 로그/artifact로 업로드하지 않습니다. image 기본 CMD는 `start`이며 별도 host cron/systemd timer를 추가하지 않습니다. container healthcheck 실패만으로 Docker가 자동 재시작하는 것은 아닙니다.
 

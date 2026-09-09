@@ -86,7 +86,7 @@ services:
       anabada-middleware: {condition: service_healthy}
   anabada-mysql:
     # 운영 DB는 호스트 bind mount에 보관해 배포 컨테이너 교체 후에도 데이터를 유지한다.
-    image: mysql:8.4
+    image: mysql:9.3.0
     ports: ["20040:3306"]
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
