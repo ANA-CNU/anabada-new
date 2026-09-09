@@ -39,9 +39,10 @@ export class CollectorApplication {
         return;
       }
       if (command === "start" || command === "run-once") {
+        const parsed = this.configLoader.parse(this.environment);
         const config = {
-          ...this.configLoader.parse(this.environment),
-          runOnce: command === "run-once",
+          ...parsed,
+          runOnce: command === "run-once" || parsed.runOnce,
         };
         await new CollectorRuntime(config).run();
         return;

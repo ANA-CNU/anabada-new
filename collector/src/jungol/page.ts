@@ -1,4 +1,4 @@
-import type { Page } from "playwright";
+import { errors, type Page } from "playwright";
 import { BoundaryError } from "../errors.js";
 import { JungolError } from "./errors.js";
 
@@ -26,7 +26,30 @@ export class PageOperation {
       if (signal?.aborted) throw new JungolError("cancelled");
       if (error instanceof JungolError || error instanceof BoundaryError)
         throw error;
-      if (error instanceof Error) throw new JungolError("browser_failed");
+      if (error instanceof errors.TimeoutError)
+        throw new JungolError("browser_failed", {
+          stage: "page_operation",
+          reason: "timeout",
+        });
+      if (error instanceof Error) {
+        const code =
+          /\b(ECONNREFUSED|ECONNRESET|ENETUNREACH|ENOTFOUND|ETIMEDOUT)\b/.exec(
+            error.message,
+          )?.[1];
+        if (
+          code === "ECONNREFUSED" ||
+          code === "ECONNRESET" ||
+          code === "ENETUNREACH" ||
+          code === "ENOTFOUND" ||
+          code === "ETIMEDOUT"
+        )
+          throw new JungolError("browser_failed", {
+            stage: "page_operation",
+            reason: "network",
+            transportCode: code,
+          });
+        throw new JungolError("browser_failed");
+      }
       throw error;
     } finally {
       signal?.removeEventListener("abort", cancel);

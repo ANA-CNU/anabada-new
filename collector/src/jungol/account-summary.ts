@@ -1,6 +1,7 @@
 import { errors, type Page } from "playwright";
 import { type AccountSyncPlan, InitialSolvedProblem } from "../domain/sync.js";
 import { problemIdSchema } from "../domain.js";
+import { accountSummaryTimeoutDiagnostics } from "./account-summary-diagnostics.js";
 import { JungolError } from "./errors.js";
 import { type BrowserSettings, PageOperation } from "./page.js";
 import type { JungolRequestCoordinator } from "./request-coordinator.js";
@@ -31,9 +32,18 @@ const readSections = async (page: Page): Promise<AccountPageSections> =>
   (async () => {
     const matched = page.getByText("맞은 문제", { exact: true });
     const solved = page.getByText(solvedTitle, { exact: true });
-    if ((await matched.count()) !== 1 || (await solved.count()) !== 1)
+    if ((await matched.count()) !== 1)
       return { matchedValue: null, solvedLinks: [], structureValid: false };
     const matchedRow = matched.locator("..");
+    const matchedValue = (await matchedRow.innerText())
+      .replace("맞은 문제", "")
+      .trim();
+    const solvedCount = await solved.count();
+    // rank와 화면의 맞은 문제 모두 0일 때만 solved card 자체가 없는 공개 빈 상태를 허용한다.
+    if (count(matchedValue) === 0 && solvedCount === 0)
+      return { matchedValue, solvedLinks: [], structureValid: true };
+    if (solvedCount !== 1)
+      return { matchedValue: null, solvedLinks: [], structureValid: false };
     const solvedSection = solved.locator(
       "xpath=ancestor::section[contains(concat(' ', normalize-space(@class), ' '), ' card ')][1]",
     );
@@ -42,9 +52,6 @@ const readSections = async (page: Page): Promise<AccountPageSections> =>
     const solvedList = solvedSection.locator(".problem-list");
     if ((await solvedList.count()) !== 1)
       return { matchedValue: null, solvedLinks: [], structureValid: false };
-    const matchedValue = (await matchedRow.innerText())
-      .replace("맞은 문제", "")
-      .trim();
     const solvedLinks = await solvedList.locator("a").evaluateAll((links) =>
       links.map((link) => ({
         href: link.getAttribute("href") ?? "",
@@ -84,8 +91,13 @@ export class AccountSummaryCollector {
           },
         );
         if (!response?.ok())
-          throw new JungolError("account_summary_http_failed");
-        await this.waitForCompleteSections(page, signal);
+          throw new JungolError("account_summary_http_failed", {
+            stage: "account_summary",
+            reason: "http",
+            httpStatus: response?.status(),
+            rankSolvedCount: plan.member.solvedCount,
+          });
+        await this.waitForCompleteSections(page, plan, signal);
         const sections = await readSections(page);
         if (!sections.structureValid || sections.matchedValue === null)
           throw new JungolError("account_summary_invalid");
@@ -102,7 +114,15 @@ export class AccountSummaryCollector {
           matched !== ids.length ||
           matched !== plan.member.solvedCount
         )
-          throw new JungolError("account_summary_mismatch");
+          throw new JungolError("account_summary_mismatch", {
+            stage: "account_summary",
+            reason: "mismatch",
+            rankSolvedCount: plan.member.solvedCount,
+            profileSolvedCount: matched,
+            observedLinkCount: ids.length,
+            distinctLinkCount: distinct.size,
+            expectedCount: plan.member.solvedCount,
+          });
         return ids.map((problemId) => new InitialSolvedProblem(problemId));
       }),
     );
@@ -110,6 +130,7 @@ export class AccountSummaryCollector {
 
   private async waitForCompleteSections(
     page: Page,
+    plan: AccountSyncPlan,
     signal: AbortSignal | undefined,
   ): Promise<void> {
     try {
@@ -153,13 +174,7 @@ export class AccountSummaryCollector {
             return "auth";
           const [matched] = matchedLabels;
           const [solved] = Array.from(solvedSections);
-          if (
-            !matched ||
-            !solved ||
-            matchedLabels.length !== 1 ||
-            solvedSections.size !== 1
-          )
-            return false;
+          if (!matched || matchedLabels.length !== 1) return false;
           const matchedRow = matched.parentElement;
           if (!matchedRow) return false;
           const count =
@@ -167,19 +182,18 @@ export class AccountSummaryCollector {
               matchedRow.innerText.replace("맞은 문제", "").trim(),
             );
           if (!count) return false;
+          const solvedCount = Number(count[1]?.replaceAll(",", ""));
+          if (!Number.isSafeInteger(solvedCount) || solvedCount < 0)
+            return false;
+          if (solvedCount === 0 && solvedSections.size === 0) return "ready";
+          if (!solved || solvedSections.size !== 1) return false;
           const solvedLists = Array.from(
             solved.querySelectorAll(".problem-list"),
           );
           const [solvedList] = solvedLists;
           if (solvedLists.length !== 1 || !solvedList) return false;
           const links = Array.from(solvedList.querySelectorAll("a"));
-          const solvedCount = Number(count[1]?.replaceAll(",", ""));
-          if (
-            !Number.isSafeInteger(solvedCount) ||
-            solvedCount < 0 ||
-            links.length !== solvedCount
-          )
-            return false;
+          if (links.length !== solvedCount) return false;
           for (const link of links) {
             const href = /^\/problem\/([1-9][0-9]*)$/.exec(
               link.getAttribute("href") ?? "",
@@ -205,7 +219,14 @@ export class AccountSummaryCollector {
     } catch (error) {
       if (signal?.aborted) throw new JungolError("cancelled");
       if (error instanceof errors.TimeoutError)
-        throw new JungolError("account_summary_invalid");
+        throw new JungolError(
+          "account_summary_invalid",
+          await accountSummaryTimeoutDiagnostics(
+            page,
+            plan.member.solvedCount,
+            this.settings.pageTimeoutMs,
+          ),
+        );
       throw error;
     }
   }

@@ -12,11 +12,13 @@ const emergencyWebhookUrlSchema = z.preprocess(
     .brand("EmergencyWebhookUrl")
     .optional(),
 );
+const runOnceSchema = z.enum(["true", "false"]).optional();
 const environmentSchema = z.object({
   DB_PASSWORD: secretSchema,
   JUNGOL_USERNAME: secretSchema,
   JUNGOL_PASSWORD: secretSchema,
   WEBHOOK_URL: emergencyWebhookUrlSchema,
+  COLLECTOR_RUN_ONCE: runOnceSchema,
 });
 export type Credentials = {
   readonly username: z.infer<typeof secretSchema>;
@@ -80,6 +82,10 @@ export class CollectorConfigLoader {
     if (!parsed.success) throw new BoundaryError("invalid_config");
     return Object.freeze({
       ...this.settings,
+      runOnce:
+        parsed.data.COLLECTOR_RUN_ONCE === undefined
+          ? this.settings.runOnce
+          : parsed.data.COLLECTOR_RUN_ONCE === "true",
       credentials: Object.freeze({
         username: parsed.data.JUNGOL_USERNAME,
         password: parsed.data.JUNGOL_PASSWORD,

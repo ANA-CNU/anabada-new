@@ -8,8 +8,10 @@ import type {
   RankMember,
 } from "../domain/sync.js";
 import type { ProblemId } from "../domain.js";
+import type { SafeJungolDiagnostics } from "../jungol/errors.js";
 import type { ProblemMetadata } from "../jungol/metadata.js";
 import type { CollectedSubmissions } from "../jungol/submission.js";
+import type { AccountFlowStep, CycleFlowStep, FlowTrace } from "./flow-log.js";
 
 export interface AccountBrowser {
   /**
@@ -66,4 +68,22 @@ export type CycleReport = {
   readonly insertedAttemptCount: number;
   readonly duplicateAttemptCount: number;
   readonly errorCode: string | null;
+  readonly accountFailureCount: number;
+  readonly accountFailures: readonly AccountFailure[];
+  readonly commonFailures: readonly CommonFailure[];
+};
+
+/** Discord 알림에 허용되는 계정별 collector 실패 정보만 보관한다. */
+export type AccountFailure = {
+  readonly accountId: string;
+  readonly mode: "initial_summary" | "incremental" | "metadata_refresh";
+  readonly code: string;
+  readonly diagnostics?: SafeJungolDiagnostics | undefined;
+  readonly trace?: FlowTrace<AccountFlowStep> | undefined;
+};
+export type CommonFailure = {
+  readonly stage: "projection" | "cycle";
+  readonly code: string;
+  readonly diagnostics?: SafeJungolDiagnostics | undefined;
+  readonly trace?: FlowTrace<CycleFlowStep> | undefined;
 };

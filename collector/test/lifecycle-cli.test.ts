@@ -84,3 +84,57 @@ for (const command of ["run-once", "start"]) {
     },
   );
 }
+
+test(
+  "CLI start honors COLLECTOR_RUN_ONCE without a scheduled retry",
+  { timeout: 10000 },
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), "collector-cli-once-"));
+    const child = spawn(
+      process.execPath,
+      [
+        "--import",
+        "tsx",
+        "--input-type=module",
+        "-e",
+        `
+        import { CollectorApplication } from './src/application/application.ts';
+        import { CollectorConfigLoader } from './src/config.ts';
+        const loader = new CollectorConfigLoader({ profileDir: ${JSON.stringify(directory)}, intervalMs: 1, database: { host: '127.0.0.1', port: 1, user: 'root', name: 'jungol_bada' } });
+        await new CollectorApplication(process.env, loader).run(['node', 'collector', 'start']);
+      `,
+      ],
+      {
+        cwd: new URL("..", import.meta.url),
+        env: {
+          ...process.env,
+          COLLECTOR_RUN_ONCE: "true",
+          WEBHOOK_URL: "",
+          JUNGOL_USERNAME: "disposable-fixture-only",
+          JUNGOL_PASSWORD: "disposable-fixture-only",
+          DB_PASSWORD: "disposable-fixture-only",
+        },
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+    let output = "";
+    let errors = "";
+    child.stdout.setEncoding("utf8").on("data", (chunk: string) => {
+      output += chunk;
+    });
+    child.stderr.setEncoding("utf8").on("data", (chunk: string) => {
+      errors += chunk;
+    });
+    try {
+      const code = await new Promise<number | null>((resolve, reject) => {
+        child.once("error", reject);
+        child.once("close", resolve);
+      });
+      assert.equal(code, 1, errors);
+      assert.equal(output.split("collector.cycle_failed").length - 1, 1);
+    } finally {
+      if (child.exitCode === null) child.kill("SIGKILL");
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+);

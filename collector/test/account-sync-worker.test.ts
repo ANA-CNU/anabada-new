@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { CycleAdapters } from "../src/application/cycle-types.js";
+import { AccountFlowFailure } from "../src/application/flow-log.js";
 import { AccountSyncWorker } from "../src/application/sync-account.js";
 import {
   AccountSyncPlan,
@@ -172,4 +173,55 @@ test("zero-solved initial summary records cursor zero without incremental calls"
   assert.equal(initialized, true);
   assert.equal(result.scannedCount, 0);
   assert.equal(result.insertedAttemptCount, 0);
+});
+
+test("Given an initial summary failure and close failure When the worker rejects Then it preserves the summary failure and cursor trace", async () => {
+  const plan = new AccountSyncPlan("initial_summary", member, 0n, 2, 1);
+  const primary = new TypeError("summary-private-message");
+  const adapters: CycleAdapters = {
+    lease: async () => ({ release: async () => {} }),
+    login: async () => {},
+    rank: async () => [member],
+    stored: async () => new Map(),
+    browser: async () => ({
+      cursor: async () => new InitialSubmissionCursor(9000n, 3),
+      summary: async () => {
+        throw primary;
+      },
+      collect: async () => assert.fail("initial summary must not paginate"),
+      metadata: async () =>
+        assert.fail("initial summary must not resolve metadata"),
+      close: async () => {
+        throw new Error("close-private-message");
+      },
+    }),
+    persist: async () => assert.fail("initial summary must not persist"),
+    initialize: async () => assert.fail("initial summary must not initialize"),
+    refreshMetadata: async () => {},
+    project: async () => {},
+  };
+
+  await assert.rejects(
+    new AccountSyncWorker(
+      { plan, previous: null },
+      {
+        adapters,
+        signal: new AbortController().signal,
+        refresh: async () => [member],
+      },
+    ).run(),
+    (error: unknown) => {
+      assert.ok(error instanceof AccountFlowFailure);
+      assert.equal(error.cause, primary);
+      assert.equal(error.trace.primaryFailure?.step, "initial_summary");
+      assert.ok(
+        error.trace.events.some(
+          (event) =>
+            event.step === "initial_cursor" && event.outcome === "completed",
+        ),
+      );
+      assert.equal(error.trace.events.at(-1)?.step, "browser_close");
+      return true;
+    },
+  );
 });

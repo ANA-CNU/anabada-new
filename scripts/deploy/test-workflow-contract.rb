@@ -13,14 +13,16 @@ Dir.chdir(root)
 runtime = %w[DB_PASSWORD JWT_SECRET ADMIN_USERNAME ADMIN_PASSWORD JUNGOL_USERNAME JUNGOL_PASSWORD]
 ssh = %w[DEPLOY_HOST DEPLOY_USER DEPLOY_PORT DEPLOY_KEY]
 optional = %w[VITE_KAKAO_MAP_API_KEY WEBHOOK_URL]
+local_debug = %w[COLLECTOR_RUN_ONCE]
 example = File.read('.env.example')
-check(example.scan(/^([A-Z_]+)=/).flatten.sort == (runtime + optional).sort, 'Unexpected .env.example assignments')
+check(example.scan(/^([A-Z_]+)=/).flatten.sort == (runtime + optional + local_debug).sort, 'Unexpected .env.example assignments')
 inventory = example.lines.grep(/^#/).join.scan(/\b[A-Z][A-Z_]+\b/)
 (runtime + ssh + optional).each { |key| check(inventory.include?(key), "Missing secret inventory: #{key}") }
 
 workflow = YAML.load_file('.github/workflows/deploy.yaml')
 deploy_environment = workflow.fetch('jobs').fetch('deploy').fetch('env')
 check(deploy_environment.fetch('WEBHOOK_URL') == '${{ secrets.WEBHOOK_URL }}', 'Optional webhook must reach renderer environment')
+check(!deploy_environment.key?('COLLECTOR_RUN_ONCE'), 'Local collector one-shot setting must not reach deployment')
 steps = workflow.fetch('jobs').fetch('deploy').fetch('steps')
 check(steps.first['name'] == 'Validate required GitHub secrets', 'Validation must be first')
 check(steps[1]['uses'] == 'actions/checkout@v4', 'Checkout must follow validation')
@@ -35,6 +37,7 @@ end
 check(deploy.scan(/docker compose --env-file \.env -f docker-compose\.prod\.yaml up /).length == 1, 'Deployment must have one canonical Compose-up path')
 check(!deploy.match?(/run-migrations|--no-deps|--profile|--scale/), 'Deployment must not bypass Compose migration dependencies')
 check(!deploy.match?(/DEPLOY_SHA|git status --porcelain|git merge --ff-only|git pull --ff-only/), 'Deployment must not require an exact SHA or clean checkout')
+check(!File.read('scripts/deploy/render-production-env.sh').include?('COLLECTOR_RUN_ONCE'), 'Local collector one-shot setting must not enter generated production env')
 
 expected = {
   'anabada-frontend' => ['VITE_KAKAO_MAP_API_KEY'], 'anabada-mysql' => ['DB_PASSWORD'],

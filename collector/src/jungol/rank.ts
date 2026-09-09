@@ -11,6 +11,13 @@ const countSchema = z
   .trim()
   .regex(/^(?:0|[1-9]\d*|[1-9]\d{0,2}(?:,\d{3})+)$/)
   .transform((value) => Number(value.replaceAll(",", "")));
+const unavailableAcRatingSchema = z
+  .union([z.literal(""), z.literal("-"), z.literal("—")])
+  .transform(() => 0);
+const acRatingSchema = z
+  .string()
+  .trim()
+  .pipe(z.union([countSchema, unavailableAcRatingSchema]));
 const problemCountSchema = z
   .string()
   .trim()
@@ -93,7 +100,7 @@ export class RankCollector {
         if (cells.length !== 6) throw new JungolError("invalid_rank");
         const solvedCount = problemCountSchema.safeParse(cells[2]).data;
         const wrongCount = problemCountSchema.safeParse(cells[3]).data;
-        const acRating = countSchema.safeParse(cells[5]).data;
+        const acRating = acRatingSchema.safeParse(cells[5]).data;
         if (
           solvedCount === undefined ||
           wrongCount === undefined ||

@@ -13,6 +13,7 @@ import { DiscordWebhookClient } from "../src/webhook.js";
 
 const incident = {
   code: "rank_mismatch",
+  signature: "rank_mismatch:runtime",
   occurredAt: new Date("2026-09-08T00:00:00Z"),
   impact: "일부 사용자 수집이 완료되지 않았습니다.",
   actions: [
@@ -34,6 +35,9 @@ const cycleReport: CycleReport = {
   insertedAttemptCount: 1,
   duplicateAttemptCount: 1,
   errorCode: "rank_mismatch",
+  accountFailureCount: 0,
+  accountFailures: [],
+  commonFailures: [],
 };
 
 test("Given a partial cycle When creating an incident Then exposes only operational counters", () => {
@@ -54,6 +58,27 @@ test("Given a successful cycle When creating an incident Then produces no alert"
   });
 
   assert.equal(result, undefined);
+});
+
+test("Given different account signatures and oversized facts When notifying Then it does not suppress distinct failures and preserves actions under 2000 characters", async () => {
+  const transport = new RecordingEmergencyTransport();
+  const notifier = new EmergencyWebhookNotifier(
+    "https://discord.com/api/webhooks/test/token",
+    transport,
+    pino({ enabled: false }),
+  );
+  const first = { ...incident, signature: "same-code:initial_summary:1" };
+  const second = { ...incident, signature: "same-code:initial_summary:2" };
+  await notifier.notify(first, new AbortController().signal);
+  await notifier.notify(second, new AbortController().signal);
+  const oversized = new EmergencyAlertFormatter().format({
+    ...incident,
+    facts: Array.from({ length: 40 }, () => "x".repeat(100)),
+  });
+
+  assert.equal(transport.messages.length, 2);
+  assert.ok(oversized.length <= 2_000);
+  assert.match(oversized, /## 즉시 확인/);
 });
 
 test("Given a collector incident When formatting Then returns an actionable Discord Markdown alert", () => {
@@ -114,13 +139,59 @@ test("Given an emergency endpoint When notifying Then posts the Markdown payload
     new DiscordWebhookClient(1_000),
     pino({ enabled: false }),
   );
+  const tracedIncident = new CollectorIncidentFactory().fromCycle({
+    ...cycleReport,
+    errorCode: "account_summary_invalid",
+    accountFailureCount: 1,
+    accountFailures: [
+      {
+        accountId: "42",
+        mode: "initial_summary",
+        code: "account_summary_invalid",
+        trace: {
+          droppedEventCount: 0,
+          events: [
+            {
+              sequence: 1,
+              elapsedMs: 0,
+              step: "initial_summary",
+              outcome: "started",
+            },
+            {
+              sequence: 2,
+              elapsedMs: 1,
+              step: "initial_summary",
+              outcome: "failed",
+              errorKind: "type_error",
+            },
+          ],
+          primaryFailure: {
+            sequence: 2,
+            elapsedMs: 1,
+            step: "initial_summary",
+            outcome: "failed",
+            errorKind: "type_error",
+          },
+        },
+      },
+    ],
+  });
+  assert.ok(tracedIncident);
 
-  const result = await notifier.notify(incident, new AbortController().signal);
+  const result = await notifier.notify(
+    tracedIncident,
+    new AbortController().signal,
+  );
 
   assert.equal(result, "delivered");
   assert.deepEqual(JSON.parse(received), {
-    content: new EmergencyAlertFormatter().format(incident),
+    content: new EmergencyAlertFormatter().format(tracedIncident),
+    allowed_mentions: { parse: [] },
   });
+  assert.match(
+    new EmergencyAlertFormatter().format(tracedIncident),
+    /최초 실패 단계 initial_summary[\s\S]*최근 흐름 initial_summary:failed@1ms:type_error/,
+  );
 });
 
 class RecordingEmergencyTransport implements EmergencyWebhookTransport {

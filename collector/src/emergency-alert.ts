@@ -1,9 +1,11 @@
 import type { Logger } from "pino";
 import type { CycleReport } from "./application/cycle-types.js";
+import { IncidentFacts } from "./incident-facts.js";
 import type { WebhookDeliveryResult } from "./webhook.js";
 
 export type EmergencyIncident = {
   readonly code: string;
+  readonly signature: string;
   readonly occurredAt: Date;
   readonly impact: string;
   readonly actions: readonly string[];
@@ -26,6 +28,7 @@ export type EmergencyNotificationResult =
 
 /** collector의 안전한 상태 코드만 운영자가 행동할 수 있는 장애 설명으로 바꾼다. */
 export class CollectorIncidentFactory {
+  private readonly facts = new IncidentFacts();
   fromCycle(
     report: CycleReport,
     occurredAt = new Date(),
@@ -106,22 +109,38 @@ export class CollectorIncidentFactory {
   }): EmergencyIncident {
     return {
       code: input.code,
+      signature: this.signature(input.code, input.report),
       occurredAt: input.occurredAt,
       impact: input.impact,
       actions: input.actions,
-      facts: input.report
-        ? [
-            `상태: ${input.report.status} / 성공: ${input.report.successUserCount}명 / 실패: ${input.report.failedUserCount}명`,
-          ]
-        : [],
+      facts: input.report ? this.facts.from(input.report) : [],
     };
+  }
+
+  private signature(code: string, report: CycleReport | undefined): string {
+    if (!report) return `${code}:runtime`;
+    return [
+      code,
+      ...report.accountFailures
+        .map(
+          (failure) =>
+            `${failure.code}:${failure.mode}:${failure.accountId}:${failure.diagnostics?.stage ?? "none"}:${failure.diagnostics?.reason ?? "none"}:${failure.trace?.primaryFailure?.step ?? "none"}`,
+        )
+        .sort(),
+      ...report.commonFailures
+        .map(
+          (failure) =>
+            `${failure.code}:${failure.stage}:${failure.diagnostics?.stage ?? "none"}:${failure.diagnostics?.reason ?? "none"}:${failure.trace?.primaryFailure?.step ?? "none"}`,
+        )
+        .sort(),
+    ].join("|");
   }
 }
 
 /** 비밀이나 원문 오류 없이 Discord가 해석할 수 있는 운영용 Markdown을 생성한다. */
 export class EmergencyAlertFormatter {
   format(incident: EmergencyIncident): string {
-    return [
+    const header = [
       "# 🚨 ANABADA 긴급 장애 알림",
       "",
       "> **서비스:** `jungol-collector`",
@@ -130,11 +149,19 @@ export class EmergencyAlertFormatter {
       "",
       "## 영향",
       incident.impact,
-      ...incident.facts.map((fact) => `- ${fact}`),
+    ].join("\n");
+    const actions = [
       "",
       "## 즉시 확인",
       ...incident.actions.map((action, index) => `${index + 1}. ${action}`),
     ].join("\n");
+    const facts = incident.facts.map((fact) => `- ${fact}`).join("\n");
+    const budget = Math.max(0, 2_000 - header.length - actions.length - 2);
+    const boundedFacts =
+      facts.length <= budget
+        ? facts
+        : `${facts.slice(0, Math.max(0, budget - 3))}...`;
+    return `${header}\n${boundedFacts}\n${actions}`;
   }
 
   private kst(value: Date): string {
@@ -168,7 +195,7 @@ export class EmergencyWebhookNotifier {
     signal: AbortSignal,
   ): Promise<EmergencyNotificationResult> {
     if (!this.url) return "disabled";
-    const key = incident.code;
+    const key = incident.signature;
     const now = incident.occurredAt.getTime();
     const previous = this.deliveredAt.get(key);
     if (previous !== undefined && now - previous < 1_800_000)
@@ -198,11 +225,10 @@ export class EmergencyWebhookNotifier {
           return unreachable;
         }
       }
-    } catch (error) {
+    } catch (_error) {
       if (signal.aborted) return "failed";
-      if (!(error instanceof Error)) throw error;
       this.logger.error(
-        { incidentCode: incident.code, errorType: error.name },
+        { incidentCode: incident.code, deliveryCode: "transport_failed" },
         "emergency_webhook.failed",
       );
       return "failed";

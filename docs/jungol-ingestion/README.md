@@ -94,7 +94,7 @@ docker run --rm --init --ipc=host anabada-jungol-collector-test:local
 
 ## 설정 계약
 
-루트 `.env`의 필수 키는 `DB_PASSWORD`, `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `JUNGOL_USERNAME`, `JUNGOL_PASSWORD`입니다. `VITE_KAKAO_MAP_API_KEY`와 긴급 장애 알림용 `WEBHOOK_URL`은 선택값입니다. Compose는 필요한 키만 각 서비스에 명시적으로 전달하며 `.env` 전체를 `env_file`로 주입하지 않습니다.
+루트 `.env`의 필수 키는 `DB_PASSWORD`, `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `JUNGOL_USERNAME`, `JUNGOL_PASSWORD`입니다. `VITE_KAKAO_MAP_API_KEY`와 긴급 장애 알림용 `WEBHOOK_URL`은 선택값입니다. `COLLECTOR_RUN_ONCE`은 로컬 진단 전용의 엄격한 `true`/`false` 값이며 기본값은 `false`입니다. 이 값은 GitHub Secret이나 생성되는 운영 `.env`에 포함되지 않습니다. Compose는 필요한 키만 각 서비스에 명시적으로 전달하며 `.env` 전체를 `env_file`로 주입하지 않습니다.
 
 | 서비스 | 외부에서 전달하는 값 |
 |---|---|
@@ -118,11 +118,12 @@ docker compose --env-file .env -f docker-compose.dev.yaml -p jungol-dev up -d an
 docker compose --env-file .env -f docker-compose.dev.yaml -p jungol-dev build jungol-collector
 docker compose --env-file .env -f docker-compose.dev.yaml -p jungol-dev run --rm --no-deps jungol-collector check-config
 docker compose --env-file .env -f docker-compose.dev.yaml -p jungol-dev run --rm --no-deps jungol-collector run-once
+docker compose --env-file .env -f docker-compose.dev.yaml -p jungol-dev run --rm --no-deps -e COLLECTOR_RUN_ONCE=true jungol-collector start
 docker compose --env-file .env -f docker-compose.dev.yaml -p jungol-dev up -d --build --wait
 docker compose --env-file .env -f docker-compose.dev.yaml -p jungol-dev ps
 ```
 
-위 one-shot을 실행할 때 scheduled collector는 정지되어 있어야 합니다. POC 완료 뒤 `docker compose --env-file .env -f docker-compose.dev.yaml -p jungol-dev stop`으로 정지하면 DB/profile을 보존합니다. 전체 실행은 실제 사이트/DB를 사용하므로 secret 없는 dry setup 검증은 `config --quiet`와 build/CLI help까지만 수행합니다.
+위 one-shot을 실행할 때 scheduled collector는 정지되어 있어야 합니다. `run --rm --no-deps`는 service의 `restart: unless-stopped`를 적용하지 않는 일회성 컨테이너이므로, `COLLECTOR_RUN_ONCE=true ... start`로 환경 경로를 검증해도 재시작 loop를 만들지 않습니다. POC 완료 뒤 `docker compose --env-file .env -f docker-compose.dev.yaml -p jungol-dev stop`으로 정지하면 DB/profile을 보존합니다. 전체 실행은 실제 사이트/DB를 사용하므로 secret 없는 dry setup 검증은 `config --quiet`와 build/CLI help까지만 수행합니다.
 
 ## production 파일·배포 순서
 

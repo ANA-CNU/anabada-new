@@ -1,4 +1,5 @@
 import { pino } from "pino";
+import { AccountFlowFailure } from "./application/flow-log.js";
 import { BoundaryError } from "./errors.js";
 import { JungolError } from "./jungol/errors.js";
 import { PersistenceError } from "./mysql/account-types.js";
@@ -8,6 +9,7 @@ import { WorkerPoolError } from "./worker-pool.js";
 /** 외부 로그에 예외 메시지나 응답 원문 대신 허용된 오류 코드만 공개한다. */
 export class ErrorCodeSanitizer {
   code(error: unknown): string {
+    if (error instanceof AccountFlowFailure) return this.code(error.cause);
     if (
       error instanceof BoundaryError ||
       error instanceof JungolError ||

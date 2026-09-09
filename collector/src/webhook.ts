@@ -66,7 +66,7 @@ export class DiscordWebhookClient implements WebhookTransport {
           ? httpRequest
           : undefined;
     if (!requester) return { kind: "rejected", code: "unsupported_protocol" };
-    const body = JSON.stringify({ content });
+    const body = JSON.stringify({ content, allowed_mentions: { parse: [] } });
     return new Promise<WebhookDeliveryResult>((resolve, reject) => {
       let settled = false;
       const finish = (result: WebhookDeliveryResult) => {

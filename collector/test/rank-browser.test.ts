@@ -53,6 +53,45 @@ test("Given ambiguous counts When collecting rank Then malformed grouping is rej
   }
 });
 
+test("Given an explicitly unavailable AC rating When collecting rank Then only blank and dash markers become zero", async () => {
+  const browser = await chromium.launch({
+    headless: true,
+    ...(existsSync(chromium.executablePath()) ? {} : { channel: "chrome" }),
+  });
+  try {
+    const page = await browser.newPage();
+    const collector = new RankCollector(
+      { baseUrl: "https://rank.test", pageTimeoutMs: 2000 },
+      new JungolRequestCoordinator({ delay: async () => {} }),
+    );
+    for (const rating of ["", "-", "—"]) {
+      await page.route("https://rank.test/**", (route) =>
+        route.fulfill({
+          contentType: "text/html; charset=utf-8",
+          body: `<table>${headers}${row.replace("<td>45</td>", `<td>${rating}</td>`)}</table>`,
+        }),
+      );
+      const [member] = await collector.collect(page, 1125);
+      assert.equal(member?.acRating, 0);
+      await page.unroute("https://rank.test/**");
+    }
+    for (const rating of ["1,,2", "abc"]) {
+      await page.route("https://rank.test/**", (route) =>
+        route.fulfill({
+          contentType: "text/html; charset=utf-8",
+          body: `<table>${headers}${row.replace("<td>45</td>", `<td>${rating}</td>`)}</table>`,
+        }),
+      );
+      await assert.rejects(collector.collect(page, 1125), {
+        code: "invalid_rank",
+      });
+      await page.unroute("https://rank.test/**");
+    }
+  } finally {
+    await browser.close();
+  }
+});
+
 test("Given duplicate accounts or changed columns When collecting rank Then schema drift fails closed", async () => {
   const browser = await chromium.launch({
     headless: true,

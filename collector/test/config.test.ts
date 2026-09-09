@@ -50,6 +50,33 @@ test("Given an emergency webhook URL When parsing Then preserves the optional en
   );
 });
 
+for (const [input, expected] of [
+  [undefined, false],
+  ["false", false],
+  ["true", true],
+] as const) {
+  test(`Given COLLECTOR_RUN_ONCE=${String(input)} When parsing Then uses ${String(expected)}`, () => {
+    const result = new CollectorConfigLoader().parse({
+      ...secrets,
+      ...(input === undefined ? {} : { COLLECTOR_RUN_ONCE: input }),
+    });
+    assert.equal(result.runOnce, expected);
+  });
+}
+
+for (const input of ["TRUE", "1", "", 1]) {
+  test(`Given invalid COLLECTOR_RUN_ONCE=${String(input)} When parsing Then rejects`, () => {
+    assert.throws(
+      () =>
+        new CollectorConfigLoader().parse({
+          ...secrets,
+          COLLECTOR_RUN_ONCE: input,
+        }),
+      { code: "invalid_config" },
+    );
+  });
+}
+
 test("Given an empty emergency webhook URL When parsing Then disables emergency alerts", () => {
   const result = new CollectorConfigLoader().parse({
     ...secrets,
@@ -104,7 +131,6 @@ test("Given stale environment overrides When parsing Then ignores every removed 
     JUNGOL_LOGIN_TIMEOUT_MS: "9",
     JUNGOL_PAGE_TIMEOUT_MS: "9",
     RANDOM_SEED: "old",
-    COLLECTOR_RUN_ONCE: "true",
     JUNGOL_TARGET_ACCOUNT_ID: "old",
   };
   const loader = new CollectorConfigLoader();

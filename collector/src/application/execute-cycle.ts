@@ -1,9 +1,14 @@
 import type { Logger } from "pino";
 import type { RankMember } from "../domain/sync.js";
-import { ErrorCodeSanitizer } from "../logger.js";
 import { SyncPlanner } from "../sync-plan.js";
 import { AccountWorkerPool } from "../worker-pool.js";
-import type { CycleAdapters, CycleReport, CycleStatus } from "./cycle-types.js";
+import { CycleReportAssembler } from "./cycle-report-assembler.js";
+import type { CycleAdapters, CycleReport } from "./cycle-types.js";
+import {
+  AccountFlowFailure,
+  AccountFlowLog,
+  CycleFlowLog,
+} from "./flow-log.js";
 import { type AccountJob, AccountSyncWorker } from "./sync-account.js";
 
 export type CycleOptions = {
@@ -16,7 +21,7 @@ export type CycleOptions = {
 export class SyncCycleExecutor {
   private readonly planner: SyncPlanner;
   private readonly workers: AccountWorkerPool;
-  private readonly errors = new ErrorCodeSanitizer();
+  private readonly reports = new CycleReportAssembler();
 
   constructor(
     private readonly adapters: CycleAdapters,
@@ -28,47 +33,93 @@ export class SyncCycleExecutor {
 
   async run(signal: AbortSignal): Promise<CycleReport> {
     signal.throwIfAborted();
-    const lease = await this.adapters.lease();
-    if (!lease) return this.empty("skipped_overlap");
+    const trace = new CycleFlowLog();
+    let report = this.reports.empty("failed");
+    let lease: { release(): Promise<void> } | null = null;
     try {
-      return await this.runWithLease(signal);
-    } finally {
-      await lease.release();
+      lease = await trace.runStep("lease", () => this.adapters.lease());
+      if (!lease) {
+        trace.dispose();
+        return this.reports.empty("skipped_overlap");
+      }
+      report = await this.runWithLease(signal, trace);
+    } catch (error) {
+      report = this.reports.commonFailure(report, "cycle", error, trace);
     }
+    if (lease) {
+      try {
+        await trace.runStep("release", () => lease.release());
+      } catch (error) {
+        report = this.reports.commonFailure(report, "cycle", error, trace);
+      }
+    }
+    const [common] = report.commonFailures.slice(-1);
+    if (common)
+      this.options.logger?.error(
+        {
+          code: common.code,
+          diagnostics: common.diagnostics,
+          trace: common.trace,
+        },
+        "cycle failed",
+      );
+    this.options.logger?.info(
+      {
+        status: report.status,
+        rankCount: report.rankCount,
+        successUserCount: report.successUserCount,
+        failedUserCount: report.failedUserCount,
+        insertedAttemptCount: report.insertedAttemptCount,
+        code: report.errorCode,
+      },
+      "cycle completed",
+    );
+    trace.dispose();
+    return report;
   }
 
-  private async runWithLease(signal: AbortSignal): Promise<CycleReport> {
-    let report = this.empty("success");
+  private async runWithLease(
+    signal: AbortSignal,
+    trace: CycleFlowLog,
+  ): Promise<CycleReport> {
+    let report = this.reports.empty("success");
+    let commonStage: "cycle" | "projection" = "cycle";
     try {
-      await this.adapters.login(signal);
-      const ranks = await this.adapters.rank(signal);
-      const stored = await this.adapters.stored();
+      await trace.runStep("login", () => this.adapters.login(signal));
+      const ranks = await trace.runStep("rank", () =>
+        this.adapters.rank(signal),
+      );
+      const stored = await trace.runStep("stored", () =>
+        this.adapters.stored(),
+      );
       const jobs: AccountJob[] = [];
       const metadata: RankMember[] = [];
       let regressions = 0;
-      for (const member of ranks) {
-        if (
-          this.options.targetAccountId &&
-          member.accountId !== this.options.targetAccountId
-        )
-          continue;
-        const previous = stored.get(member.accountId) ?? null;
-        const selection = this.planner.plan(member, previous);
-        if (
-          selection.kind === "initial_summary" ||
-          selection.kind === "incremental"
-        )
-          jobs.push({ plan: selection.plan, previous });
-        else if (selection.kind === "metadata_refresh")
-          metadata.push(selection.member);
-        else {
-          regressions += 1;
-          this.options.logger?.warn(
-            { accountId: member.accountId, code: "rank_regression" },
-            "account skipped",
-          );
+      await trace.runStep("planner", async () => {
+        for (const member of ranks) {
+          if (
+            this.options.targetAccountId &&
+            member.accountId !== this.options.targetAccountId
+          )
+            continue;
+          const previous = stored.get(member.accountId) ?? null;
+          const selection = this.planner.plan(member, previous);
+          if (
+            selection.kind === "initial_summary" ||
+            selection.kind === "incremental"
+          )
+            jobs.push({ plan: selection.plan, previous });
+          else if (selection.kind === "metadata_refresh")
+            metadata.push(selection.member);
+          else {
+            regressions += 1;
+            this.options.logger?.warn(
+              { accountId: member.accountId, code: "rank_regression" },
+              "account skipped",
+            );
+          }
         }
-      }
+      });
       report = {
         ...report,
         rankCount: ranks.length,
@@ -76,44 +127,75 @@ export class SyncCycleExecutor {
         metadataUserCount: metadata.length,
         failedUserCount: regressions,
       };
-      const metadataResults = await this.workers.run(
-        metadata,
-        signal,
-        (member) => this.adapters.refreshMetadata(member),
+      const metadataResults = await trace.runStep("worker_completion", () =>
+        this.workers.run(metadata, signal, (member) =>
+          this.refreshMetadata(member),
+        ),
       );
       let refreshed: Promise<readonly RankMember[]> | undefined;
       const refresh = (refreshSignal: AbortSignal) => {
         refreshed ??= this.adapters.rank(refreshSignal);
         return refreshed;
       };
-      const syncResults = await this.workers.run(
-        jobs,
-        signal,
-        async (job, _index, workerSignal) =>
+      const syncResults = await trace.runStep("worker_completion", () =>
+        this.workers.run(jobs, signal, async (job, _index, workerSignal) =>
           new AccountSyncWorker(job, {
             adapters: this.adapters,
             signal: workerSignal,
             refresh,
           }).run(),
+        ),
       );
-      for (const result of metadataResults) {
+      for (const [index, result] of metadataResults.entries()) {
         if (result.kind === "failure") {
-          report = {
-            ...report,
-            failedUserCount: report.failedUserCount + 1,
-            errorCode: this.errors.code(result.error),
-          };
+          const member = metadata[index];
+          report = this.reports.accountFailure(
+            {
+              ...report,
+              failedUserCount: report.failedUserCount + 1,
+              errorCode: this.reports.code(result.error),
+            },
+            {
+              accountId: member?.accountId ?? "unknown",
+              mode: "metadata_refresh",
+              code: this.reports.code(result.error),
+              diagnostics: this.reports.diagnostics(result.error),
+              trace: this.reports.accountTrace(result.error),
+            },
+          );
         } else {
           report = { ...report, successUserCount: report.successUserCount + 1 };
         }
       }
-      for (const result of syncResults) {
+      for (const [index, result] of syncResults.entries()) {
         if (result.kind === "failure") {
-          report = {
-            ...report,
-            failedUserCount: report.failedUserCount + 1,
-            errorCode: this.errors.code(result.error),
-          };
+          const job = jobs[index];
+          report = this.reports.accountFailure(
+            {
+              ...report,
+              failedUserCount: report.failedUserCount + 1,
+              errorCode: this.reports.code(result.error),
+            },
+            {
+              accountId: job?.plan.member.accountId ?? "unknown",
+              mode: job?.plan.mode ?? "incremental",
+              code: this.reports.code(result.error),
+              diagnostics: this.reports.diagnostics(result.error),
+              trace: this.reports.accountTrace(result.error),
+            },
+          );
+          if (job)
+            this.options.logger?.warn(
+              {
+                accountId: job.plan.member.accountId,
+                rankSolvedCount: job.plan.member.solvedCount,
+                phase: job.plan.mode,
+                code: this.reports.code(result.error),
+                diagnostics: this.reports.diagnostics(result.error),
+                trace: this.reports.accountTrace(result.error),
+              },
+              "account sync failed",
+            );
         } else
           report = {
             ...report,
@@ -129,7 +211,8 @@ export class SyncCycleExecutor {
           };
       }
       signal.throwIfAborted();
-      await this.adapters.project(signal);
+      commonStage = "projection";
+      await trace.runStep("projection", () => this.adapters.project(signal));
       report = {
         ...report,
         status: report.failedUserCount > 0 ? "partial" : "success",
@@ -137,51 +220,23 @@ export class SyncCycleExecutor {
           report.errorCode ?? (regressions > 0 ? "rank_regression" : null),
       };
     } catch (error) {
-      const code = this.errors.code(error);
-      report = {
-        ...report,
-        status: this.failureStatus(
-          code,
-          report.successUserCount > 0 ? "partial" : "failed",
-        ),
-        errorCode: code,
-      };
-      this.options.logger?.error({ code }, "cycle failed");
+      report = this.reports.commonFailure(report, commonStage, error, trace);
     }
-    this.options.logger?.info(
-      {
-        status: report.status,
-        rankCount: report.rankCount,
-        successUserCount: report.successUserCount,
-        failedUserCount: report.failedUserCount,
-        insertedAttemptCount: report.insertedAttemptCount,
-        code: report.errorCode,
-      },
-      "cycle completed",
-    );
     return report;
   }
 
-  private empty(status: CycleStatus): CycleReport {
-    return {
-      status,
-      rankCount: 0,
-      syncUserCount: 0,
-      metadataUserCount: 0,
-      successUserCount: 0,
-      failedUserCount: 0,
-      scannedAttemptCount: 0,
-      acceptedAttemptCount: 0,
-      insertedAttemptCount: 0,
-      duplicateAttemptCount: 0,
-      errorCode: null,
-    };
-  }
-
-  private failureStatus(code: string, fallback: CycleStatus): CycleStatus {
-    if (code === "login_failed" || code === "auth_required")
-      return "auth_required";
-    if (code === "manual_recovery_required") return "manual_recovery_required";
-    return fallback;
+  private async refreshMetadata(member: RankMember): Promise<void> {
+    const trace = new AccountFlowLog();
+    try {
+      await trace.runStep("metadata_refresh", () =>
+        this.adapters.refreshMetadata(member),
+      );
+      trace.dispose();
+    } catch (error) {
+      const snapshot = trace.failureSnapshot();
+      if (!snapshot) throw error;
+      trace.dispose();
+      throw new AccountFlowFailure(error, snapshot);
+    }
   }
 }
