@@ -2,6 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { CollectorService } from "./application/service.js";
 import { SyncCycle } from "./application/sync-cycle.js";
 import type { CollectorConfig } from "./config.js";
+import { CycleLifecycleReporter } from "./cycle-lifecycle-reporter.js";
 import {
   CollectorIncidentFactory,
   EmergencyWebhookNotifier,
@@ -13,7 +14,13 @@ import { DiscordWebhookClient } from "./webhook.js";
 
 type CycleFactory = (
   runtime: ConstructorParameters<typeof SyncCycle>[0],
-) => Pick<SyncCycle, "run" | "close">;
+) => Pick<SyncCycle, "run" | "close"> & {
+  readonly currentStage?: () => string | undefined;
+};
+type RuntimeScheduling = Pick<
+  ConstructorParameters<typeof CollectorService>[0],
+  "delay" | "now"
+>;
 
 /** collector 프로세스 수명과 health 상태를 소유하고 cycle 업무는 SyncCycle에 위임한다. */
 export class CollectorRuntime {
@@ -21,6 +28,7 @@ export class CollectorRuntime {
     private readonly config: CollectorConfig,
     private readonly createCycle: CycleFactory = (runtime) =>
       new SyncCycle(runtime),
+    private readonly scheduling: RuntimeScheduling = {},
   ) {}
 
   async run(): Promise<void> {
@@ -44,6 +52,12 @@ export class CollectorRuntime {
       logger,
       randomSeed: config.randomSeed,
     });
+    const lifecycle = new CycleLifecycleReporter({
+      url: config.emergencyWebhookUrl,
+      transport: new DiscordWebhookClient(),
+      logger,
+      stage: () => cycle.currentStage?.(),
+    });
     let status: HealthState["status"] = "starting";
     let lastStartedAt: number | null = null;
     let lastCompletedAt: number | null = null;
@@ -57,18 +71,21 @@ export class CollectorRuntime {
       return healthWrites;
     };
     let shutdownTimer: NodeJS.Timeout | undefined;
+    let activeCycle: ReturnType<CycleLifecycleReporter["start"]> | undefined;
     const service = new CollectorService({
       intervalMs: config.intervalMs,
       runOnce: config.runOnce,
+      ...this.scheduling,
       cycle: async (signal) => {
+        let completedAt: number | null = null;
         if (lastStartedAt === null) await updateHealth();
         status = "running";
         lastStartedAt = Date.now();
         await updateHealth();
+        activeCycle = lifecycle.start(new Date(lastStartedAt));
         try {
           const summary = await cycle.run(signal);
-          const incident = incidents.fromCycle(summary);
-          if (incident) await emergencyWebhook.notify(incident, signal);
+          completedAt = Date.now();
           status =
             summary.status === "success" || summary.status === "skipped_overlap"
               ? "idle"
@@ -76,6 +93,12 @@ export class CollectorRuntime {
                   summary.status === "manual_recovery_required"
                 ? summary.status
                 : "failed";
+          lastCompletedAt = completedAt;
+          degraded = status !== "idle";
+          await updateHealth();
+          await lifecycle.complete(activeCycle, summary, new Date(completedAt));
+          const incident = incidents.fromCycle(summary);
+          if (incident) await emergencyWebhook.notify(incident, signal);
         } catch (error) {
           status = "failed";
           const code = errors.code(error);
@@ -88,8 +111,10 @@ export class CollectorRuntime {
             signal,
           );
         } finally {
+          await lifecycle.stop(activeCycle);
+          activeCycle = undefined;
           if (status === "running") status = "failed";
-          lastCompletedAt = Date.now();
+          lastCompletedAt = completedAt ?? Date.now();
           degraded = status !== "idle";
           await updateHealth();
           if (config.runOnce && degraded) process.exitCode = 1;
@@ -114,6 +139,7 @@ export class CollectorRuntime {
     const stop = () => {
       if (shutdownTimer) return;
       logger.info("collector.shutdown_requested");
+      void lifecycle.stop(activeCycle);
       service.stop();
       shutdownTimer = setTimeout(() => {
         logger.error({ code: "shutdown_timeout" }, "collector.shutdown_failed");
@@ -158,6 +184,8 @@ export class CollectorRuntime {
     process.on("SIGINT", stop);
     try {
       logger.info("collector.started");
+      status = "idle";
+      await updateHealth();
       scheduleHeartbeat();
       await service.run();
     } finally {
@@ -168,6 +196,7 @@ export class CollectorRuntime {
         status = "stopped";
         await updateHealth();
         logger.info("collector.stopped");
+        if (config.runOnce && degraded) process.exitCode = 1;
       } finally {
         if (shutdownTimer) clearTimeout(shutdownTimer);
         process.off("SIGTERM", stop);

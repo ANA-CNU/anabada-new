@@ -1,4 +1,5 @@
 import { ChartTooltip } from "./ChartTooltip";
+import { ScoreReasonText } from "@/components/ScoreReasonText";
 import { SquircleSurface } from "@/components/ui/squircle";
 import React, { useState, useEffect } from 'react';
 import { Button } from '../../components/ui/button';
@@ -297,7 +298,7 @@ const UserProfile: React.FC = () => {
                       className="flex items-center justify-between p-3 bg-white/5"
                     >
                       <div className="flex-1">
-                        <div className="text-sm text-gray-300">{record.desc}</div>
+                        <div className="text-sm text-gray-300"><ScoreReasonText>{record.desc}</ScoreReasonText></div>
                         <div className="text-xs text-gray-400">
                           {formatDate(record.created_at)}
                         </div>

@@ -47,7 +47,9 @@ test("Given a partial cycle When creating an incident Then exposes only operatio
   );
 
   assert.equal(result?.code, "rank_mismatch");
-  assert.deepEqual(result?.facts, ["상태: partial / 성공: 1명 / 실패: 1명"]);
+  assert.deepEqual(result?.facts, [
+    "상태: `partial` / 성공: `1`명 / 실패: `1`명",
+  ]);
 });
 
 test("Given a successful cycle When creating an incident Then produces no alert", () => {
@@ -89,6 +91,22 @@ test("Given a collector incident When formatting Then returns an actionable Disc
   assert.match(message, /\*\*오류 코드:\*\* `rank_mismatch`/);
   assert.match(message, /## 즉시 확인/);
   assert.equal(message.includes("2026-09-08 09:00:00 KST"), true);
+});
+
+test("Given scalar Markdown control characters and oversized facts When formatting Then it keeps code spans intact and only includes whole fact lines", () => {
+  const message = new EmergencyAlertFormatter().format({
+    ...incident,
+    code: "rank`mismatch\nnext",
+    actions: ["JUNGOL_USERNAME과 JUNGOL_PASSWORD를 확인하세요."],
+    facts: ["완전한 사실 `one`", "x".repeat(2_000)],
+  });
+
+  assert.match(message, /\*\*오류 코드:\*\* `rankˋmismatch next`/);
+  assert.match(message, /`JUNGOL_USERNAME`과 `JUNGOL_PASSWORD`를 확인하세요\./);
+  assert.match(message, /- 완전한 사실 `one`/);
+  assert.equal(message.includes("x".repeat(2_000)), false);
+  assert.equal(message.length <= 2_000, true);
+  assert.equal((message.match(/`/g) ?? []).length % 2, 0);
 });
 
 test("Given no emergency URL When notifying Then performs no delivery", async () => {
@@ -190,7 +208,7 @@ test("Given an emergency endpoint When notifying Then posts the Markdown payload
   });
   assert.match(
     new EmergencyAlertFormatter().format(tracedIncident),
-    /최초 실패 단계 initial_summary[\s\S]*최근 흐름 initial_summary:failed@1ms:type_error/,
+    /최초 실패 단계 `initial_summary`[\s\S]*최근 흐름 `initial_summary:failed@1ms:type_error`/,
   );
 });
 

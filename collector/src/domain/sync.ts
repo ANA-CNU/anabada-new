@@ -130,4 +130,10 @@ export class ScoreAward {
     readonly scoreDay: string,
     readonly createdAt: Date,
   ) {}
+
+  get description(): string {
+    return this.ruleType === "daily"
+      ? `#${this.problemNumber}를 해결하여, 일일 점수 획득`
+      : `이벤트 ID #event${this.eventId} 문제를 풀어 점수 획득`;
+  }
 }

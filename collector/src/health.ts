@@ -1,6 +1,7 @@
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
+import { CYCLE_UNHEALTHY_AFTER_MS } from "./cycle-lifecycle-reporter.js";
 
 const healthSchema = z
   .object({
@@ -23,6 +24,8 @@ export type HealthState = z.infer<typeof healthSchema>;
 
 /** Docker healthcheck가 읽는 상태 파일을 원자적으로 쓰고 검증한다. */
 export class CollectorHealthStore {
+  constructor(private readonly now: () => number = Date.now) {}
+
   async write(
     profileDir: string,
     state: Omit<HealthState, "updatedAt">,
@@ -30,7 +33,7 @@ export class CollectorHealthStore {
     const path = join(profileDir, "collector-health.json");
     await writeFile(
       `${path}.tmp`,
-      JSON.stringify({ ...state, updatedAt: Date.now() }),
+      JSON.stringify({ ...state, updatedAt: this.now() }),
       { mode: 0o600 },
     );
     await rename(`${path}.tmp`, path);
@@ -43,14 +46,14 @@ export class CollectorHealthStore {
           await readFile(join(profileDir, "collector-health.json"), "utf8"),
         ),
       );
-      const age = Date.now() - state.updatedAt;
+      const age = this.now() - state.updatedAt;
       return (
         age >= 0 &&
         age <= maxAgeMs &&
         !state.degraded &&
         (state.status !== "running" ||
           (state.lastStartedAt !== null &&
-            Date.now() - state.lastStartedAt <= 1800000)) &&
+            this.now() - state.lastStartedAt < CYCLE_UNHEALTHY_AFTER_MS)) &&
         (state.status === "running" || state.status === "idle")
       );
     } catch (error) {

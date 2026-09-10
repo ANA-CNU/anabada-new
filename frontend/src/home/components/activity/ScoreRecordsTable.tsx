@@ -8,6 +8,7 @@ import type { ScoreRecord } from './types';
 import { formatRelativeTime, formatExactTime, getScoreColor } from './types';
 import { URL } from "@/resource/constant";
 import type { RecentScore } from "@/types";
+import { ScoreReasonText } from "@/components/ScoreReasonText";
 
 interface ScoreRecordsTableProps {
   records: ScoreRecord[];
@@ -128,7 +129,7 @@ function ScoreRecordsTable({ records }: ScoreRecordsTableProps) {
           </TableHeader>
           <TableBody>
             {items.map((record) => (
-              <Tooltip key={record.id}>
+              <Tooltip disableHoverableContent={false} key={record.id}>
                 <TooltipTrigger asChild>
                   <TableRow className="border-white/10 hover:bg-white/5 cursor-help">
                     <TableCell className="text-white font-medium">{record.user}</TableCell>
@@ -160,7 +161,7 @@ function ScoreRecordsTable({ records }: ScoreRecordsTableProps) {
                   <div className="text-sm">
                     <div className="font-semibold">획득 이유:</div>
                     <div className="text-xs text-gray-300">
-                      {record.reason}
+                      <ScoreReasonText>{record.reason}</ScoreReasonText>
                     </div>
                   </div>
                 </TooltipContent>

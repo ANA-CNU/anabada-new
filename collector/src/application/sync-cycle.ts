@@ -42,6 +42,8 @@ export class SyncCycle {
   private session: JungolSession | undefined;
   private readonly requests = new JungolRequestCoordinator();
   private readonly metadata: ProblemMetadataResolver;
+  private flow: CycleFlowLog | undefined;
+  private groupExecutor: GroupCycleExecutor | undefined;
 
   constructor(private readonly runtime: Runtime) {
     this.metadata = new ProblemMetadataResolver(runtime.config, this.requests);
@@ -53,11 +55,16 @@ export class SyncCycle {
     this.session = undefined;
   }
 
+  currentStage(): string | undefined {
+    return this.groupExecutor?.currentStage() ?? this.flow?.currentStep();
+  }
+
   async run(signal: AbortSignal) {
     const { config, credentials, pool, logger, randomSeed } = this.runtime;
     const reports = new GroupCycleReportMapper();
     const leases = new CycleLeaseManager(pool);
     const trace = new CycleFlowLog();
+    this.flow = trace;
     let lease: Awaited<ReturnType<CycleLeaseManager["acquire"]>> | null = null;
     let browser: GroupRuntimeBrowser | undefined;
     let groupResult: GroupCycleResult | undefined;
@@ -126,7 +133,11 @@ export class SyncCycle {
         await trace.runStep("login", async () =>
           (await session()).ensureLogin(credentials, signal),
         );
-        groupResult = await new GroupCycleExecutor(group).run(signal);
+        const executor = new GroupCycleExecutor(group);
+        this.groupExecutor = executor;
+        groupResult = await trace.runStep("worker_completion", () =>
+          executor.run(signal),
+        );
         report = reports.result(groupResult);
       }
     } catch (error) {
@@ -151,6 +162,8 @@ export class SyncCycle {
         }
         this.metadata.clearCycle();
         trace.dispose();
+        this.flow = undefined;
+        this.groupExecutor = undefined;
       }
     }
     const [failure] = report.commonFailures;

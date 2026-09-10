@@ -59,7 +59,7 @@ export class ScoreHistoryRepository {
         award.awardKey,
         award.scoreDay,
         award.eventId,
-        award.ruleType,
+        award.description,
         award.createdAt,
       ],
     );

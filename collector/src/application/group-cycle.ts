@@ -77,11 +77,18 @@ export class GroupCycleFailure extends Error {
 }
 
 export class GroupCycleExecutor {
+  private flow: GroupCycleFlowLog | undefined;
+
   constructor(private readonly adapters: GroupCycleAdapters) {}
+
+  currentStage(): GroupCycleFlowStep | undefined {
+    return this.flow?.currentStep();
+  }
 
   async run(signal: AbortSignal): Promise<GroupCycleResult> {
     signal.throwIfAborted();
     const trace = new GroupCycleFlowLog();
+    this.flow = trace;
     try {
       const phase = await trace.runStep("group_phase", () =>
         this.adapters.phase(signal),
@@ -156,6 +163,7 @@ export class GroupCycleExecutor {
       throw error;
     } finally {
       trace.dispose();
+      this.flow = undefined;
     }
   }
 }
