@@ -107,5 +107,7 @@ jobs:
           mv -f .env.next .env
           docker compose --env-file .env -f docker-compose.prod.yaml config --quiet
           timeout 1200 docker compose --env-file .env -f docker-compose.prod.yaml up -d --build --remove-orphans --wait --wait-timeout 180
+          # 변경되지 않은 nginx도 이전 backend 컨테이너 IP를 계속 가리킬 수 있어 배포마다 재시작한다.
+          timeout 60 docker compose --env-file .env -f docker-compose.prod.yaml restart bada-nginx
           docker compose --env-file .env -f docker-compose.prod.yaml ps
           DEPLOY

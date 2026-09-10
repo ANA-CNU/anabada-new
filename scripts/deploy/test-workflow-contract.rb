@@ -64,6 +64,12 @@ remote_deploy = /<<'DEPLOY'\n(?<script>.*?)\nDEPLOY\n\z/m.match(deploy)&.[](:scr
 check(!remote_deploy.nil?, 'Deployment must retain the remote deployment shell')
 check(remote_deploy.include?('export COMPOSE_BAKE=false'), 'Remote deployment shell must disable Compose Bake delegation')
 check(remote_deploy.index('export COMPOSE_BAKE=false') < remote_deploy.index('docker compose --env-file .env -f docker-compose.prod.yaml up '), 'Remote deployment shell must disable Compose Bake before its canonical Compose up')
+compose_config = 'docker compose --env-file .env -f docker-compose.prod.yaml config --quiet'
+compose_up = 'timeout 1200 docker compose --env-file .env -f docker-compose.prod.yaml up -d --build --remove-orphans --wait --wait-timeout 180'
+compose_restart = 'timeout 60 docker compose --env-file .env -f docker-compose.prod.yaml restart bada-nginx'
+compose_ps = 'docker compose --env-file .env -f docker-compose.prod.yaml ps'
+check(remote_deploy.scan(Regexp.new(Regexp.escape(compose_restart))).length == 1, 'Deployment must restart nginx exactly once')
+check(remote_deploy.index(compose_config) < remote_deploy.index(compose_up) && remote_deploy.index(compose_up) < remote_deploy.index(compose_restart) && remote_deploy.index(compose_restart) < remote_deploy.index(compose_ps), 'Deployment Compose sequence must be config, up, nginx restart, then ps')
 check(remote_deploy.include?('git -C "$repository" rev-parse --is-inside-work-tree'), 'Existing deployment path must be a Git working tree')
 check(remote_deploy.include?('Deployment repository path is not a Git working tree'), 'Non-Git deployment path must fail safely')
 
@@ -144,7 +150,15 @@ Dir.mktmpdir('deployment-git-contract-') do |dir|
   check(system('git', '-C', seed, '-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'first'), 'Cannot commit disposable source repository')
   check(system('git', '-C', seed, 'remote', 'add', 'origin', origin), 'Cannot add disposable source remote')
   check(system('git', '-C', seed, 'push', 'origin', 'main'), 'Cannot push disposable source repository')
-  File.write(docker, "#!/usr/bin/env bash\nprintf '%s\\n' \"$*\" >> \"$COMPOSE_LOG\"\n")
+  File.write(docker, <<~'SH')
+    #!/usr/bin/env bash
+    set -euo pipefail
+    printf '%s\n' "$*" >> "$COMPOSE_LOG"
+    case "${MOCK_COMPOSE_FAILURE:-}" in
+      up) if [[ "$*" == *' up '* ]]; then exit 71; fi ;;
+      restart) if [[ "$*" == *' restart bada-nginx' ]]; then exit 72; fi ;;
+    esac
+  SH
   File.chmod(0700, docker)
   File.write(timeout, "#!/usr/bin/env bash\nshift\nexec \"$@\"\n")
   File.chmod(0700, timeout)
@@ -154,6 +168,12 @@ Dir.mktmpdir('deployment-git-contract-') do |dir|
     File.write(File.join(transit, '.env'), "DB_PASSWORD=fixture\n")
   end
   command_env = { 'PATH' => "#{dir}:#{ENV.fetch('PATH')}", 'COMPOSE_LOG' => compose_log }
+  compose_sequence = [
+    'compose --env-file .env -f docker-compose.prod.yaml config --quiet',
+    'compose --env-file .env -f docker-compose.prod.yaml up -d --build --remove-orphans --wait --wait-timeout 180',
+    'compose --env-file .env -f docker-compose.prod.yaml restart bada-nginx',
+    'compose --env-file .env -f docker-compose.prod.yaml ps'
+  ]
 
   write_transit.call
   _, errors, status = Open3.capture3(command_env, 'bash', '-se', '--', transit, stdin_data: fixture)
@@ -161,7 +181,7 @@ Dir.mktmpdir('deployment-git-contract-') do |dir|
   check(File.exist?(File.join(repository, '.git')), 'Fresh deployment did not clone main')
   history, _, history_status = Open3.capture3('git', '-C', repository, 'rev-list', '--count', 'HEAD')
   check(history_status.success? && history.strip == '1', 'Fresh deployment is not shallow')
-  check(File.readlines(compose_log).length == 3, 'Fresh clone did not reach exactly one Compose deployment sequence')
+  check(File.readlines(compose_log).map(&:strip) == compose_sequence, 'Fresh clone Compose sequence must restart nginx after up')
 
   File.write(File.join(repository, 'local-untracked'), "preserve\n")
   FileUtils.mkdir_p(File.join(repository, 'database', 'mysql_data'))
@@ -179,6 +199,21 @@ Dir.mktmpdir('deployment-git-contract-') do |dir|
   check(history_status.success? && history.strip == '1', 'Existing deployment is not shallow after reset')
   check(File.read(File.join(repository, 'local-untracked')) == "preserve\n", 'Existing checkout lost an untracked file')
   check(File.read(File.join(repository, 'database', 'mysql_data', 'sentinel')) == "preserve\n", 'Existing checkout lost untracked database data')
+  check(File.readlines(compose_log).last(4).map(&:strip) == compose_sequence, 'Existing checkout Compose sequence must restart nginx after up')
+
+  write_transit.call
+  calls_before_up_failure = File.readlines(compose_log).length
+  _, _, status = Open3.capture3(command_env.merge('MOCK_COMPOSE_FAILURE' => 'up'), 'bash', '-se', '--', transit, stdin_data: fixture)
+  check(!status.success?, 'Compose up failure must stop deployment')
+  failed_up_calls = File.readlines(compose_log).drop(calls_before_up_failure).map(&:strip)
+  check(failed_up_calls.any? { |call| call.include?(' up ') } && failed_up_calls.none? { |call| call.include?(' restart bada-nginx') || call.end_with?(' ps') }, 'Compose up failure must prevent nginx restart and ps')
+
+  write_transit.call
+  calls_before_restart_failure = File.readlines(compose_log).length
+  _, _, status = Open3.capture3(command_env.merge('MOCK_COMPOSE_FAILURE' => 'restart'), 'bash', '-se', '--', transit, stdin_data: fixture)
+  check(!status.success?, 'Nginx restart failure must propagate nonzero')
+  failed_restart_calls = File.readlines(compose_log).drop(calls_before_restart_failure).map(&:strip)
+  check(failed_restart_calls.any? { |call| call.include?(' restart bada-nginx') } && failed_restart_calls.none? { |call| call.end_with?(' ps') }, 'Nginx restart failure must prevent ps')
 
   non_git = File.join(dir, 'non-git')
   Dir.mkdir(non_git)
