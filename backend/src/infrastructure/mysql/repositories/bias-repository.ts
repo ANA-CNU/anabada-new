@@ -3,7 +3,7 @@ import type { DatabaseExecutor } from "../database-session.js";
 import { sqlOperations } from "../database-session.js";
 
 const operations = {
-  clear: sqlOperations.biasClear,
+  lockUsers: sqlOperations.biasLockUsers,
   aggregate: sqlOperations.biasAggregate,
   insert: sqlOperations.biasInsert,
   list: sqlOperations.biasList,
@@ -29,30 +29,39 @@ export type BiasUser = Readonly<z.output<typeof biasUserSchema>>;
 export class BiasRepository {
   constructor(private readonly database: DatabaseExecutor) {}
   async replaceTotals(beginUtc: Date, endUtc: Date): Promise<number> {
-    await this.database.execute(
-      operations.clear,
-      "DELETE FROM user_bias_total",
+    const scoreMonth = new Date(beginUtc.getTime() + 9 * 60 * 60 * 1_000)
+      .toISOString()
+      .slice(0, 7)
+      .concat("-01");
+    await this.database.select(
+      operations.lockUsers,
+      "SELECT id FROM user ORDER BY id ASC FOR UPDATE",
       [],
+      z.object({ id: z.coerce.number().int().positive() }),
     );
     const totals = await this.database.select(
       operations.aggregate,
-      "SELECT user_id, COALESCE(SUM(bias), 0) AS total_point FROM score_history WHERE created_at >= ? AND created_at < ? GROUP BY user_id",
+      "SELECT u.id AS user_id, COALESCE(SUM(s.bias), 0) AS total_point FROM user u LEFT JOIN score_history s ON s.user_id = u.id AND s.created_at >= ? AND s.created_at < ? GROUP BY u.id",
       [beginUtc, endUtc],
       aggregateSchema,
     );
     if (totals.length === 0) return 0;
     await this.database.execute(
       operations.insert,
-      `INSERT INTO user_bias_total (user_id, total_point) VALUES ${totals.map(() => "(?, ?)").join(", ")}`,
-      totals.flatMap((total) => [total.user_id, total.total_point]),
+      `INSERT INTO user_bias_total (user_id, score_month, total_point) VALUES ${totals.map(() => "(?, ?, ?)").join(", ")} ON DUPLICATE KEY UPDATE score_month=VALUES(score_month),total_point=VALUES(total_point)`,
+      totals.flatMap((total) => [total.user_id, scoreMonth, total.total_point]),
     );
     return totals.length;
   }
-  async list(): Promise<readonly BiasUser[]> {
+  async list(now: Date): Promise<readonly BiasUser[]> {
+    const scoreMonth = new Date(now.getTime() + 9 * 60 * 60 * 1_000)
+      .toISOString()
+      .slice(0, 7)
+      .concat("-01");
     return this.database.select(
       operations.list,
-      "SELECT u.id AS user_id, u.jungol_name, u.korean_name, u.jungol_name AS display_name, COALESCE(ubt.total_point, 0) AS total_point, ubt.updated_at FROM user u LEFT JOIN user_bias_total ubt ON ubt.user_id = u.id ORDER BY total_point DESC, u.jungol_name ASC",
-      [],
+      "SELECT u.id AS user_id, u.jungol_name, u.korean_name, u.jungol_name AS display_name, COALESCE(ubt.total_point, 0) AS total_point, ubt.updated_at FROM user u LEFT JOIN user_bias_total ubt ON ubt.user_id = u.id AND ubt.score_month=? ORDER BY total_point DESC, u.jungol_name ASC",
+      [scoreMonth],
       biasUserSchema,
     );
   }

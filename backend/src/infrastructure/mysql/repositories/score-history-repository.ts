@@ -12,10 +12,12 @@ const operations = {
   list: sqlOperations.scoreHistoryList,
   update: sqlOperations.scoreHistoryUpdate,
   remove: sqlOperations.scoreHistoryRemove,
+  owner: sqlOperations.scoreHistoryOwner,
 } as const;
 
 const existsSchema = z.object({ id: z.coerce.number().int().positive() });
 const totalSchema = z.object({ total: z.coerce.number().int().nonnegative() });
+const ownerSchema = z.object({ user_id: z.coerce.number().int().positive() });
 const utcDate = z.date().transform((value) => value.toISOString());
 const scoreDay = z
   .date()
@@ -109,6 +111,16 @@ export class ScoreHistoryRepository {
     );
   }
 
+  async findOwner(id: number): Promise<number | null> {
+    const owner = await this.database.selectOne(
+      operations.owner,
+      "SELECT user_id FROM score_history WHERE id = ?",
+      [id],
+      ownerSchema,
+    );
+    return owner?.user_id ?? null;
+  }
+
   async list(
     page: number,
     limit: number,
@@ -135,7 +147,11 @@ export class ScoreHistoryRepository {
     return { total: total?.total ?? 0, data };
   }
 
-  async update(id: number, patch: ScoreHistoryPatch): Promise<boolean> {
+  async updateForUser(
+    id: number,
+    userId: number,
+    patch: ScoreHistoryPatch,
+  ): Promise<boolean> {
     const entries = Object.entries(patch) as readonly (readonly [
       keyof ScoreHistoryPatch,
       string | number | null,
@@ -146,19 +162,21 @@ export class ScoreHistoryRepository {
       event_id: "event_id",
       problem_id: "problem_id",
     };
-    const sql = `UPDATE score_history SET ${entries.map(([field]) => `${columns[field]} = ?`).join(", ")} WHERE id = ?`;
+    if (entries.length === 0) return false;
+    const sql = `UPDATE score_history SET ${entries.map(([field]) => `${columns[field]} = ?`).join(", ")} WHERE id = ? AND user_id = ?`;
     const result = await this.database.execute(operations.update, sql, [
       ...entries.map(([, value]) => value),
       id,
+      userId,
     ]);
     return result.affectedRows === 1;
   }
 
-  async remove(id: number): Promise<boolean> {
+  async removeForUser(id: number, userId: number): Promise<boolean> {
     const result = await this.database.execute(
       operations.remove,
-      "DELETE FROM score_history WHERE id = ?",
-      [id],
+      "DELETE FROM score_history WHERE id = ? AND user_id = ?",
+      [id, userId],
     );
     return result.affectedRows === 1;
   }

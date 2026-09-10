@@ -1,10 +1,10 @@
 import { z } from "zod";
 
 export const submissionIdSchema = z
-  .number()
-  .int()
-  .positive()
-  .max(Number.MAX_SAFE_INTEGER)
+  .union([
+    z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+    z.string().regex(/^[1-9][0-9]*$/),
+  ])
   .transform(String)
   .brand("SubmissionId");
 export const problemIdSchema = z.number().int().positive().brand("ProblemId");

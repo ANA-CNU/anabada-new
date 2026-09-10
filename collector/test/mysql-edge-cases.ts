@@ -81,6 +81,7 @@ const makeInput = (
         problemId: problemIdSchema.parse(problem),
         problemName: null,
         problemTier: 0,
+        estimatedTier: 0,
         score: 100,
         submittedAt: new Date(time),
       },

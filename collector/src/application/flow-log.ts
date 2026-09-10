@@ -150,3 +150,19 @@ export class CycleFlowLog extends FlowLog<CycleFlowStep> {
     super(clock);
   }
 }
+
+export type GroupCycleFlowStep =
+  | "group_phase"
+  | "group_members"
+  | "group_checkpoint"
+  | "group_initialize"
+  | "group_scan"
+  | "group_settlement"
+  | "group_finalize"
+  | "monthly_cache"
+  | "projection";
+export class GroupCycleFlowLog extends FlowLog<GroupCycleFlowStep> {
+  constructor(clock: () => number = () => performance.now()) {
+    super(clock);
+  }
+}

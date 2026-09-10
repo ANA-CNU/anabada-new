@@ -41,7 +41,7 @@ test("Given a ready schema When health is requested Then it returns a UTC timest
   });
 });
 
-test("Given migration 002 schema When checking required tables Then uses its exact application table set", () => {
+test("Given migration 003 schema When checking required tables Then uses its exact application table set", () => {
   expect(requiredApplicationTables).toEqual([
     "event",
     "event_problem",
@@ -70,6 +70,23 @@ test("Given a health repository When issuing readiness and schema probes Then as
   const repository = new HealthRepository(database);
   await repository.ready();
   await repository.hasRequiredTables();
+});
+
+test("Given a health repository When checking schema migration Then requires migration 003", async () => {
+  let migrationValues: readonly unknown[] = [];
+  const database: DatabaseExecutor = {
+    select: async () => [],
+    selectOne: async (operation, _sql, values) => {
+      expect(operation.id).toBe(sqlOperations.healthMigrations.id);
+      migrationValues = values;
+      return undefined;
+    },
+    execute: async () => ({ affectedRows: 0, insertId: 0 }),
+  };
+  await expect(new HealthRepository(database).hasRequiredMigration()).resolves.toBe(
+    false,
+  );
+  expect(migrationValues).toEqual([3]);
 });
 
 test("Given a non-resolving health probe When its timer expires Then returns one sanitized unavailable incident", async () => {

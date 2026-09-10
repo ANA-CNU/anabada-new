@@ -74,7 +74,7 @@ export class ScoreHistoryRepository {
       existing.userId !== award.userId ||
       existing.eventId !== award.eventId ||
       existing.ruleType !== award.ruleType ||
-      existing.scoreDay !== award.scoreDay ||
+      (award.ruleType === "daily" && existing.scoreDay !== award.scoreDay) ||
       (award.ruleType === "daily"
         ? existing.problemId !== award.problemRowId
         : existing.problemNumber !== award.problemNumber)
@@ -92,9 +92,10 @@ export class BiasRepository {
 
   async refreshUser(userId: number, now: Date): Promise<void> {
     const [start, end] = this.calendar.monthWindow(now);
+    const scoreMonth = `${this.calendar.day(now).slice(0, 7)}-01`;
     await this.connection.execute(
-      "INSERT INTO user_bias_total (user_id, total_point) SELECT ?, COALESCE(SUM(bias),0) FROM score_history WHERE user_id=? AND created_at>=? AND created_at<? ON DUPLICATE KEY UPDATE total_point=VALUES(total_point)",
-      [userId, userId, start, end],
+      "INSERT INTO user_bias_total (user_id,score_month,total_point) SELECT ?,?,COALESCE(SUM(bias),0) FROM score_history WHERE user_id=? AND created_at>=? AND created_at<? ON DUPLICATE KEY UPDATE score_month=VALUES(score_month),total_point=VALUES(total_point)",
+      [userId, scoreMonth, userId, start, end],
     );
   }
 }

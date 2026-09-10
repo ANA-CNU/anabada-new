@@ -262,7 +262,7 @@ async function seedPreview(connection: PoolConnection): Promise<void> {
       ),
     );
     await connection.execute(
-      `INSERT INTO user_bias_total (user_id, total_point, updated_at) VALUES ${previewUsers.map(() => "(?, ?, '2026-09-09 00:00:00')").join(", ")}`,
+      `INSERT INTO user_bias_total (user_id, score_month, total_point, updated_at) VALUES ${previewUsers.map(() => "(?, '2026-09-01', ?, '2026-09-09 00:00:00')").join(", ")}`,
       previewUsers.flatMap((user) => [user.id, user.totalPoint]),
     );
     await connection.commit();

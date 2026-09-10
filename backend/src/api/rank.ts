@@ -28,6 +28,14 @@ function bad(): Response {
 function range(d: RankingRouteDependencies) {
   return d.calendar.monthRange(d.clock.now());
 }
+function scoreMonthFromStart(start: Date): string {
+  return new Date(start.getTime() + 9 * 60 * 60 * 1_000)
+    .toISOString()
+    .slice(0, 10);
+}
+function currentScoreMonth(d: RankingRouteDependencies): string {
+  return scoreMonthFromStart(range(d)[0]);
+}
 function priorRange(d: RankingRouteDependencies) {
   const [start] = range(d);
   return d.calendar.monthRange(new Date(start.getTime() - 1));
@@ -58,20 +66,20 @@ export function createRankingRoutes(d: RankingRouteDependencies) {
     })
     .get("/api/ranking/bias", async () => ({
       success: true,
-      data: await read(d, (r) => r.bias()),
+      data: await read(d, (r) => r.bias(currentScoreMonth(d))),
       message: "가중치 랭킹 조회 성공",
     }))
     .get("/api/v2/ranking/bias", async () => {
       const [s, e] = range(d);
       return {
         success: true,
-        data: await read(d, (r) => r.latestBias(s, e)),
+        data: await read(d, (r) => r.latestBias(s, e, scoreMonthFromStart(s))),
         message: "가중치 랭킹(v2) 조회 성공",
       };
     })
     .get("/api/board/latest", async () => ({
       success: true,
-      data: await read(d, (r) => r.latestBoard()),
+      data: await read(d, (r) => r.latestBoard(currentScoreMonth(d))),
       message: "최신 랭킹 보드 조회 성공",
     }))
     .get("/api/board/recently-date", async () => ({

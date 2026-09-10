@@ -102,27 +102,28 @@ export class RankingRepository {
       monthlySolvedRow,
     );
   }
-  bias() {
+  /** 현재 KST 월 캐시만 사용해 이월된 합계가 순위 응답에 섞이지 않게 한다. */
+  bias(scoreMonth: string) {
     return this.database.select(
       operation("ranking.bias"),
-      "SELECT u.jungol_name AS display_name, u.jungol_name, u.korean_name, u.tier, ub.total_point AS bias FROM user u JOIN user_bias_total ub ON ub.user_id = u.id WHERE ub.total_point > 0 ORDER BY ub.total_point DESC",
-      [],
+      "SELECT u.jungol_name AS display_name, u.jungol_name, u.korean_name, u.tier, ub.total_point AS bias FROM user u JOIN user_bias_total ub ON ub.user_id = u.id AND ub.score_month=? WHERE ub.total_point > 0 ORDER BY ub.total_point DESC",
+      [scoreMonth],
       biasRow,
     );
   }
-  latestBias(start: Date, end: Date) {
+  latestBias(start: Date, end: Date, scoreMonth: string) {
     return this.database.select(
       operation("ranking.bias_v2"),
-      `WITH latest_board AS (SELECT id FROM ranking_boards ORDER BY id DESC LIMIT 1), previous_board AS (SELECT id FROM ranking_boards WHERE id < (SELECT id FROM latest_board) ORDER BY id DESC LIMIT 1), monthly_problems AS (SELECT user_id, COUNT(*) AS monthly_problem FROM problem WHERE repeatation = 0 AND verdict = 'accepted' AND submitted_at >= ? AND submitted_at < ? GROUP BY user_id) SELECT u.jungol_name AS display_name, u.jungol_name, u.korean_name, u.tier, lr.rank, COALESCE(pr.rank - lr.rank, 0) AS delta, u.corrects AS total_problem, COALESCE(ubt.total_point, 0) AS bias, COALESCE(mp.monthly_problem, 0) AS monthly_problem FROM ranked_users lr JOIN latest_board lb ON lr.board_id = lb.id JOIN user u ON u.id = lr.user_id LEFT JOIN ranked_users pr ON pr.user_id = lr.user_id AND pr.board_id = (SELECT id FROM previous_board) LEFT JOIN user_bias_total ubt ON ubt.user_id = u.id LEFT JOIN monthly_problems mp ON mp.user_id = u.id ORDER BY lr.rank`,
-      [start, end],
+      `WITH latest_board AS (SELECT id FROM ranking_boards ORDER BY id DESC LIMIT 1), previous_board AS (SELECT id FROM ranking_boards WHERE id < (SELECT id FROM latest_board) ORDER BY id DESC LIMIT 1), monthly_problems AS (SELECT user_id, COUNT(*) AS monthly_problem FROM problem WHERE repeatation = 0 AND verdict = 'accepted' AND submitted_at >= ? AND submitted_at < ? GROUP BY user_id) SELECT u.jungol_name AS display_name, u.jungol_name, u.korean_name, u.tier, lr.rank, COALESCE(pr.rank - lr.rank, 0) AS delta, u.corrects AS total_problem, COALESCE(ubt.total_point, 0) AS bias, COALESCE(mp.monthly_problem, 0) AS monthly_problem FROM ranked_users lr JOIN latest_board lb ON lr.board_id = lb.id JOIN user u ON u.id = lr.user_id LEFT JOIN ranked_users pr ON pr.user_id = lr.user_id AND pr.board_id = (SELECT id FROM previous_board) LEFT JOIN user_bias_total ubt ON ubt.user_id = u.id AND ubt.score_month=? LEFT JOIN monthly_problems mp ON mp.user_id = u.id ORDER BY lr.rank`,
+      [start, end, scoreMonth],
       latestBiasRow,
     );
   }
-  latestBoard() {
+  latestBoard(scoreMonth: string) {
     return this.database.select(
       operation("ranking.board_latest"),
-      "SELECT u.jungol_name AS display_name, u.jungol_name, u.korean_name, u.tier, COALESCE(ub.total_point, 0) AS bias, ru.rank FROM ranked_users ru JOIN user u ON u.id = ru.user_id LEFT JOIN user_bias_total ub ON ub.user_id = u.id WHERE ru.board_id = (SELECT id FROM ranking_boards ORDER BY created_at DESC LIMIT 1) ORDER BY ru.rank",
-      [],
+      "SELECT u.jungol_name AS display_name, u.jungol_name, u.korean_name, u.tier, COALESCE(ub.total_point, 0) AS bias, ru.rank FROM ranked_users ru JOIN user u ON u.id = ru.user_id LEFT JOIN user_bias_total ub ON ub.user_id = u.id AND ub.score_month=? WHERE ru.board_id = (SELECT id FROM ranking_boards ORDER BY created_at DESC LIMIT 1) ORDER BY ru.rank",
+      [scoreMonth],
       boardRow,
     );
   }

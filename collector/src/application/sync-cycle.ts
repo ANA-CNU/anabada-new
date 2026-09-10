@@ -1,23 +1,17 @@
 import type { Pool } from "mysql2/promise";
 import type { Logger } from "pino";
 import { AccountInitializationService } from "../account-initialization.js";
-import { AccountSyncService } from "../account-sync.js";
+import { AccountSettlementService } from "../account-settlement.js";
 import type { CollectorConfig, Credentials } from "../config.js";
-import type { ProblemId } from "../domain.js";
-import { AccountSummaryCollector } from "../jungol/account-summary.js";
-import {
-  type ProblemMetadata,
-  ProblemMetadataResolver,
-} from "../jungol/metadata.js";
+import { GroupFeedCollector } from "../jungol/group-feed.js";
+import { ProblemMetadataResolver } from "../jungol/metadata.js";
+import { AccountProfileCollector } from "../jungol/profile.js";
 import { RankCollector } from "../jungol/rank.js";
 import { JungolRequestCoordinator } from "../jungol/request-coordinator.js";
 import { JungolSession } from "../jungol/session.js";
-import { SubmissionCollector } from "../jungol/submission.js";
-import { SubmissionCursorCollector } from "../jungol/submission-cursor.js";
 import { HookRepository } from "../mysql/hooks.js";
 import { CycleLeaseManager } from "../mysql/lease.js";
 import { AccountUnitOfWork } from "../mysql/unit-of-work.js";
-import { UserRepository } from "../mysql/users.js";
 import { ProjectionService } from "../projection.js";
 import { KstCalendar } from "../scoring/daily.js";
 import { WeightedRankingPolicy } from "../scoring/ranking.js";
@@ -28,9 +22,12 @@ import {
   WebhookBroadcaster,
   WebhookMessageFormatter,
 } from "../webhook.js";
-import type { CycleAdapters } from "./cycle-types.js";
-import { SyncCycleExecutor } from "./execute-cycle.js";
-import { MetadataRefreshService } from "./metadata-refresh.js";
+import type { CycleReport } from "./cycle-types.js";
+import { CycleFlowLog } from "./flow-log.js";
+import { GroupCycleExecutor, type GroupCycleResult } from "./group-cycle.js";
+import { GroupCycleReportMapper } from "./group-cycle-report.js";
+import { GroupRuntime } from "./group-runtime.js";
+import { GroupRuntimeBrowser } from "./group-runtime-browser.js";
 
 type Runtime = {
   readonly config: CollectorConfig;
@@ -39,119 +36,147 @@ type Runtime = {
   readonly logger: Logger;
   readonly randomSeed: string;
 };
-/** 브라우저 세션과 cycle 의존성을 조립하되 사용자 transaction에는 직접 관여하지 않는다. */
+
+/** lease를 먼저 확보한 뒤 browser/session을 열어 GroupRuntime 한 cycle을 조립·정리한다. */
 export class SyncCycle {
   private session: JungolSession | undefined;
   private readonly requests = new JungolRequestCoordinator();
   private readonly metadata: ProblemMetadataResolver;
+
   constructor(private readonly runtime: Runtime) {
     this.metadata = new ProblemMetadataResolver(runtime.config, this.requests);
   }
+
   async close(): Promise<void> {
     this.requests.close();
     await this.session?.close();
     this.session = undefined;
   }
+
   async run(signal: AbortSignal) {
-    this.metadata.clearCycle();
     const { config, credentials, pool, logger, randomSeed } = this.runtime;
-    const session = async () => {
-      this.session ??= await JungolSession.launch(config, this.requests);
-      return this.session;
-    };
-    const calendar = new KstCalendar();
-    const ratingTierMapper = new AcRatingTierMapper();
-    const unitOfWork = new AccountUnitOfWork(pool, calendar);
-    const persist = new AccountSyncService(
-      unitOfWork,
-      calendar,
-      ratingTierMapper,
-    );
-    const initialize = new AccountInitializationService(
-      unitOfWork,
-      ratingTierMapper,
-    );
-    const metadataRefresh = new MetadataRefreshService(
-      unitOfWork,
-      ratingTierMapper,
-    );
-    const lease = new CycleLeaseManager(pool);
-    const projection = new ProjectionService(
-      pool,
-      calendar,
-      new WeightedRankingPolicy(),
-      randomSeed,
-    );
-    const projectionNotification = new ProjectionNotificationService(
-      projection,
-      new WebhookBroadcaster(
-        new HookRepository(pool),
-        new DiscordWebhookClient(),
-        new WebhookMessageFormatter(),
-        logger,
-      ),
-    );
-    const rank = new RankCollector(config, this.requests, ratingTierMapper);
-    const submissions = new SubmissionCollector(config, this.requests);
-    const submissionCursor = new SubmissionCursorCollector(
-      config,
-      this.requests,
-    );
-    const summary = new AccountSummaryCollector(config, this.requests);
-    const metadata = new Map<ProblemId, Promise<ProblemMetadata>>();
-    const adapters: CycleAdapters = {
-      lease: () => lease.acquire(),
-      stored: async () => {
-        const connection = await pool.getConnection();
-        try {
-          return new Map(
-            (await new UserRepository(connection).readAll()).map((user) => [
-              user.accountId,
-              {
-                solvedCount: user.solvedCount,
-                lastSubmissionId: BigInt(user.cursor),
-              },
-            ]),
-          );
-        } finally {
-          connection.release();
-        }
-      },
-      login: async (signal) => {
-        await (await session()).ensureLogin(credentials, signal);
-      },
-      rank: async (signal) => {
-        const page = await (await session()).newPage();
-        try {
-          return await rank.collect(page, config.groupId, signal);
-        } finally {
-          await page.close();
-        }
-      },
-      browser: async () => {
-        const page = await (await session()).newPage();
-        return {
-          summary: (plan, signal) => summary.collect(page, plan, signal),
-          cursor: (plan, signal) =>
-            submissionCursor.collect(page, plan, signal),
-          collect: (plan, signal) => submissions.collect(page, plan, signal),
-          metadata: (id, signal) => {
-            const pending = metadata.get(id);
-            if (pending) return pending;
-            const resolved = this.metadata.resolve(page, id, signal);
-            metadata.set(id, resolved);
-            return resolved;
-          },
-          close: () => page.close(),
+    const reports = new GroupCycleReportMapper();
+    const leases = new CycleLeaseManager(pool);
+    const trace = new CycleFlowLog();
+    let lease: Awaited<ReturnType<CycleLeaseManager["acquire"]>> | null = null;
+    let browser: GroupRuntimeBrowser | undefined;
+    let groupResult: GroupCycleResult | undefined;
+    let report: CycleReport = reports.overlap();
+    this.metadata.clearCycle();
+    try {
+      lease = await trace.runStep("lease", () => leases.acquire());
+      if (!lease) report = reports.overlap();
+      else {
+        const session = async () => {
+          this.session ??= await JungolSession.launch(config, this.requests);
+          return this.session;
         };
+        const calendar = new KstCalendar();
+        const unitOfWork = new AccountUnitOfWork(pool, calendar);
+        const tiers = new AcRatingTierMapper();
+        const projection = new ProjectionNotificationService(
+          new ProjectionService(
+            pool,
+            calendar,
+            new WeightedRankingPolicy(),
+            randomSeed,
+          ),
+          new WebhookBroadcaster(
+            new HookRepository(pool),
+            new DiscordWebhookClient(),
+            new WebhookMessageFormatter(),
+            logger,
+          ),
+        );
+        const cycleBrowser = new GroupRuntimeBrowser({
+          newPage: async () => (await session()).newPage(),
+          groupId: config.groupId,
+          baseUrl: config.baseUrl,
+          pageTimeoutMs: config.pageTimeoutMs,
+          requests: this.requests,
+          rank: new RankCollector(config, this.requests, tiers),
+          feed: new GroupFeedCollector(config, this.requests),
+          profile: new AccountProfileCollector(config, this.requests),
+          metadata: this.metadata,
+        });
+        browser = cycleBrowser;
+        const groupId = String(config.groupId);
+        const group = new GroupRuntime({
+          groupId,
+          accountUnitOfWork: unitOfWork,
+          initialization: new AccountInitializationService(unitOfWork, tiers),
+          settlement: new AccountSettlementService(
+            unitOfWork,
+            groupId,
+            calendar,
+            tiers,
+          ),
+          calendar,
+          members: (memberSignal) => cycleBrowser.members(memberSignal),
+          feed: cycleBrowser,
+          profiles: cycleBrowser,
+          metadata: {
+            read: (problemId, metadataSignal) =>
+              cycleBrowser.readMetadata(problemId, metadataSignal),
+          },
+          project: async (projectSignal) => {
+            await projection.run(projectSignal);
+          },
+        });
+        await trace.runStep("login", async () =>
+          (await session()).ensureLogin(credentials, signal),
+        );
+        groupResult = await new GroupCycleExecutor(group).run(signal);
+        report = reports.result(groupResult);
+      }
+    } catch (error) {
+      report = reports.failure(error, trace.failureSnapshot());
+    } finally {
+      try {
+        await browser?.close();
+      } catch (error) {
+        if (report.status === "success" || report.status === "skipped_overlap")
+          report = reports.failure(error);
+      } finally {
+        try {
+          const acquiredLease = lease;
+          if (acquiredLease)
+            await trace.runStep("release", () => acquiredLease.release());
+        } catch (error) {
+          if (
+            report.status === "success" ||
+            report.status === "skipped_overlap"
+          )
+            report = reports.failure(error, trace.failureSnapshot());
+        }
+        this.metadata.clearCycle();
+        trace.dispose();
+      }
+    }
+    const [failure] = report.commonFailures;
+    if (failure)
+      logger.error(
+        {
+          code: failure.code,
+          diagnostics: failure.diagnostics,
+          trace: failure.trace,
+        },
+        "cycle failed",
+      );
+    logger.info(
+      {
+        status: report.status,
+        rankCount: report.rankCount,
+        successUserCount: report.successUserCount,
+        failedUserCount: report.failedUserCount,
+        insertedAttemptCount: report.insertedAttemptCount,
+        code: report.errorCode,
+        pending: groupResult?.status === "success_pending",
+        phase: groupResult?.scan.phase,
+        scannedPageCount: groupResult?.scan.scannedPageCount,
       },
-      persist: (input) => persist.persist(input),
-      initialize: (snapshot) => initialize.initialize(snapshot),
-      refreshMetadata: (member) => metadataRefresh.refresh(member),
-      project: async (signal) => {
-        await projectionNotification.run(signal);
-      },
-    };
-    return new SyncCycleExecutor(adapters, { ...config, logger }).run(signal);
+      "cycle completed",
+    );
+    return report;
   }
 }

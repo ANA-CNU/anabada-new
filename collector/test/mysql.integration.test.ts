@@ -46,7 +46,7 @@ interface ScoreDayRow extends RowDataPacket {
   readonly score_day: string;
   readonly created_at: Date;
 }
-const { MYSQL_TEST_PORT: port } = process.env;
+const { MYSQL_TEST_PASSWORD: password, MYSQL_TEST_PORT: port } = process.env;
 const attempt = (
   id: number,
   problem: number,
@@ -56,6 +56,7 @@ const attempt = (
   problemId: problemIdSchema.parse(problem),
   problemName: null,
   problemTier: 0,
+  estimatedTier: 0,
   score: 100,
   submittedAt: new Date(time),
 });
@@ -89,6 +90,7 @@ test(
       host: "127.0.0.1",
       port: Number(port),
       user: "root",
+      ...(password === undefined ? {} : { password }),
       database: "jungol_bada",
       connectionLimit: 5,
       timezone: "Z",
@@ -162,7 +164,7 @@ test(
           assert.deepEqual(await state(12), {
             corrects: 2,
             submissions: 2,
-            solution: "1199",
+            solution: "0",
             attempts: "2",
             scores: "0",
             points: null,
@@ -206,9 +208,16 @@ test(
               },
             ],
           );
-          await assert.rejects(initial(12, [12, 13], 1199n), {
-            code: "account_conflict",
-          });
+          const [beforeReplay] = await pool.query<RowDataPacket[]>(
+            "SELECT corrects,submissions,solution,initial_submission_id,initialized_at,(SELECT COUNT(*) FROM problem WHERE user_id=user.id) AS attempts FROM user WHERE jungol_account_id=12",
+          );
+          await initial(12, [12, 13], 1199n);
+          const [afterReplay] = await pool.query<RowDataPacket[]>(
+            "SELECT corrects,submissions,solution,initial_submission_id,initialized_at,(SELECT COUNT(*) FROM problem WHERE user_id=user.id) AS attempts FROM user WHERE jungol_account_id=12",
+          );
+          assert.equal(beforeReplay[0]?.["initial_submission_id"], "1199");
+          assert.ok(beforeReplay[0]?.["initialized_at"]);
+          assert.deepEqual(afterReplay[0], beforeReplay[0]);
         },
       );
       await t.test(
@@ -228,7 +237,7 @@ test(
         },
       );
       await t.test(
-        "initial summary rejects a plan whose expected solved delta disagrees",
+        "initial summary stores the solved baseline independently from profile delta",
         async () => {
           const member = rankMemberSchema.parse({
             accountId: "16",
@@ -238,21 +247,25 @@ test(
             acRating: 20,
             tier: 0,
           });
-          await assert.rejects(
-            initialization.initialize(
-              new AccountInitialSnapshot(
-                new AccountSyncPlan("initial_summary", member, 0n, 0, 1),
-                [new InitialSolvedProblem(problemIdSchema.parse(16))],
-                0n,
-              ),
+          await initialization.initialize(
+            new AccountInitialSnapshot(
+              new AccountSyncPlan("initial_summary", member, 0n, 0, 1),
+              [new InitialSolvedProblem(problemIdSchema.parse(16))],
+              0n,
             ),
-            { code: "account_conflict" },
           );
-          assert.equal(await state(16), undefined);
+          assert.deepEqual(await state(16), {
+            corrects: 1,
+            submissions: 1,
+            solution: "0",
+            attempts: "1",
+            scores: "0",
+            points: null,
+          });
         },
       );
       await t.test(
-        "initial summary rejects a newer solved list without committing its cursor",
+        "initial summary stores a solved list independently from the profile count",
         async () => {
           const member = rankMemberSchema.parse({
             accountId: "18",
@@ -262,20 +275,24 @@ test(
             acRating: 20,
             tier: 0,
           });
-          await assert.rejects(
-            initialization.initialize(
-              new AccountInitialSnapshot(
-                new AccountSyncPlan("initial_summary", member, 0n, 2, 1),
-                [16, 17, 18].map(
-                  (problemId) =>
-                    new InitialSolvedProblem(problemIdSchema.parse(problemId)),
-                ),
-                1899n,
+          await initialization.initialize(
+            new AccountInitialSnapshot(
+              new AccountSyncPlan("initial_summary", member, 0n, 2, 1),
+              [16, 17, 18].map(
+                (problemId) =>
+                  new InitialSolvedProblem(problemIdSchema.parse(problemId)),
               ),
+              1899n,
             ),
-            { code: "account_conflict" },
           );
-          assert.equal(await state(18), undefined);
+          assert.deepEqual(await state(18), {
+            corrects: 3,
+            submissions: 3,
+            solution: "0",
+            attempts: "3",
+            scores: "0",
+            points: null,
+          });
         },
       );
       await t.test(
@@ -308,7 +325,7 @@ test(
                 acRating: 20,
                 tier: 0,
               }),
-              1199n,
+              0n,
               0,
               1000,
             ),
@@ -451,7 +468,7 @@ test(
       await t.test(
         "incremental persistence rejects an initial-summary plan",
         async () => {
-          const value = input(16);
+          const value = input(19);
           await assert.rejects(
             service.persist({
               ...value,
@@ -465,7 +482,7 @@ test(
             }),
             { code: "account_conflict" },
           );
-          assert.equal(await state(16), undefined);
+          assert.equal(await state(19), undefined);
         },
       );
       await t.test(
@@ -724,11 +741,11 @@ test(
           const grants = [
             "GRANT SELECT ON jungol_bada.user TO 'collector_test'@'%'",
             "GRANT INSERT (jungol_name,jungol_account_id), UPDATE (id,jungol_name,corrects,submissions,solution,rank_wrong_count,ac_rating,tier) ON jungol_bada.user TO 'collector_test'@'%'",
-            "GRANT SELECT, INSERT (user_id,problem,problem_name,problem_tier,submitted_at,level,repeatation,verdict,external_submission_id,score), UPDATE (id) ON jungol_bada.problem TO 'collector_test'@'%'",
+            "GRANT SELECT, INSERT (user_id,problem,problem_name,problem_tier,estimated_tier,submitted_at,level,repeatation,verdict,external_submission_id,score), UPDATE (id) ON jungol_bada.problem TO 'collector_test'@'%'",
             "GRANT SELECT ON jungol_bada.event TO 'collector_test'@'%'",
             "GRANT SELECT ON jungol_bada.event_problem TO 'collector_test'@'%'",
             "GRANT SELECT, INSERT (user_id,problem_id,rule_type,award_key,score_day,event_id,bias,`desc`,created_at), UPDATE (id) ON jungol_bada.score_history TO 'collector_test'@'%'",
-            "GRANT SELECT, INSERT (user_id,total_point), UPDATE (total_point) ON jungol_bada.user_bias_total TO 'collector_test'@'%'",
+            "GRANT SELECT, INSERT (user_id,score_month,total_point), UPDATE (score_month,total_point) ON jungol_bada.user_bias_total TO 'collector_test'@'%'",
             "GRANT SELECT, INSERT (title,is_active), UPDATE (is_active) ON jungol_bada.ranking_boards TO 'collector_test'@'%'",
             "GRANT SELECT, INSERT (board_id,`rank`,user_id) ON jungol_bada.ranked_users TO 'collector_test'@'%'",
           ];

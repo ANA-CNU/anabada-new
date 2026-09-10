@@ -6,10 +6,11 @@ export type BrowserSettings = {
   readonly baseUrl: string;
   readonly pageTimeoutMs: number;
 };
+export type PageCloser = Pick<Page, "close">;
 /** AbortSignal을 Playwright page 종료로 연결하고 외부 예외를 안전한 코드로 변환한다. */
 export class PageOperation {
   async run<T>(
-    page: Page,
+    page: PageCloser,
     signal: AbortSignal | undefined,
     work: () => Promise<T>,
   ): Promise<T> {

@@ -73,6 +73,8 @@ export class AcceptedAttempt {
     readonly problemTier: number,
     readonly submittedAt: Date,
     readonly score: number | null,
+    /** 수집 시점 메타데이터가 없으면 0인 보수적 추정 난이도다. */
+    readonly estimatedTier: number = 0,
   ) {}
 }
 

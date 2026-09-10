@@ -12,6 +12,7 @@
     "healthcheck": "node dist/cli.js healthcheck",
     "test": "node --import tsx --test test/*.test.ts",
     "test:mysql": "node test/mysql-integration.mjs",
+    "test:group:mysql": "node test/group-mysql-integration.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "build": "tsc -p tsconfig.build.json",

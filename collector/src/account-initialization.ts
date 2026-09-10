@@ -17,12 +17,16 @@ export class AccountInitializationService {
         snapshot.plan.mode !== "initial_summary" ||
         snapshot.plan.cursorBefore !== 0n ||
         snapshot.plan.maxPages !== 1 ||
-        snapshot.plan.expectedSolvedDelta !== member.solvedCount
+        snapshot.plan.expectedSolvedDelta < 0
       )
         throw new PersistenceError("account_conflict");
       if (this.ratingTierMapper.toTier(member.acRating) !== member.tier)
         throw new PersistenceError("rating_tier_mismatch");
       const user = await repositories.users.upsertAndLock(member);
+      if (user.initializedAt !== null && user.initialSubmissionId !== null)
+        return;
+      if (user.initializedAt !== null || user.initialSubmissionId !== null)
+        throw new PersistenceError("account_conflict");
       const distinctSolved = new Map(
         snapshot.solved.map((problem) => [problem.problemId, problem]),
       );
@@ -31,8 +35,7 @@ export class AccountInitializationService {
         user.submissions !== 0 ||
         BigInt(user.solution) !== 0n ||
         (await repositories.attempts.readProblemCount(user.id)) !== 0 ||
-        snapshot.solved.length !== member.solvedCount ||
-        distinctSolved.size !== member.solvedCount
+        distinctSolved.size !== snapshot.solved.length
       )
         throw new PersistenceError("account_conflict");
       await repositories.attempts.insertInitialSolved({
@@ -40,10 +43,12 @@ export class AccountInitializationService {
         userTier: member.tier,
         solved: [...distinctSolved.values()],
       });
-      await repositories.users.completeSync({
+      await repositories.users.completeInitialization({
         userId: user.id,
         member,
+        solvedCount: distinctSolved.size,
         highestInspectedSubmissionId: snapshot.highestInspectedSubmissionId,
+        initializedAt: new Date(),
       });
     });
   }

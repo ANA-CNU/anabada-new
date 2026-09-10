@@ -26,7 +26,8 @@ interface State extends RowDataPacket {
   readonly scores: string;
   readonly boards: string;
 }
-const { MYSQL_TEST_PORT: testPort } = process.env;
+const { MYSQL_TEST_PASSWORD: password, MYSQL_TEST_PORT: testPort } =
+  process.env;
 test(
   "real coordinator commits account and projects without a DB run ledger",
   { skip: !testPort },
@@ -36,6 +37,7 @@ test(
       host: "127.0.0.1",
       port,
       user: "root",
+      ...(password === undefined ? {} : { password }),
       database: "jungol_bada",
       timezone: "Z",
       supportBigNumbers: true,
@@ -152,7 +154,7 @@ test(
         "SELECT corrects,solution,(SELECT COUNT(*) FROM problem) AS attempts,(SELECT COUNT(*) FROM score_history) AS scores,(SELECT COUNT(*) FROM ranking_boards) AS boards FROM user WHERE jungol_account_id='81291'",
       );
       assert.equal(rows[0]?.corrects, 1);
-      assert.equal(rows[0]?.solution, "8129101");
+      assert.equal(rows[0]?.solution, "0");
       assert.equal(Number(rows[0]?.attempts), 1);
       assert.equal(Number(rows[0]?.scores), 0);
       assert.equal(Number(rows[0]?.boards), 0);

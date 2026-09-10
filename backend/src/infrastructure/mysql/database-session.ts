@@ -104,10 +104,18 @@ export const sqlOperations = {
   hookRemove: { id: "hook.remove" as SqlOperationId, timeoutMs: 2_000 },
   hookToggle: { id: "hook.toggle" as SqlOperationId, timeoutMs: 2_000 },
   userRemove: { id: "user.remove" as SqlOperationId, timeoutMs: 2_000 },
-  biasClear: { id: "bias.clear" as SqlOperationId, timeoutMs: 2_000 },
+  biasLockUsers: { id: "bias.lock_users" as SqlOperationId, timeoutMs: 2_000 },
   biasAggregate: { id: "bias.aggregate" as SqlOperationId, timeoutMs: 2_000 },
   biasInsert: { id: "bias.insert" as SqlOperationId, timeoutMs: 2_000 },
   biasList: { id: "bias.list" as SqlOperationId, timeoutMs: 1_000 },
+  monthlyScoreLockUsers: {
+    id: "monthly_score.lock_users" as SqlOperationId,
+    timeoutMs: 2_000,
+  },
+  monthlyScoreRefresh: {
+    id: "monthly_score.refresh" as SqlOperationId,
+    timeoutMs: 2_000,
+  },
   scoreHistoryUserExists: {
     id: "score_history.user_exists" as SqlOperationId,
     timeoutMs: 1_000,
@@ -143,6 +151,10 @@ export const sqlOperations = {
   scoreHistoryRemove: {
     id: "score_history.remove" as SqlOperationId,
     timeoutMs: 2_000,
+  },
+  scoreHistoryOwner: {
+    id: "score_history.owner" as SqlOperationId,
+    timeoutMs: 1_000,
   },
   rankingSolvedMonth: {
     id: "ranking.solved_month" as SqlOperationId,

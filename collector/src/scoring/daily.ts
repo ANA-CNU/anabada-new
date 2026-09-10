@@ -11,8 +11,14 @@ export class KstCalendar {
   monthWindow(now: Date): readonly [Date, Date] {
     const month = this.day(now).slice(0, 7);
     const start = new Date(`${month}-01T00:00:00+09:00`);
-    const next = new Date(start);
-    next.setUTCMonth(next.getUTCMonth() + 1);
+    const year = Number(month.slice(0, 4));
+    const monthNumber = Number(month.slice(5, 7));
+    const nextMonth = monthNumber === 12 ? 1 : monthNumber + 1;
+    const nextYear = monthNumber === 12 ? year + 1 : year;
+    // KST 월초는 UTC 기준 전월 말일이므로 setUTCMonth의 말일 넘침을 쓰면 안 된다.
+    const next = new Date(
+      `${nextYear}-${String(nextMonth).padStart(2, "0")}-01T00:00:00+09:00`,
+    );
     return [start, next];
   }
 }
@@ -34,11 +40,7 @@ export class DailyScorePolicy {
     if (
       input.alreadyAwarded ||
       !input.firstSolve ||
-      !(
-        input.problemTier === 0 ||
-        input.problemTier >= 11 ||
-        input.problemTier >= input.userTier - 5
-      )
+      !(input.problemTier >= 11 || input.problemTier >= input.userTier - 5)
     )
       return null;
     const day = this.calendar.day(input.submittedAt);

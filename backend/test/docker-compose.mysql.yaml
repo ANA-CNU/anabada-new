@@ -1,10 +1,13 @@
 services:
   anabada-mysql:
-    image: mysql:8.4
+    image: mysql:9.3.0
     environment:
       MYSQL_ROOT_PASSWORD: integration-test-only
     tmpfs:
-      - /var/lib/mysql
+      - /var/lib/mysql:rw,size=1g
+    mem_limit: 1536m
+    cpus: 1.5
+    pids_limit: 256
     healthcheck:
       test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin --protocol=TCP -h127.0.0.1 -uroot ping --silent"]
       interval: 2s

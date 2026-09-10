@@ -53,7 +53,7 @@ test("Given ambiguous counts When collecting rank Then malformed grouping is rej
   }
 });
 
-test("Given an explicitly unavailable AC rating When collecting rank Then only blank and dash markers become zero", async () => {
+test("Given numeric AC ratings When collecting rank Then it preserves zero and maps the tier", async () => {
   const browser = await chromium.launch({
     headless: true,
     ...(existsSync(chromium.executablePath()) ? {} : { channel: "chrome" }),
@@ -64,7 +64,10 @@ test("Given an explicitly unavailable AC rating When collecting rank Then only b
       { baseUrl: "https://rank.test", pageTimeoutMs: 2000 },
       new JungolRequestCoordinator({ delay: async () => {} }),
     );
-    for (const rating of ["", "-", "—"]) {
+    for (const [rating, acRating, tier] of [
+      ["0", 0, 0],
+      ["45", 45, 1],
+    ] as const) {
       await page.route("https://rank.test/**", (route) =>
         route.fulfill({
           contentType: "text/html; charset=utf-8",
@@ -72,10 +75,27 @@ test("Given an explicitly unavailable AC rating When collecting rank Then only b
         }),
       );
       const [member] = await collector.collect(page, 1125);
-      assert.equal(member?.acRating, 0);
+      assert.equal(member?.acRating, acRating);
+      assert.equal(member?.tier, tier);
       await page.unroute("https://rank.test/**");
     }
-    for (const rating of ["1,,2", "abc"]) {
+  } finally {
+    await browser.close();
+  }
+});
+
+test("Given an unavailable or malformed AC rating When collecting rank Then it fails closed", async () => {
+  const browser = await chromium.launch({
+    headless: true,
+    ...(existsSync(chromium.executablePath()) ? {} : { channel: "chrome" }),
+  });
+  try {
+    const page = await browser.newPage();
+    const collector = new RankCollector(
+      { baseUrl: "https://rank.test", pageTimeoutMs: 2000 },
+      new JungolRequestCoordinator({ delay: async () => {} }),
+    );
+    for (const rating of ["", "-", "—", "1,,2", "abc"]) {
       await page.route("https://rank.test/**", (route) =>
         route.fulfill({
           contentType: "text/html; charset=utf-8",

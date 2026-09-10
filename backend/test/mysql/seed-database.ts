@@ -44,7 +44,7 @@ export class SeedDatabase {
         "INSERT INTO ranked_users (id, board_id, `rank`, user_id) VALUES (601, 501, 1, 2), (602, 501, 2, 1), (603, 502, 1, 1), (604, 502, 2, 2)",
       );
       await connection.execute(
-        "INSERT INTO user_bias_total (user_id, total_point, updated_at) VALUES (1, -1, '2026-09-08 00:00:00'), (2, 1, '2026-09-08 00:00:00')",
+        "INSERT INTO user_bias_total (user_id, score_month, total_point, updated_at) VALUES (1, '2026-09-01', -1, '2026-09-08 00:00:00'), (2, '2026-09-01', 1, '2026-09-08 00:00:00')",
       );
       await connection.execute(
         "INSERT INTO hook (id, url, ignored, created_at) VALUES (701, 'https://enabled.invalid/hook', 0, '2026-09-01 00:00:00'), (702, 'https://ignored.invalid/hook', 1, '2026-09-01 00:00:00')",

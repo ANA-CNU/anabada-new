@@ -9,9 +9,14 @@ const fixture = "scripts/database/test-fixtures/compose-startup-order.yaml";
 const project = `jungol-startup-${randomUUID().replaceAll("-", "")}`;
 const context = mkdtempSync(join(tmpdir(), "jungol-compose-context-"));
 const unreadableSibling = join(context, "database", "mysql_data", "#innodb_redo");
-const password = "compose-startup-test-password";
+const password = `compose-startup-test-${randomUUID()}`;
 const base = ["compose", "--project-name", project, "--env-file", "/dev/null", "-f", fixture];
-const env = { ...process.env, DB_PASSWORD: password, MIGRATOR_CONTEXT: join(context, "migrations") };
+const env = {
+  ...process.env,
+  DB_PASSWORD: password,
+  MYSQL_PWD: password,
+  MIGRATOR_CONTEXT: join(context, "migrations"),
+};
 
 function docker(args, options = {}) {
   return spawnSync("docker", args, { cwd: root, encoding: "utf8", env, ...options });
@@ -29,7 +34,7 @@ function inspect(service) {
   return JSON.parse(run(["inspect", container.ID], `inspect ${service} state`))[0];
 }
 function sql(statement) {
-  return run([...base, "exec", "-T", "anabada-mysql", "mysql", "-uroot", `-p${password}`, "-Nse", statement], "SQL assertion");
+  return run([...base, "exec", "-T", "-e", "MYSQL_PWD", "anabada-mysql", "mysql", "-uroot", "-Nse", statement], "SQL assertion");
 }
 function bounded(value, limit = 4096) {
   return value.replaceAll(password, "[REDACTED]").slice(-limit);
@@ -89,7 +94,7 @@ function startupDiagnostics() {
   const imageMigrations = migrator === null
     ? null
     : commandDiagnostic(["run", "--rm", "--network", "none", "--entrypoint", "sh", migrator.image, "-ec", "find /app -maxdepth 1 -type f -name '*.sql' -exec basename {} \\; | sort"]);
-  const ledger = docker([...base, "exec", "-T", "anabada-mysql", "mysql", "-uroot", `-p${password}`, "-Nse", "SELECT version FROM jungol_bada.migrations ORDER BY version"]);
+  const ledger = docker([...base, "exec", "-T", "-e", "MYSQL_PWD", "anabada-mysql", "mysql", "-uroot", "-Nse", "SELECT version FROM jungol_bada.migrations ORDER BY version"]);
   const logs = Object.fromEntries(
     ["jungol-migrator", "pending-probe"].map((service) => [
       service,

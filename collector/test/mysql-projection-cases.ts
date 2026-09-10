@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import type { TestContext } from "node:test";
 import type { Pool, RowDataPacket } from "mysql2/promise";
+import { MonthlyScoreCacheService } from "../src/monthly-score-cache.js";
 import { ProjectionService } from "../src/projection.js";
 import { KstCalendar } from "../src/scoring/daily.js";
 import { WeightedRankingPolicy } from "../src/scoring/ranking.js";
@@ -39,6 +40,23 @@ const members = async (
   return rows.map((row) => row.user_id);
 };
 
+const rebuildCache = async (pool: Pool, now: Date): Promise<void> => {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    await new MonthlyScoreCacheService(
+      connection,
+      new KstCalendar(),
+    ).rebuildStale(now);
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+};
+
 export async function runManualProjectionCases(
   t: TestContext,
   pool: Pool,
@@ -55,6 +73,7 @@ export async function runManualProjectionCases(
       await pool.query(
         "INSERT INTO score_history (user_id,bias,created_at) VALUES (901,10,'2026-09-07'),(902,1,'2026-09-07')",
       );
+      await rebuildCache(pool, new Date("2026-09-07Z"));
       const projection = new ProjectionService(
         pool,
         new KstCalendar(),
@@ -79,6 +98,9 @@ export async function runManualProjectionCases(
       await pool.query(
         "INSERT INTO score_history (user_id,bias,created_at) VALUES (903,2,'2026-09-07')",
       );
+      const historyOnly = await projection.rebuild(new Date("2026-09-07Z"));
+      assert.equal(historyOnly.kind, "unchanged");
+      await rebuildCache(pool, new Date("2026-09-07Z"));
       const changed = await projection.rebuild(new Date("2026-09-07Z"));
       assert.equal(changed.kind, "changed");
       assert.notEqual(changed.boardId, first.boardId);
@@ -93,6 +115,7 @@ export async function runManualProjectionCases(
       await pool.query(
         "INSERT INTO score_history (user_id,bias,created_at) VALUES (901,10,'2026-10-07'),(902,1,'2026-10-07'),(903,2,'2026-10-07')",
       );
+      await rebuildCache(pool, new Date("2026-10-07Z"));
       const nextMonth = await projection.rebuild(new Date("2026-10-07Z"));
       assert.equal(nextMonth.kind, "changed");
       const [nextRows] = await pool.query<BoardRow[]>(

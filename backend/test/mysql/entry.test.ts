@@ -35,7 +35,7 @@ test("Given migrated MySQL and deterministic fixture When calling root and healt
   if (!activeContext) throw new Error("MySQL test context was not initialized");
 
   const [fixtureRows] = await activeContext.rawPool.query<FixtureCounts[]>(
-    "SELECT (SELECT COUNT(*) FROM migrations WHERE version = 2) AS migration_count, (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'jungol_bada' AND table_name IN ('event', 'event_problem', 'hook', 'problem', 'ranking_boards', 'ranked_users', 'score_history', 'user', 'user_bias_total')) AS table_count, (SELECT COUNT(*) FROM user) AS user_count",
+    "SELECT (SELECT COUNT(*) FROM migrations WHERE version = 3) AS migration_count, (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'jungol_bada' AND table_name IN ('event', 'event_problem', 'hook', 'problem', 'ranking_boards', 'ranked_users', 'score_history', 'user', 'user_bias_total')) AS table_count, (SELECT COUNT(*) FROM user) AS user_count",
   );
   const root = await activeContext.handle(new Request("http://test/"));
   const version = await activeContext.handle(

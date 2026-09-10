@@ -80,14 +80,15 @@ export class AttemptRepository {
   }): Promise<number | null> {
     const { userId, userTier, attempt, repetition } = input;
     const [result] = await this.connection.execute<ResultSetHeader>(
-      "INSERT INTO problem (user_id,problem,problem_name,problem_tier,submitted_at,level,repeatation,verdict,external_submission_id,score) VALUES (?,?,?,?,?,?,?,'accepted',?,?) ON DUPLICATE KEY UPDATE id=id",
+      "INSERT INTO problem (user_id,problem,problem_name,problem_tier,estimated_tier,submitted_at,level,repeatation,verdict,external_submission_id,score) VALUES (?,?,?,?,?,?,?,?,'accepted',?,?) ON DUPLICATE KEY UPDATE id=id",
       [
         userId,
         attempt.problemId,
         attempt.problemName,
         attempt.problemTier,
+        attempt.estimatedTier,
         attempt.submittedAt,
-        attempt.problemTier - userTier,
+        attempt.estimatedTier - userTier,
         repetition,
         attempt.submissionId,
         attempt.score,
@@ -116,7 +117,7 @@ export class AttemptRepository {
   }): Promise<void> {
     for (const problem of input.solved)
       await this.connection.execute(
-        "INSERT INTO problem (user_id,problem,problem_name,problem_tier,submitted_at,level,repeatation,verdict,external_submission_id,score) VALUES (?,?,NULL,0,'1970-01-01 00:00:01.000',?,0,'accepted',NULL,NULL)",
+        "INSERT INTO problem (user_id,problem,problem_name,problem_tier,estimated_tier,submitted_at,level,repeatation,verdict,external_submission_id,score) VALUES (?,?,NULL,0,0,'1970-01-01 00:00:01.000',?,0,'accepted',NULL,NULL)",
         [input.userId, problem.problemId, -input.userTier],
       );
   }

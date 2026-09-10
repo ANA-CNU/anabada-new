@@ -1,6 +1,6 @@
 import { Elysia } from "elysia";
 import { z } from "zod";
-import type { BiasService } from "./bias-service.js";
+import { isCurrentKstMonthWindow } from "./bias-service.js";
 
 const kstDateTime = z.string().regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
 const dateInitSchema = z
@@ -28,8 +28,12 @@ function parseKst(value: string): Date | null {
   return new Date(localAsUtc.getTime() - 9 * 60 * 60 * 1000);
 }
 export type BiasRouteDependencies = Readonly<{
-  service: BiasService;
+  service: Readonly<{
+    initialize(beginUtc: Date, endUtc: Date): Promise<number | null>;
+    list(): Promise<readonly unknown[]>;
+  }>;
   authorize: (request: Request) => boolean;
+  clock?: () => Date;
 }>;
 export function createBiasRoutes(dependencies: BiasRouteDependencies) {
   return new Elysia()
@@ -52,7 +56,21 @@ export function createBiasRoutes(dependencies: BiasRouteDependencies) {
         set.status = 400;
         return { success: false, message: "유효한 KST 기간을 전달해주세요." };
       }
+      if (!isCurrentKstMonthWindow(begin, end, dependencies.clock?.() ?? new Date())) {
+        set.status = 400;
+        return {
+          success: false,
+          message: "현재 KST 월의 시작과 종료만 재계산할 수 있습니다.",
+        };
+      }
       const insertedCount = await dependencies.service.initialize(begin, end);
+      if (insertedCount === null) {
+        set.status = 400;
+        return {
+          success: false,
+          message: "현재 KST 월의 시작과 종료만 재계산할 수 있습니다.",
+        };
+      }
       return {
         success: true,
         insertedCount,

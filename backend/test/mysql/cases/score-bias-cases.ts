@@ -97,6 +97,12 @@ export async function runScoreBiasCases(
   expect(
     context.observedOperationIds.has(sqlOperations.scoreHistoryInsert.id),
   ).toBe(true);
+  expect(
+    context.observedOperationIds.has(sqlOperations.monthlyScoreLockUsers.id),
+  ).toBe(true);
+  expect(
+    context.observedOperationIds.has(sqlOperations.monthlyScoreRefresh.id),
+  ).toBe(true);
 
   const list = await context.handle(
     jsonScoreRequest(
@@ -158,6 +164,9 @@ export async function runScoreBiasCases(
   expect(missingUpdate.status).toBe(404);
   expect(
     context.observedOperationIds.has(sqlOperations.scoreHistoryUpdate.id),
+  ).toBe(true);
+  expect(
+    context.observedOperationIds.has(sqlOperations.scoreHistoryOwner.id),
   ).toBe(true);
   const invalidDelete = await context.handle(
     jsonScoreRequest("/api/score-history/nope", "DELETE"),

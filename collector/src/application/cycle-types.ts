@@ -11,7 +11,12 @@ import type { ProblemId } from "../domain.js";
 import type { SafeJungolDiagnostics } from "../jungol/errors.js";
 import type { ProblemMetadata } from "../jungol/metadata.js";
 import type { CollectedSubmissions } from "../jungol/submission.js";
-import type { AccountFlowStep, CycleFlowStep, FlowTrace } from "./flow-log.js";
+import type {
+  AccountFlowStep,
+  CycleFlowStep,
+  FlowTrace,
+  GroupCycleFlowStep,
+} from "./flow-log.js";
 
 export interface AccountBrowser {
   /**
@@ -85,5 +90,5 @@ export type CommonFailure = {
   readonly stage: "projection" | "cycle";
   readonly code: string;
   readonly diagnostics?: SafeJungolDiagnostics | undefined;
-  readonly trace?: FlowTrace<CycleFlowStep> | undefined;
+  readonly trace?: FlowTrace<CycleFlowStep | GroupCycleFlowStep> | undefined;
 };

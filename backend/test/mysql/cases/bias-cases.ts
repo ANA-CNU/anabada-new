@@ -25,17 +25,17 @@ export async function runBiasCases(context: MysqlTestContext): Promise<void> {
   ]);
   const rebuild = await context.handle(
     jsonScoreRequest("/api/bias/date-init", "POST", {
-      begin: "2026-09-01 09:00:00",
-      end: "2026-09-03 09:00:00",
+      begin: "2026-09-01 00:00:00",
+      end: "2026-10-01 00:00:00",
     }),
   );
   expect(rebuild.status).toBe(200);
   expect(await rebuild.json()).toMatchObject({
     success: true,
-    insertedCount: 1,
+    insertedCount: 3,
     range: {
-      begin: "2026-09-01T00:00:00.000Z",
-      end: "2026-09-03T00:00:00.000Z",
+      begin: "2026-08-31T15:00:00.000Z",
+      end: "2026-09-30T15:00:00.000Z",
     },
   });
   const biasList = await context.handle(
@@ -60,7 +60,7 @@ export async function runBiasCases(context: MysqlTestContext): Promise<void> {
         korean_name: null,
         display_name: "beta",
         total_point: 0,
-        updated_at: null,
+        updated_at: expect.any(String),
       },
       {
         user_id: 3,
@@ -68,12 +68,12 @@ export async function runBiasCases(context: MysqlTestContext): Promise<void> {
         korean_name: "무시",
         display_name: "ignored",
         total_point: 0,
-        updated_at: null,
+        updated_at: expect.any(String),
       },
     ]),
   );
   for (const operation of [
-    sqlOperations.biasClear,
+    sqlOperations.biasLockUsers,
     sqlOperations.biasAggregate,
     sqlOperations.biasInsert,
     sqlOperations.biasList,
@@ -93,8 +93,8 @@ export async function runBiasCases(context: MysqlTestContext): Promise<void> {
   try {
     const failedRebuild = await context.handle(
       jsonScoreRequest("/api/bias/date-init", "POST", {
-        begin: "2026-09-01 09:00:00",
-        end: "2026-09-03 09:00:00",
+        begin: "2026-09-01 00:00:00",
+        end: "2026-10-01 00:00:00",
       }),
     );
     expect(failedRebuild.status).toBe(503);
@@ -106,6 +106,44 @@ export async function runBiasCases(context: MysqlTestContext): Promise<void> {
     await context.rawPool.query(
       "DROP TRIGGER IF EXISTS mysql_score_bias_bias_failure",
     );
+  }
+
+  await context.seed();
+  await context.rawPool.query("DELETE FROM score_history");
+  const allZeroRebuild = await context.handle(
+    jsonScoreRequest("/api/bias/date-init", "POST", {
+      begin: "2026-09-01 00:00:00",
+      end: "2026-10-01 00:00:00",
+    }),
+  );
+  expect(allZeroRebuild.status).toBe(200);
+  const [allZeroTotals] = await context.rawPool.query<BiasRow[]>(
+    "SELECT user_id, total_point FROM user_bias_total ORDER BY user_id",
+  );
+  expect(allZeroTotals.map(toTotal)).toEqual([
+    { user_id: 1, total_point: 0 },
+    { user_id: 2, total_point: 0 },
+    { user_id: 3, total_point: 0 },
+  ]);
+
+  await context.seed();
+  try {
+    await context.rawPool.query("SET FOREIGN_KEY_CHECKS = 0");
+    await context.rawPool.query("DELETE FROM user");
+    await context.rawPool.query("SET FOREIGN_KEY_CHECKS = 1");
+    const emptyUserRebuild = await context.handle(
+      jsonScoreRequest("/api/bias/date-init", "POST", {
+        begin: "2026-09-01 00:00:00",
+        end: "2026-10-01 00:00:00",
+      }),
+    );
+    expect(emptyUserRebuild.status).toBe(200);
+    expect(await emptyUserRebuild.json()).toMatchObject({
+      success: true,
+      insertedCount: 0,
+    });
+  } finally {
+    await context.seed();
   }
 }
 
