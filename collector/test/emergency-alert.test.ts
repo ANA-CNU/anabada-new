@@ -96,12 +96,12 @@ test("Given a collector incident When formatting Then returns an actionable Disc
 test("Given scalar Markdown control characters and oversized facts When formatting Then it keeps code spans intact and only includes whole fact lines", () => {
   const message = new EmergencyAlertFormatter().format({
     ...incident,
-    code: "rank`mismatch\nnext",
+    code: "rank`mismatch\u0000\nnext\u007F",
     actions: ["JUNGOL_USERNAME과 JUNGOL_PASSWORD를 확인하세요."],
     facts: ["완전한 사실 `one`", "x".repeat(2_000)],
   });
 
-  assert.match(message, /\*\*오류 코드:\*\* `rankˋmismatch next`/);
+  assert.match(message, /\*\*오류 코드:\*\* `rankˋmismatch {2}next`/);
   assert.match(message, /`JUNGOL_USERNAME`과 `JUNGOL_PASSWORD`를 확인하세요\./);
   assert.match(message, /- 완전한 사실 `one`/);
   assert.equal(message.includes("x".repeat(2_000)), false);

@@ -1,6 +1,6 @@
+import { inlineCode } from "./alert-markdown.js";
 import type { CycleReport } from "./application/cycle-types.js";
 import type { FlowTrace } from "./application/flow-log.js";
-import { inlineCode } from "./alert-markdown.js";
 import type { SafeJungolDiagnostics } from "./jungol/errors.js";
 
 /** 안전한 cycle 진단값과 흐름 기록만 Discord 알림용 사실로 변환한다. */
@@ -33,11 +33,10 @@ export class IncidentFacts {
     );
     const trail = completed
       .slice(-8)
-      .map(
-        (event) =>
-          inlineCode(
-            `${event.step}:${event.outcome}@${Math.round(event.elapsedMs)}ms${event.errorKind ? `:${event.errorKind}` : ""}`,
-          ),
+      .map((event) =>
+        inlineCode(
+          `${event.step}:${event.outcome}@${Math.round(event.elapsedMs)}ms${event.errorKind ? `:${event.errorKind}` : ""}`,
+        ),
       )
       .join(" > ");
     const facts: string[] = [];

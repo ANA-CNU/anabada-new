@@ -64,6 +64,8 @@ async function startFixture(options: {
         import { CollectorConfigLoader } from "./src/config.ts";
         const loader = new CollectorConfigLoader({
           profileDir: ${JSON.stringify(directory)},
+          // 실제 시계 slot을 쓰되 부모가 첫 실패를 관찰하고 SIGTERM을 보낼 여유를 남긴다.
+          intervalMs: 1_000,
           database: { host: "127.0.0.1", port: ${address.port}, user: "root", name: "jungol_bada" },
         });
         await new CollectorApplication(process.env, loader).run(["node", "collector", ${JSON.stringify(options.command)}]);

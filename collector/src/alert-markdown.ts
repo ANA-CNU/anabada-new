@@ -18,8 +18,11 @@ export function truncateProse(value: string, maximumLength: number): string {
 }
 
 function singleLine(value: string | number): string {
-  return String(value)
-    .replace(/[\u0000-\u001F\u007F]/g, " ")
+  return Array.from(String(value), (character) => {
+    const code = character.charCodeAt(0);
+    return code <= 31 || code === 127 ? " " : character;
+  })
+    .join("")
     .trim()
     .slice(0, 160);
 }
