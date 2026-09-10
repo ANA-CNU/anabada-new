@@ -56,7 +56,13 @@ export function createBiasRoutes(dependencies: BiasRouteDependencies) {
         set.status = 400;
         return { success: false, message: "유효한 KST 기간을 전달해주세요." };
       }
-      if (!isCurrentKstMonthWindow(begin, end, dependencies.clock?.() ?? new Date())) {
+      if (
+        !isCurrentKstMonthWindow(
+          begin,
+          end,
+          dependencies.clock?.() ?? new Date(),
+        )
+      ) {
         set.status = 400;
         return {
           success: false,

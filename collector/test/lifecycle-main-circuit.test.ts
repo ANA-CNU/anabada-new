@@ -30,9 +30,10 @@ for (const status of ["auth_required", "manual_recovery_required"]) {
         let calls=0;
         const health=new CollectorHealthStore();
         const profileDir=${JSON.stringify(directory)};
-        process.on('message',async()=>process.send({calls,healthy:await health.isHealthy(profileDir),state:JSON.parse(await readFile(profileDir+'/collector-health.json','utf8')).status}));
-        const report={status:${JSON.stringify(status)},rankCount:0,syncUserCount:0,metadataUserCount:0,successUserCount:0,failedUserCount:0,scannedAttemptCount:0,acceptedAttemptCount:0,insertedAttemptCount:0,duplicateAttemptCount:0,errorCode:null};
-        await new CollectorRuntime(new CollectorConfigLoader({profileDir,intervalMs:1,runOnce:${runOnce}}).parse(process.env),()=>({run:async()=>{calls++;return report;},close:async()=>{process.stdout.write('fixture-closed\\n');}})).run();
+        const report={status:${JSON.stringify(status)},rankCount:0,syncUserCount:0,metadataUserCount:0,successUserCount:0,failedUserCount:0,scannedAttemptCount:0,acceptedAttemptCount:0,insertedAttemptCount:0,duplicateAttemptCount:0,errorCode:null,accountFailureCount:0,accountFailures:[],commonFailures:[]};
+        const config=new CollectorConfigLoader({profileDir,intervalMs:1,runOnce:${runOnce}}).parse(process.env);
+        process.on('message',async()=>process.send({calls,healthy:await health.isHealthy(profileDir),state:JSON.parse(await readFile(profileDir+'/collector-health.json','utf8')).status,runOnce:config.runOnce,webhookEnabled:config.emergencyWebhookUrl!==undefined}));
+        await new CollectorRuntime(config,()=>({run:async()=>{calls++;return report;},close:async()=>{process.stdout.write('fixture-closed\\n');}}),{now:()=>0,delay:async(milliseconds,signal)=>{if(milliseconds===0)return;await new Promise(resolve=>signal.addEventListener('abort',resolve,{once:true}));}}).run();
         process.disconnect();
       `,
           ],
@@ -43,6 +44,8 @@ for (const status of ["auth_required", "manual_recovery_required"]) {
               JUNGOL_USERNAME: "fixture-only",
               JUNGOL_PASSWORD: "fixture-only",
               DB_PASSWORD: "fixture-only",
+              WEBHOOK_URL: "",
+              COLLECTOR_RUN_ONCE: runOnce ? "true" : "false",
             },
             stdio: ["ignore", "pipe", "pipe", "ipc"],
           },
@@ -53,6 +56,7 @@ for (const status of ["auth_required", "manual_recovery_required"]) {
         let errors = "";
         let probed = false;
         let observed = false;
+        let state: unknown;
         child.stdout.setEncoding("utf8").on("data", (chunk: string) => {
           output += chunk;
           if (
@@ -68,10 +72,13 @@ for (const status of ["auth_required", "manual_recovery_required"]) {
           errors += chunk;
         });
         child.on("message", (message: unknown) => {
+          state = message;
           assert.deepEqual(message, {
             calls: 1,
             healthy: false,
             state: status,
+            runOnce,
+            webhookEnabled: false,
           });
           observed = true;
           child.kill("SIGTERM");
@@ -81,9 +88,18 @@ for (const status of ["auth_required", "manual_recovery_required"]) {
             child.once("error", reject);
             child.once("close", resolve);
           });
-          assert.equal(code, runOnce ? 1 : 0, errors);
-          assert.equal(observed, !runOnce);
-          assert.equal(output.includes("fixture-closed"), true);
+          const diagnostics = JSON.stringify({
+            code,
+            errors,
+            observed,
+            output,
+            probed,
+            runOnce,
+            state,
+          });
+          assert.equal(code, runOnce ? 1 : 0, diagnostics);
+          assert.equal(observed, !runOnce, diagnostics);
+          assert.equal(output.includes("fixture-closed"), true, diagnostics);
           const health = z
             .object({ status: z.literal("stopped"), degraded: z.literal(true) })
             .parse(

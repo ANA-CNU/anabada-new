@@ -8,7 +8,9 @@ const operations = {
   refresh: sqlOperations.monthlyScoreRefresh,
 } as const;
 
-const kstMonth = (now: Date): Readonly<{
+const kstMonth = (
+  now: Date,
+): Readonly<{
   readonly scoreMonth: string;
   readonly startUtc: Date;
   readonly endUtc: Date;

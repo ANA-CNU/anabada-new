@@ -76,6 +76,7 @@ export type CycleReport = {
   readonly accountFailureCount: number;
   readonly accountFailures: readonly AccountFailure[];
   readonly commonFailures: readonly CommonFailure[];
+  readonly pending?: boolean;
 };
 
 /** Discord 알림에 허용되는 계정별 collector 실패 정보만 보관한다. */

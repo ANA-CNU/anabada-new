@@ -39,6 +39,7 @@ export class GroupCycleReportMapper {
       accountFailureCount: failures.length,
       accountFailures: failures.slice(0, 5),
       commonFailures: [],
+      pending: result.status === "success_pending",
     };
   }
 
@@ -76,6 +77,7 @@ export class GroupCycleReportMapper {
       accountFailureCount: 0,
       accountFailures: [],
       commonFailures: [],
+      pending: false,
     };
   }
 

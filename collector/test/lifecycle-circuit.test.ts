@@ -71,7 +71,7 @@ test(
     let calls=0;
     const service=new CollectorService({intervalMs:1,runOnce:false,
       cycle:async()=>{calls++;await health.write(process.env.CIRCUIT_DIR,{status:'failed',lastStartedAt:Date.now(),lastCompletedAt:Date.now(),degraded:true});process.send('opened');return 'circuit_open';},
-      delay:async()=>{throw new Error('unexpected repeat delay');},
+      delay:async(milliseconds,signal)=>{if(milliseconds===0)return;await new Promise(resolve=>signal.addEventListener('abort',resolve,{once:true}));},
       close:async()=>{process.stdout.write('closed\\n');},
     });
     process.on('SIGTERM',()=>service.stop());

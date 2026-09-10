@@ -144,7 +144,7 @@ test("sanitizes unexpected error messages into a stable code", () => {
   );
 });
 
-test("waits a fixed delay after settlement and abort prevents another cycle", async () => {
+test("waits for the next aligned boundary after settlement and abort prevents another cycle", async () => {
   const events: string[] = [];
   const service = new CollectorService({
     cycle: async () => {
@@ -156,10 +156,12 @@ test("waits a fixed delay after settlement and abort prevents another cycle", as
       events.push("close");
     },
     delay: async (ms) => {
+      if (ms === 0) return;
       events.push(String(ms));
       service.stop();
     },
     intervalMs: 123,
+    now: () => 0,
     runOnce: false,
   });
   await service.run();
@@ -177,10 +179,12 @@ test("cooperative shutdown waits for in flight cycle before close", async () => 
     close: async () => {
       events.push("close");
     },
-    delay: async () => {
+    delay: async (ms) => {
+      if (ms === 0) return;
       assert.fail("unexpected delay");
     },
     intervalMs: 123,
+    now: () => 0,
     runOnce: false,
   });
   await service.run();

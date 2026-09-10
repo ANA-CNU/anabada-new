@@ -35,6 +35,11 @@ MySQL, backend, collector는 root 계정과 동일한 `DB_PASSWORD`를 사용합
 
 ## 2) 실행과 배포
 
+일상 개발, PR 통합, `main` 전용 production 배포의 브랜치 절차는
+[개발 브랜치와 배포 통합 절차](./docs/branch-workflow.md)를 따른다.
+collector의 예정 실행 주기와 운영 관측 기준은
+[Collector 운영 동작](./docs/collector-operations.md)을 따른다.
+
 아래 명령은 저장소 루트에서 실행합니다. 개발 환경도 루트 `.env`를 명시적으로 읽습니다.
 
 ```sh

@@ -108,7 +108,7 @@ test("initial-summary worker failure leaves other baseline initialization commit
     new Date("2026-09-08T00:00:00Z"),
   );
   assert.ok(alert);
-  assert.match(alert.facts.join("\n"), /그룹 rank 기대 1 \/ 프로필 표시 3/);
+  assert.match(alert.facts.join("\n"), /그룹 rank 기대 `1` \/ 프로필 표시 `3`/);
   assert.deepEqual(events, ["initialize", "project", "release"]);
   const failure = lines
     .map((line) =>

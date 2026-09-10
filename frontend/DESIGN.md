@@ -30,6 +30,8 @@ The high-radius ladder above is the global corner contract: use the semantic tok
 
 Use `SquircleSurface` from `@/components/ui/squircle`. Its default element is a div; `asChild` merges onto one semantic child, preserving its ref, events, ARIA, and data attributes. `radius` defaults to surface. `corners` supports all, left, right, top, bottom, and none; calendar range middles use none to remain square.
 
+Use `ScoreReasonText` for score-history reasons wherever they are displayed: it preserves inherited compact text styling while rendering only `#<numeric problem id>` references as accessible external links with visible underline and keyboard focus.
+
 Native CSS uses `corner-shape: squircle` and semantic radius variables. Unsupported browsers use `@lisse/core` 0.7.2 superellipse paths with exponent 4, explicitly avoiding Lisse's default Figma curve. `data-squircle-mode` reports native/fallback; `data-squircle-fallback` on the document root forces the fallback for browser QA. Our React SquircleSurface is the framework adapter over Lisse core. The upstream React package is not installed because its hook mutates data-state/data-slot and its wrapper changes layout. Shadow mask IDs use a module-local increasing counter, so they remain unique across mounted instances without requiring crypto.randomUUID on older Safari.
 
 True circles (avatars, dots, spinners and circular glows), capsules (fully rounded pills), and geometry arrows are exceptions. Keep `rounded-full` only for these roles. Use `rounded-none` for intentionally square range middles. Any other radius exception requires a same-line `squircle-exception: <reason>` annotation reviewed with its consumer.

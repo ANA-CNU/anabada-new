@@ -1,4 +1,5 @@
 import type { Logger } from "pino";
+import { formatAction, inlineCode, truncateProse } from "./alert-markdown.js";
 import type { CycleReport } from "./application/cycle-types.js";
 import { IncidentFacts } from "./incident-facts.js";
 import type { WebhookDeliveryResult } from "./webhook.js";
@@ -144,24 +145,36 @@ export class EmergencyAlertFormatter {
       "# 🚨 ANABADA 긴급 장애 알림",
       "",
       "> **서비스:** `jungol-collector`",
-      `> **발생 시각:** \`${this.kst(incident.occurredAt)}\``,
-      `> **오류 코드:** \`${incident.code}\``,
+      `> **발생 시각:** ${inlineCode(this.kst(incident.occurredAt))}`,
+      `> **오류 코드:** ${inlineCode(incident.code)}`,
       "",
       "## 영향",
-      incident.impact,
+      truncateProse(incident.impact, 800),
     ].join("\n");
-    const actions = [
-      "",
-      "## 즉시 확인",
-      ...incident.actions.map((action, index) => `${index + 1}. ${action}`),
-    ].join("\n");
-    const facts = incident.facts.map((fact) => `- ${fact}`).join("\n");
-    const budget = Math.max(0, 2_000 - header.length - actions.length - 2);
-    const boundedFacts =
-      facts.length <= budget
-        ? facts
-        : `${facts.slice(0, Math.max(0, budget - 3))}...`;
-    return `${header}\n${boundedFacts}\n${actions}`;
+    const actionLines: string[] = [];
+    let actionsLength = 0;
+    for (const [index, action] of incident.actions.entries()) {
+      const line = `${index + 1}. ${formatAction(action)}`;
+      const nextLength =
+        actionsLength + (actionLines.length ? 1 : 0) + line.length;
+      if (nextLength > 600) break;
+      actionLines.push(line);
+      actionsLength = nextLength;
+    }
+    const actions = ["", "## 즉시 확인", ...actionLines].join("\n");
+    const budget = Math.max(0, 2_000 - header.length - actions.length - 1);
+    const boundedFacts: string[] = [];
+    let factsLength = 0;
+    for (const fact of incident.facts) {
+      const line = `- ${fact}`;
+      const nextLength =
+        factsLength + (boundedFacts.length ? 1 : 0) + line.length;
+      if (nextLength > budget) break;
+      boundedFacts.push(line);
+      factsLength = nextLength;
+    }
+    const facts = boundedFacts.join("\n");
+    return facts ? `${header}\n${facts}${actions}` : `${header}${actions}`;
   }
 
   private kst(value: Date): string {

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { URL } from "@/resource/constant";
 import { Separator } from "@/components/ui/separator";
+import { ScoreReasonText } from "@/components/ScoreReasonText";
 
 const messageOf = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
 
@@ -212,7 +213,7 @@ export default function LogManagement() {
                           placeholder="설명"
                         />
                       ) : (
-                        <span className="whitespace-pre-wrap break-words">{row.desc}</span>
+                        <ScoreReasonText className="whitespace-pre-wrap break-words">{row.desc}</ScoreReasonText>
                       )}
                     </td>
                     <td className="px-4 py-2 align-top w-28">

@@ -3,6 +3,7 @@ import { Writable } from "node:stream";
 import test from "node:test";
 import { pino } from "pino";
 import type { CycleReport } from "../src/application/cycle-types.js";
+import type { AccountFlowStep } from "../src/application/flow-log.js";
 import {
   CollectorIncidentFactory,
   EmergencyAlertFormatter,
@@ -36,6 +37,17 @@ const cycleReport: CycleReport = {
   accountFailures: [],
   commonFailures: [],
 };
+
+const completedAccountSteps = [
+  "browser_open",
+  "initial_cursor",
+  "initial_summary",
+  "prepare_snapshot",
+  "prepare_attempts",
+  "browser_close",
+  "initialize_transaction",
+  "incremental_collect",
+] as const satisfies readonly AccountFlowStep[];
 
 test("Given three sanitized summary failures When creating an incident Then it includes bounded numeric facts", () => {
   const result = new CollectorIncidentFactory().fromCycle(
@@ -79,9 +91,12 @@ test("Given three sanitized summary failures When creating an incident Then it i
   assert.ok(result);
   const message = new EmergencyAlertFormatter().format(result);
 
-  assert.match(message, /그룹 rank 기대 3 \/ 프로필 표시 10/);
-  assert.match(message, /그룹 rank 기대 2 \/ 프로필 표시 5/);
-  assert.match(message, /준비 대기 30000ms \/ 프로필 표시 73 \/ 목록 링크 50/);
+  assert.match(message, /그룹 rank 기대 `3` \/ 프로필 표시 `10`/);
+  assert.match(message, /그룹 rank 기대 `2` \/ 프로필 표시 `5`/);
+  assert.match(
+    message,
+    /준비 대기 `30000ms` \/ 프로필 표시 `73` \/ 목록 링크 `50`/,
+  );
 });
 
 test("Given unsafe diagnostic extras When formatting an incident Then only allowlisted fields reach the alert", () => {
@@ -129,7 +144,7 @@ test("Given unsafe diagnostic extras When formatting an incident Then only allow
     "private-stack",
   ])
     assert.equal(message.includes(forbidden), false);
-  assert.match(message, /그룹 rank 기대 3 \/ 프로필 표시 10/);
+  assert.match(message, /그룹 rank 기대 `3` \/ 프로필 표시 `10`/);
 });
 
 test("Given sanitized HTTP and network diagnostics When formatting an incident Then it preserves only their operational codes", () => {
@@ -163,8 +178,38 @@ test("Given sanitized HTTP and network diagnostics When formatting an incident T
   assert.ok(result);
   const message = new EmergencyAlertFormatter().format(result);
 
-  assert.match(message, /HTTP 상태 429/);
-  assert.match(message, /전송 코드 ETIMEDOUT/);
+  assert.match(message, /HTTP 상태 `429`/);
+  assert.match(message, /전송 코드 `ETIMEDOUT`/);
+});
+
+test("Given eight completed trace events When formatting an incident Then it preserves the final event as a separate code scalar", () => {
+  const result = new CollectorIncidentFactory().fromCycle({
+    ...cycleReport,
+    accountFailureCount: 1,
+    accountFailures: [
+      {
+        accountId: "42",
+        mode: "initial_summary",
+        code: "account_summary_invalid",
+        trace: {
+          droppedEventCount: 0,
+          events: completedAccountSteps.map((step, index) => ({
+            sequence: index + 1,
+            elapsedMs: index + 1,
+            step,
+            outcome: "completed" as const,
+          })),
+          primaryFailure: undefined,
+        },
+      },
+    ],
+  });
+  assert.ok(result);
+
+  const message = new EmergencyAlertFormatter().format(result);
+
+  assert.match(message, /`browser_open:completed@1ms`/);
+  assert.match(message, /`incremental_collect:completed@8ms`/);
 });
 
 test("Given a malicious transport exception When notifying Then it logs only the fixed delivery code", async () => {

@@ -30,6 +30,10 @@ interface StateRow extends RowDataPacket {
   readonly solution: string;
   readonly points: number;
 }
+interface ReplayRow extends RowDataPacket {
+  readonly initial_submission_id: string;
+  readonly initialized_at: Date;
+}
 interface RepetitionRow extends RowDataPacket {
   readonly repeatation: number;
 }
@@ -208,15 +212,15 @@ test(
               },
             ],
           );
-          const [beforeReplay] = await pool.query<RowDataPacket[]>(
+          const [beforeReplay] = await pool.query<ReplayRow[]>(
             "SELECT corrects,submissions,solution,initial_submission_id,initialized_at,(SELECT COUNT(*) FROM problem WHERE user_id=user.id) AS attempts FROM user WHERE jungol_account_id=12",
           );
           await initial(12, [12, 13], 1199n);
-          const [afterReplay] = await pool.query<RowDataPacket[]>(
+          const [afterReplay] = await pool.query<ReplayRow[]>(
             "SELECT corrects,submissions,solution,initial_submission_id,initialized_at,(SELECT COUNT(*) FROM problem WHERE user_id=user.id) AS attempts FROM user WHERE jungol_account_id=12",
           );
-          assert.equal(beforeReplay[0]?.["initial_submission_id"], "1199");
-          assert.ok(beforeReplay[0]?.["initialized_at"]);
+          assert.equal(beforeReplay[0]?.initial_submission_id, "1199");
+          assert.ok(beforeReplay[0]?.initialized_at);
           assert.deepEqual(afterReplay[0], beforeReplay[0]);
         },
       );

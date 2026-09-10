@@ -83,9 +83,9 @@ test("Given a health repository When checking schema migration Then requires mig
     },
     execute: async () => ({ affectedRows: 0, insertId: 0 }),
   };
-  await expect(new HealthRepository(database).hasRequiredMigration()).resolves.toBe(
-    false,
-  );
+  await expect(
+    new HealthRepository(database).hasRequiredMigration(),
+  ).resolves.toBe(false);
   expect(migrationValues).toEqual([3]);
 });
 

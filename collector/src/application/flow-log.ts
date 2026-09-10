@@ -28,6 +28,7 @@ export abstract class FlowLog<Step extends string> {
   private droppedEventCount = 0;
   private failed = false;
   private primaryFailure: FlowEvent<Step> | undefined;
+  private activeStep: Step | undefined;
 
   protected constructor(
     private readonly clock: () => number = () => performance.now(),
@@ -68,6 +69,7 @@ export abstract class FlowLog<Step extends string> {
     this.droppedEventCount = 0;
     this.failed = false;
     this.primaryFailure = undefined;
+    this.activeStep = undefined;
   }
 
   markRecovered(): void {
@@ -75,11 +77,17 @@ export abstract class FlowLog<Step extends string> {
     this.primaryFailure = undefined;
   }
 
+  protected activeStepValue(): Step | undefined {
+    return this.activeStep;
+  }
+
   private record(
     step: Step,
     outcome: FlowOutcome,
     errorKind?: FlowErrorKind,
   ): FlowEvent<Step> {
+    if (outcome === "started") this.activeStep = step;
+    else if (this.activeStep === step) this.activeStep = undefined;
     if (this.events.length === 32) {
       this.events.shift();
       this.droppedEventCount += 1;
@@ -149,6 +157,10 @@ export class CycleFlowLog extends FlowLog<CycleFlowStep> {
   constructor(clock: () => number = () => performance.now()) {
     super(clock);
   }
+
+  currentStep(): CycleFlowStep | undefined {
+    return this.activeStepValue();
+  }
 }
 
 export type GroupCycleFlowStep =
@@ -164,5 +176,9 @@ export type GroupCycleFlowStep =
 export class GroupCycleFlowLog extends FlowLog<GroupCycleFlowStep> {
   constructor(clock: () => number = () => performance.now()) {
     super(clock);
+  }
+
+  currentStep(): GroupCycleFlowStep | undefined {
+    return this.activeStepValue();
   }
 }
