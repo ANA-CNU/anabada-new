@@ -17,7 +17,9 @@ export const isCurrentKstMonthWindow = (
   const month = kst.getUTCMonth();
   const start = new Date(Date.UTC(year, month, 1) - 9 * 60 * 60 * 1_000);
   const end = new Date(Date.UTC(year, month + 1, 1) - 9 * 60 * 60 * 1_000);
-  return beginUtc.getTime() === start.getTime() && endUtc.getTime() === end.getTime();
+  return (
+    beginUtc.getTime() === start.getTime() && endUtc.getTime() === end.getTime()
+  );
 };
 export class BiasService {
   constructor(

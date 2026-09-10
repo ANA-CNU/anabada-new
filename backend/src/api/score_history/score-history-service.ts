@@ -1,10 +1,10 @@
 import type { DatabaseExecutor } from "../../infrastructure/mysql/database-session.js";
+import { MonthlyScoreCacheRepository } from "../../infrastructure/mysql/repositories/monthly-score-cache.js";
 import {
   type ManualScoreHistory,
   type ScoreHistoryPatch,
   ScoreHistoryRepository,
 } from "../../infrastructure/mysql/repositories/score-history-repository.js";
-import { MonthlyScoreCacheRepository } from "../../infrastructure/mysql/repositories/monthly-score-cache.js";
 
 export interface ScoreHistoryUnitOfWork {
   unitOfWork<T>(work: (database: DatabaseExecutor) => Promise<T>): Promise<T>;
