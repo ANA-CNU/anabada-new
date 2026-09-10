@@ -1,0 +1,114 @@
+name: anabada-dev-seeded
+
+services:
+  # 새 MySQL 9.3.0 named volume만 쓰는 로컬 미리보기 데이터베이스다.
+  anabada-mysql:
+    image: mysql:9.3.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the explicit env file}
+    volumes:
+      - ./database/my.cnf:/etc/mysql/conf.d/my.cnf:ro
+      - anabada-dev-seeded_mysql-data:/var/lib/mysql
+    networks: [seeded-preview]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin --protocol=TCP -h127.0.0.1 -uroot ping --silent"]
+      interval: 10s
+      timeout: 5s
+      start_period: 60s
+      retries: 12
+
+  jungol-migrator:
+    build: {context: ./migrations, dockerfile: Dockerfile}
+    environment:
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the explicit env file}
+    networks: [seeded-preview]
+    depends_on:
+      anabada-mysql: {condition: service_healthy}
+    restart: "no"
+
+  preview-seeder:
+    image: mysql:9.3.0
+    entrypoint: ["/bin/sh", "/seeds/seed.sh"]
+    environment:
+      DB_HOST: anabada-mysql
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the explicit env file}
+      DB_NAME: jungol_bada
+      PREVIEW_SEED: anabada-dev-seeded
+    volumes: ["./seeds:/seeds:ro"]
+    networks: [seeded-preview]
+    depends_on:
+      jungol-migrator: {condition: service_completed_successfully}
+    restart: "no"
+
+  anabada-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_KAKAO_MAP_API_KEY: ${VITE_KAKAO_MAP_API_KEY:-}
+    networks: [seeded-preview]
+    depends_on:
+      preview-seeder: {condition: service_completed_successfully}
+
+  anabada-middleware:
+    build: {context: ./middleware, dockerfile: Dockerfile}
+    environment:
+      PORT: "80"
+      NODE_ENV: development
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in the explicit env file}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:?Set ADMIN_USERNAME in the explicit env file}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in the explicit env file}
+      FRONTEND_URL: http://anabada-frontend:20030
+      ALLOWED_ORIGIN: http://localhost:20050
+    networks: [seeded-preview]
+    depends_on:
+      preview-seeder: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:80/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  anabada-backend:
+    build: {context: ./backend, dockerfile: Dockerfile.prod}
+    environment:
+      DB_HOST: anabada-mysql
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the explicit env file}
+      DB_NAME: jungol_bada
+      NODE_ENV: development
+      ALLOWED_ORIGIN: http://localhost:20050
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in the explicit env file}
+      WEBHOOK_URL: ""
+    networks: [seeded-preview]
+    restart: unless-stopped
+    depends_on:
+      preview-seeder: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  bada-nginx:
+    # loopback에만 공개하는 로컬 브라우저 진입점이다.
+    image: nginx:stable
+    volumes: ["./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro"]
+    ports: ["127.0.0.1:20050:80"]
+    networks: [seeded-preview]
+    depends_on:
+      anabada-backend: {condition: service_healthy}
+      anabada-middleware: {condition: service_healthy}
+
+volumes:
+  # 기존 dev/prod 데이터와 공유하지 않는 전용 named volume이다.
+  anabada-dev-seeded_mysql-data:
+    name: anabada-dev-seeded_mysql-data
+
+networks:
+  # 다른 Compose 프로젝트와 격리되는 local bridge network다.
+  seeded-preview:
+    name: anabada-dev-seeded_network
+    driver: bridge
