@@ -98,7 +98,7 @@ export class AccountSyncService {
           problemNumber: attempt.problemId,
           submittedAt: attempt.submittedAt,
           firstSolve: repetition === 0,
-          problemTier: attempt.problemTier,
+          problemTier: attempt.effectiveTier,
           userTier: member.tier,
           alreadyAwarded: dailyDays.has(this.calendar.day(attempt.submittedAt)),
         });

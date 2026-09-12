@@ -391,9 +391,13 @@ test(
             ],
           );
           const [level] = await pool.query<RowDataPacket[]>(
-            "SELECT level,estimated_tier FROM problem WHERE external_submission_id=101",
+            "SELECT problem_tier,estimated_tier,level FROM problem WHERE external_submission_id=101",
           );
-          assert.deepEqual(level[0], { level: -1, estimated_tier: 0 });
+          assert.deepEqual(level[0], {
+            problem_tier: 20,
+            estimated_tier: 0,
+            level: 19,
+          });
           const retryConnection = await pool.getConnection();
           try {
             await new GroupFeedRepository(retryConnection).appendInbox("77", [

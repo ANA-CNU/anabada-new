@@ -7,6 +7,7 @@ import {
   type PersistAccountInput,
 } from "../src/account-sync.js";
 import {
+  AcceptedAttempt,
   AccountInitialSnapshot,
   AccountSyncPlan,
   InitialSolvedProblem,
@@ -51,19 +52,15 @@ interface ScoreDayRow extends RowDataPacket {
   readonly created_at: Date;
 }
 const { MYSQL_TEST_PASSWORD: password, MYSQL_TEST_PORT: port } = process.env;
-const attempt = (
-  id: number,
-  problem: number,
-  time = "2026-09-07T01:00:00Z",
-) => ({
-  submissionId: submissionIdSchema.parse(id),
-  problemId: problemIdSchema.parse(problem),
-  problemName: null,
-  problemTier: 0,
-  estimatedTier: 0,
-  score: 100,
-  submittedAt: new Date(time),
-});
+const attempt = (id: number, problem: number, time = "2026-09-07T01:00:00Z") =>
+  new AcceptedAttempt(
+    submissionIdSchema.parse(id),
+    problemIdSchema.parse(problem),
+    null,
+    0,
+    new Date(time),
+    100,
+  );
 function input(
   account: number,
   attempts = [attempt(account * 100, account)],

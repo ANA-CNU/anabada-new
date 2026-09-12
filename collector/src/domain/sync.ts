@@ -76,6 +76,18 @@ export class AcceptedAttempt {
     /** 수집 시점 메타데이터가 없으면 0인 보수적 추정 난이도다. */
     readonly estimatedTier: number = 0,
   ) {}
+
+  /** 실제 1~31 티어를 우선하고 0·비정상값은 추정 티어를 사용한다. */
+  get effectiveTier(): number {
+    return isKnownProblemTier(this.problemTier)
+      ? this.problemTier
+      : this.estimatedTier;
+  }
+}
+
+/** 0은 메타데이터 미확인을 뜻하므로 정산 전 추정 fallback 대상으로만 취급한다. */
+export function isKnownProblemTier(tier: number): boolean {
+  return Number.isSafeInteger(tier) && tier >= 1 && tier <= 31;
 }
 
 /** 네트워크 작업과 DB transaction 사이의 완전한 사용자 수집 결과다. */

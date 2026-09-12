@@ -88,7 +88,7 @@ export class AttemptRepository {
         attempt.problemTier,
         attempt.estimatedTier,
         attempt.submittedAt,
-        attempt.estimatedTier - userTier,
+        attempt.effectiveTier - userTier,
         repetition,
         attempt.submissionId,
         attempt.score,

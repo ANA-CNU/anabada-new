@@ -19,6 +19,15 @@ interface CheckpointRow extends RowDataPacket {
   readonly window_upper_submission_id: string | null;
   readonly phase: string;
 }
+interface PersistedTierRow extends RowDataPacket {
+  readonly external_submission_id: string;
+  readonly problem_tier: number;
+  readonly estimated_tier: number;
+  readonly level: number;
+}
+interface DailyCountRow extends RowDataPacket {
+  readonly count: string;
+}
 
 const member = rankMemberSchema.parse({
   accountId: "5000",
@@ -285,6 +294,119 @@ export async function runGroupRuntimeCases(
         "SELECT COUNT(*) AS count FROM collector_ac_inbox WHERE group_id=1125 AND external_submission_id>=20200",
       );
       assert.equal(Number(outsideBatch[0]?.count), 1);
+    },
+  );
+
+  await t.test(
+    "runtime scores valid real tiers and only estimates missing tiers",
+    async () => {
+      await pool.query("DELETE FROM collector_ac_inbox");
+      await pool.query("DELETE FROM problem");
+      await pool.query("DELETE FROM score_history");
+      await pool.query(
+        "DELETE FROM user WHERE jungol_account_id IN (8100,8101)",
+      );
+      const calendar = new KstCalendar();
+      const unitOfWork = new AccountUnitOfWork(pool, calendar);
+      const initialization = new AccountInitializationService(unitOfWork);
+      const members = [8100, 8101].map((accountId) =>
+        rankMemberSchema.parse({
+          accountId: String(accountId),
+          jungolName: `tier-${accountId}`,
+          solvedCount: 0,
+          wrongCount: 0,
+          acRating: 3000,
+          tier: 31,
+        }),
+      );
+      for (const candidate of members)
+        await initialization.initialize(
+          new AccountInitialSnapshot(
+            new AccountSyncPlan("initial_summary", candidate, 0n, 0, 1),
+            [],
+            100n,
+          ),
+        );
+      await unitOfWork.executeConnection((connection) =>
+        new GroupFeedRepository(connection).appendInbox("1125", [
+          {
+            accountId: members[0]?.accountId ?? member.accountId,
+            submissionId: submissionIdSchema.parse(101),
+            problemId: problemIdSchema.parse(9810),
+            submittedAt: new Date("2026-09-10T01:00:00Z"),
+            score: 100,
+          },
+          {
+            accountId: members[1]?.accountId ?? member.accountId,
+            submissionId: submissionIdSchema.parse(102),
+            problemId: problemIdSchema.parse(9811),
+            submittedAt: new Date("2026-09-10T01:00:00Z"),
+            score: 100,
+          },
+        ]),
+      );
+      let estimatorCalls = 0;
+      const runtime = new GroupRuntime({
+        groupId: "1125",
+        accountUnitOfWork: unitOfWork,
+        initialization,
+        settlement: new AccountSettlementService(unitOfWork, "1125", calendar),
+        calendar,
+        members: async () => members,
+        feed: {
+          head: async () => 100n,
+          readPage: async () => ({
+            submissions: [],
+            nextCursor: null,
+            more: false,
+          }),
+        },
+        profiles: {
+          initialize: async () => assert.fail("unexpected initialization"),
+          currentMember: async (accountId) =>
+            members.find((candidate) => candidate.accountId === accountId) ??
+            assert.fail("unknown tier fixture account"),
+        },
+        metadata: {
+          read: async (problemId) => ({
+            problemId,
+            title: null,
+            tier: problemId === 9810 ? 17 : 0,
+          }),
+        },
+        project: async () => {},
+        tierEstimator: {
+          estimate_tier: async () => {
+            estimatorCalls += 1;
+            return 5;
+          },
+        },
+        now: () => new Date("2026-09-10T01:00:00Z"),
+      });
+      const result = await runtime.settle(new AbortController().signal);
+      assert.equal(result.failedUserCount, 0);
+      assert.equal(estimatorCalls, 1);
+      const [tiers] = await pool.query<PersistedTierRow[]>(
+        "SELECT external_submission_id,problem_tier,estimated_tier,level FROM problem WHERE external_submission_id IN (101,102) ORDER BY external_submission_id",
+      );
+      assert.deepEqual(tiers, [
+        {
+          external_submission_id: "101",
+          problem_tier: 17,
+          estimated_tier: 0,
+          level: -14,
+        },
+        {
+          external_submission_id: "102",
+          problem_tier: 0,
+          estimated_tier: 5,
+          level: -26,
+        },
+      ]);
+      const [daily] = await pool.query<DailyCountRow[]>(
+        "SELECT COUNT(*) AS count FROM score_history WHERE rule_type='daily' AND user_id=(SELECT id FROM user WHERE jungol_account_id=8100)",
+      );
+      assert.equal(Number(daily[0]?.count), 1);
     },
   );
 }

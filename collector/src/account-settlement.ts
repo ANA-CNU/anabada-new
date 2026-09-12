@@ -102,7 +102,7 @@ export class AccountSettlementService {
           problemNumber: attempt.problemId,
           submittedAt: attempt.submittedAt,
           firstSolve: repetition === 0,
-          problemTier: attempt.estimatedTier,
+          problemTier: attempt.effectiveTier,
           userTier: tier,
           alreadyAwarded: awardedDays.has(
             this.calendar.day(attempt.submittedAt),

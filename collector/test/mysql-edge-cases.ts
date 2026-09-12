@@ -7,6 +7,7 @@ import {
 } from "../src/account-sync.js";
 import { MetadataRefreshService } from "../src/application/metadata-refresh.js";
 import {
+  AcceptedAttempt,
   AccountSyncPlan,
   rankMemberSchema,
   type SyncMode,
@@ -76,15 +77,14 @@ const makeInput = (
     pageCount: 1,
     now: new Date("2026-09-07Z"),
     acceptedAttempts: [
-      {
-        submissionId: submissionIdSchema.parse(id),
-        problemId: problemIdSchema.parse(problem),
-        problemName: null,
-        problemTier: 0,
-        estimatedTier: 0,
-        score: 100,
-        submittedAt: new Date(time),
-      },
+      new AcceptedAttempt(
+        submissionIdSchema.parse(id),
+        problemIdSchema.parse(problem),
+        null,
+        0,
+        new Date(time),
+        100,
+      ),
     ],
   };
 };

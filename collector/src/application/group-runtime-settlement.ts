@@ -1,6 +1,6 @@
 import type { PoolConnection } from "mysql2/promise";
 import type { AccountSettlementService } from "../account-settlement.js";
-import { AcceptedAttempt } from "../domain/sync.js";
+import { AcceptedAttempt, isKnownProblemTier } from "../domain/sync.js";
 import type { ProblemId } from "../domain.js";
 import { ProblemTierEstimator } from "../group-domain.js";
 import type { ProblemMetadata } from "../jungol/metadata.js";
@@ -20,13 +20,15 @@ export interface GroupRuntimeMetadataPort {
   read(problemId: ProblemId, signal: AbortSignal): Promise<ProblemMetadata>;
 }
 
+type ProblemTierEstimatorPort = Pick<ProblemTierEstimator, "estimate_tier">;
+
 export type GroupSettlementRuntimeDependencies = {
   readonly groupId: string;
   readonly settlement: AccountSettlementService;
   readonly profiles: GroupRuntimeProfilePort;
   readonly metadata: GroupRuntimeMetadataPort;
   readonly now?: () => Date;
-  readonly tierEstimator?: ProblemTierEstimator;
+  readonly tierEstimator?: ProblemTierEstimatorPort;
 };
 
 type Transaction = <T>(
@@ -36,7 +38,7 @@ type Transaction = <T>(
 /** 그룹 rank snapshot과 문제 metadata를 transaction 전에 읽고 200행·10계정 정산 실패를 계정별로 격리한다. */
 export class GroupSettlementRuntime {
   private readonly now: () => Date;
-  private readonly tierEstimator: ProblemTierEstimator;
+  private readonly tierEstimator: ProblemTierEstimatorPort;
   private readonly metadata = new Map<ProblemId, ProblemMetadata>();
   private readonly estimatedTiers = new Map<ProblemId, number>();
   private readonly errors = new GroupRuntimeErrorPolicy();
@@ -137,13 +139,15 @@ export class GroupSettlementRuntime {
     for (const row of rows) {
       signal.throwIfAborted();
       const metadata = await this.metadataFor(row.problemId, signal);
-      const estimatedTier = await this.estimatedTierFor(row.problemId);
+      const problemTier = isKnownProblemTier(metadata.tier) ? metadata.tier : 0;
+      const estimatedTier =
+        problemTier === 0 ? await this.estimatedTierFor(row.problemId) : 0;
       attempts.push(
         new AcceptedAttempt(
           row.externalSubmissionId,
           row.problemId,
           metadata.title,
-          metadata.tier,
+          problemTier,
           row.submittedAt,
           row.score,
           estimatedTier,
