@@ -11,6 +11,7 @@ import type { ProblemId } from "../domain.js";
 import type { SafeJungolDiagnostics } from "../jungol/errors.js";
 import type { ProblemMetadata } from "../jungol/metadata.js";
 import type { CollectedSubmissions } from "../jungol/submission.js";
+import type { CycleTraceSnapshot } from "./cycle-diagnostics.js";
 import type {
   AccountFlowStep,
   CycleFlowStep,
@@ -77,6 +78,7 @@ export type CycleReport = {
   readonly accountFailures: readonly AccountFailure[];
   readonly commonFailures: readonly CommonFailure[];
   readonly pending?: boolean;
+  readonly cycleTrace?: CycleTraceSnapshot | undefined;
 };
 
 /** Discord 알림에 허용되는 계정별 collector 실패 정보만 보관한다. */

@@ -122,6 +122,9 @@ export class CollectorIncidentFactory {
     if (!report) return `${code}:runtime`;
     return [
       code,
+      report.cycleTrace
+        ? `${report.cycleTrace.firstFailure?.stage ?? "none"}:${this.traceTarget(report.cycleTrace.firstFailure?.context)}`
+        : "none:none",
       ...report.accountFailures
         .map(
           (failure) =>
@@ -135,6 +138,23 @@ export class CollectorIncidentFactory {
         )
         .sort(),
     ].join("|");
+  }
+
+  private traceTarget(
+    context:
+      | Readonly<Record<string, string | number | boolean | null>>
+      | undefined,
+  ): string {
+    if (!context) return "none";
+    const { accountId, actorHandle, submissionId, endpointPath } = context as {
+      readonly accountId?: string | number | boolean | null;
+      readonly actorHandle?: string | number | boolean | null;
+      readonly submissionId?: string | number | boolean | null;
+      readonly endpointPath?: string | number | boolean | null;
+    };
+    return String(
+      accountId ?? actorHandle ?? submissionId ?? endpointPath ?? "none",
+    );
   }
 }
 

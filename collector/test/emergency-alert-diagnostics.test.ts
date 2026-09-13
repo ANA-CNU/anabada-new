@@ -212,6 +212,36 @@ test("Given eight completed trace events When formatting an incident Then it pre
   assert.match(message, /`incremental_collect:completed@8ms`/);
 });
 
+test("Given a transaction rollback failure When formatting a bounded incident Then the cycle ID and first failure remain before optional facts", () => {
+  // Given
+  const result = new CollectorIncidentFactory().fromCycle({
+    ...cycleReport,
+    cycleTrace: {
+      cycleId: "cycle-42",
+      durationMs: 1_234,
+      transactionStatus: "rollback_failed",
+      droppedEventCount: 0,
+      events: [],
+      firstFailure: {
+        sequence: 2,
+        elapsedMs: 1_200,
+        durationMs: 1_100,
+        stage: "navigation",
+        outcome: "failed",
+        context: {},
+      },
+    },
+  });
+  assert.ok(result);
+
+  // When
+  const message = new EmergencyAlertFormatter().format(result);
+
+  // Then
+  assert.match(message, /cycle `cycle-42` \/ DB transaction `rollback_failed`/);
+  assert.match(message, /최초 실패 단계 `navigation` \/ `failed`/);
+});
+
 test("Given a malicious transport exception When notifying Then it logs only the fixed delivery code", async () => {
   const lines: string[] = [];
   const logger = pino(
@@ -251,4 +281,90 @@ test("Given a malicious transport exception When notifying Then it logs only the
     "PrivateErrorName",
   ])
     assert.equal(output.includes(forbidden), false);
+});
+
+test("Given an oversized failed cycle When formatting Then primary transaction and SQL failure facts remain within Discord's limit", () => {
+  const result = new CollectorIncidentFactory().fromCycle({
+    ...cycleReport,
+    status: "failed",
+    cycleTrace: {
+      cycleId: "cycle-priority",
+      durationMs: 9_999,
+      transactionStatus: "rollback_failed",
+      droppedEventCount: 99,
+      events: [],
+      firstFailure: {
+        sequence: 1,
+        elapsedMs: 10,
+        durationMs: 7,
+        stage: "db_commit",
+        outcome: "failed",
+        context: { submissionId: "77", errno: 1213, sqlState: "40001" },
+      },
+    },
+    accountFailures: Array.from({ length: 20 }, (_, index) => ({
+      accountId: String(index),
+      mode: "incremental" as const,
+      code: "failed",
+    })),
+    accountFailureCount: 20,
+  });
+  assert.ok(result);
+  const message = new EmergencyAlertFormatter().format(result);
+  assert.ok(message.length <= 2_000);
+  assert.match(message, /rollback_failed/);
+  assert.match(message, /제출 `77`/);
+  assert.match(message, /SQL 상태 `40001`/);
+});
+
+test("Given same code failures with distinct trace targets When notifying Then only an identical target is suppressed for thirty minutes", async () => {
+  const delivered: string[] = [];
+  const notifier = new EmergencyWebhookNotifier(
+    "https://example.test/webhook",
+    {
+      async send(_url, content) {
+        delivered.push(content);
+        return { kind: "delivered" as const };
+      },
+    },
+    pino({ level: "silent" }),
+  );
+  const report = (target: string): CycleReport => ({
+    ...cycleReport,
+    status: "failed",
+    cycleTrace: {
+      cycleId: "cycle-dedupe",
+      durationMs: 1,
+      transactionStatus: "active",
+      droppedEventCount: 0,
+      events: [],
+      firstFailure: {
+        sequence: 1,
+        elapsedMs: 1,
+        durationMs: 1,
+        stage: "submission_actor",
+        outcome: "failed",
+        context: { actorHandle: target },
+      },
+    },
+  });
+  const factory = new CollectorIncidentFactory();
+  const at = new Date("2026-01-01T00:00:00Z");
+  const first = factory.fromCycle(report("one"), at);
+  const other = factory.fromCycle(report("two"), new Date(at.getTime() + 1));
+  const same = factory.fromCycle(report("one"), new Date(at.getTime() + 2));
+  assert.ok(first && other && same);
+  assert.equal(
+    await notifier.notify(first, new AbortController().signal),
+    "delivered",
+  );
+  assert.equal(
+    await notifier.notify(other, new AbortController().signal),
+    "delivered",
+  );
+  assert.equal(
+    await notifier.notify(same, new AbortController().signal),
+    "suppressed",
+  );
+  assert.equal(delivered.length, 2);
 });

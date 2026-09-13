@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { serialize } from "bson";
 import { rankMemberSchema } from "../src/domain/sync.js";
+import { problemIdSchema, submissionIdSchema } from "../src/domain.js";
 import {
   GroupActorResolver,
+  GroupActorUnresolvedError,
   GroupWireDecoder,
 } from "../src/jungol/group-wire.js";
 
@@ -89,9 +91,26 @@ test("Given an actor handle matching one rank member When resolving Then the ver
     tier: 0,
   });
 
-  assert.equal(new GroupActorResolver([member]).accountIdFor("member"), "42");
+  const resolver = new GroupActorResolver([member]);
+  const entry = {
+    submissionId: submissionIdSchema.parse("20"),
+    problemId: problemIdSchema.parse(1000),
+  };
+  assert.equal(resolver.accountIdFor("member", entry, 2), "42");
   assert.throws(
-    () => new GroupActorResolver([member]).accountIdFor("missing"),
-    { message: "group_actor_unresolved" },
+    () => resolver.accountIdFor("missing\n`", entry, 2),
+    (error: unknown) => {
+      assert.equal(error instanceof GroupActorUnresolvedError, true);
+      assert.deepEqual((error as GroupActorUnresolvedError).diagnostics, {
+        stage: "actor",
+        submissionId: "20",
+        problemId: "1000",
+        actorHandle: "missing  ",
+        memberCount: 1,
+        responseCount: 2,
+        matchedCount: 1,
+      });
+      return true;
+    },
   );
 });

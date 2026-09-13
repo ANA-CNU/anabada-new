@@ -44,6 +44,22 @@ export type GroupWirePage = {
 
 export class GroupWireContractError extends BoundaryError {}
 
+export type SafeGroupActorDiagnostics = {
+  readonly stage: "actor";
+  readonly submissionId: string;
+  readonly problemId: string;
+  readonly actorHandle: string;
+  readonly memberCount: number;
+  readonly responseCount: number;
+  readonly matchedCount: number;
+};
+
+export class GroupActorUnresolvedError extends GroupWireContractError {
+  constructor(readonly diagnostics: SafeGroupActorDiagnostics) {
+    super("group_actor_unresolved");
+  }
+}
+
 /** 실제 group endpoint의 XOR BSON 경계를 파싱하며 미검증 필드는 즉시 버린다. */
 export class GroupWireDecoder {
   decode(body: Uint8Array, fingerprint: unknown): GroupWirePage {
@@ -90,6 +106,7 @@ export class GroupWireDecoder {
 /** group `u`는 실제 rank page의 login handle과 전부 대응할 때만 account ID로 변환한다. */
 export class GroupActorResolver {
   private readonly accountsByHandle = new Map<string, AccountId>();
+  private matchedCount = 0;
 
   constructor(members: readonly RankMemberSnapshot[]) {
     for (const member of members) {
@@ -99,9 +116,26 @@ export class GroupActorResolver {
     }
   }
 
-  accountIdFor(handle: string): AccountId {
+  accountIdFor(
+    handle: string,
+    entry: Pick<GroupWireEntry, "submissionId" | "problemId">,
+    responseCount: number,
+  ): AccountId {
     const accountId = this.accountsByHandle.get(handle);
-    if (!accountId) throw new GroupWireContractError("group_actor_unresolved");
+    if (!accountId)
+      throw new GroupActorUnresolvedError({
+        stage: "actor",
+        submissionId: entry.submissionId,
+        problemId: String(entry.problemId),
+        actorHandle: publicHandle(handle),
+        memberCount: this.accountsByHandle.size,
+        responseCount,
+        matchedCount: this.matchedCount,
+      });
+    this.matchedCount += 1;
     return accountId;
   }
 }
+
+const publicHandle = (value: string): string =>
+  value.replaceAll(/[\r\n`]/g, " ").slice(0, 64);

@@ -1,4 +1,5 @@
 import type { Logger } from "pino";
+import type { CycleTrace } from "./application/cycle-diagnostics.js";
 import type { CycleReport } from "./application/cycle-types.js";
 import type { EmergencyWebhookTransport } from "./emergency-alert.js";
 
@@ -21,10 +22,17 @@ type LifecycleOptions = {
 type ActiveCycle = {
   readonly id: string;
   readonly startedAt: Date;
+  readonly trace: CycleTrace | undefined;
   slowAlerted: boolean;
   cancel: (() => void) | undefined;
   finished: boolean;
   inFlight: Promise<void> | undefined;
+};
+
+export type CycleLifecycleStart = {
+  readonly cycleId: string;
+  readonly startedAt?: Date | undefined;
+  readonly trace?: CycleTrace | undefined;
 };
 
 /** cycle 수명에만 결합된 WEBHOOK_URL 알림과 완료 영수증을 관리한다. */
@@ -36,10 +44,16 @@ export class CycleLifecycleReporter {
     this.timer = options.timer ?? this.nativeTimer();
   }
 
-  start(startedAt = new Date()): ActiveCycle {
+  start(startedAt?: Date): ActiveCycle;
+  start(input: CycleLifecycleStart): ActiveCycle;
+  start(input: Date | CycleLifecycleStart = new Date()): ActiveCycle {
+    const context = input instanceof Date ? undefined : input;
+    const startedAt =
+      input instanceof Date ? input : (input.startedAt ?? new Date());
     const active: ActiveCycle = {
-      id: `${startedAt.getTime()}-${++this.sequence}`,
+      id: context?.cycleId ?? `${startedAt.getTime()}-${++this.sequence}`,
       startedAt,
+      trace: context?.trace,
       slowAlerted: false,
       cancel: undefined,
       finished: false,
@@ -97,7 +111,12 @@ export class CycleLifecycleReporter {
   }
 
   private slowMessage(active: ActiveCycle): string {
-    const stage = this.options.stage?.() ?? "unknown";
+    const snapshot = active.trace?.snapshot();
+    const stage =
+      active.trace?.currentStage() ??
+      snapshot?.events.at(-1)?.stage ??
+      this.options.stage?.() ??
+      "unknown";
     return this.bound([
       "# ⏱️ ANABADA collector 지연 알림",
       "",
@@ -105,6 +124,7 @@ export class CycleLifecycleReporter {
       `- 시작 시각: ${this.code(this.kst(active.startedAt))}`,
       `- 경과 시간: ${this.code("20분 이상")}`,
       `- 현재 단계: ${this.code(stage)}`,
+      `- DB transaction: ${this.code(snapshot?.transactionStatus ?? "not_started")}`,
       "",
       "요청 간 3초 대기는 정상 정책입니다. 현재 단계의 로그, 응답 대기, DB 잠금을 확인하세요.",
     ]);

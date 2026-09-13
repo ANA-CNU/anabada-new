@@ -17,15 +17,42 @@ export type FlowTrace<Step extends string> = {
   readonly primaryFailure?: FlowEvent<Step> | undefined;
 };
 
+/** 안전한 trace event를 제한된 순환 버퍼로 보관하는 공통 저장소다. */
+export class BoundedTraceBuffer<Event> {
+  private readonly values: Event[] = [];
+  private dropped = 0;
+
+  constructor(private readonly limit: number) {}
+
+  push(value: Event): void {
+    if (this.values.length === this.limit) {
+      this.values.shift();
+      this.dropped += 1;
+    }
+    this.values.push(value);
+  }
+
+  snapshot(copy: (value: Event) => Event): {
+    readonly values: readonly Event[];
+    readonly dropped: number;
+  } {
+    return { values: this.values.map(copy), dropped: this.dropped };
+  }
+
+  clear(): void {
+    this.values.length = 0;
+    this.dropped = 0;
+  }
+}
+
 /**
  * 흐름별 인스턴스만 보관하는 32개 이벤트 순환 버퍼다. 원문 예외·객체는 넣지 않아
  * 실패 알림 경계에서 계정 간 상태와 비밀이 섞이지 않는다.
  */
 export abstract class FlowLog<Step extends string> {
-  private readonly events: FlowEvent<Step>[] = [];
+  private readonly events = new BoundedTraceBuffer<FlowEvent<Step>>(32);
   private readonly startedAt: number;
   private sequence = 0;
-  private droppedEventCount = 0;
   private failed = false;
   private primaryFailure: FlowEvent<Step> | undefined;
   private activeStep: Step | undefined;
@@ -55,9 +82,10 @@ export abstract class FlowLog<Step extends string> {
 
   failureSnapshot(): FlowTrace<Step> | undefined {
     if (!this.failed) return undefined;
+    const snapshot = this.events.snapshot((event) => ({ ...event }));
     return {
-      events: this.events.map((event) => ({ ...event })),
-      droppedEventCount: this.droppedEventCount,
+      events: snapshot.values,
+      droppedEventCount: snapshot.dropped,
       primaryFailure: this.primaryFailure
         ? { ...this.primaryFailure }
         : undefined,
@@ -65,8 +93,7 @@ export abstract class FlowLog<Step extends string> {
   }
 
   dispose(): void {
-    this.events.length = 0;
-    this.droppedEventCount = 0;
+    this.events.clear();
     this.failed = false;
     this.primaryFailure = undefined;
     this.activeStep = undefined;
@@ -88,10 +115,6 @@ export abstract class FlowLog<Step extends string> {
   ): FlowEvent<Step> {
     if (outcome === "started") this.activeStep = step;
     else if (this.activeStep === step) this.activeStep = undefined;
-    if (this.events.length === 32) {
-      this.events.shift();
-      this.droppedEventCount += 1;
-    }
     const event = {
       sequence: ++this.sequence,
       elapsedMs: Math.max(0, this.clock() - this.startedAt),

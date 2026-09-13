@@ -4,6 +4,7 @@ import { createServer } from "node:http";
 import test from "node:test";
 import { serialize } from "bson";
 import { type Browser, chromium } from "playwright";
+import { CycleTrace } from "../src/application/cycle-diagnostics.js";
 import { rankMemberSchema } from "../src/domain/sync.js";
 import { GroupFeedCollector } from "../src/jungol/group-feed.js";
 import { JungolRequestCoordinator } from "../src/jungol/request-coordinator.js";
@@ -24,6 +25,15 @@ type FixtureMode =
   | "malformed"
   | "non_ac"
   | "rejected"
+  | "rejected_429"
+  | "server_error"
+  | "invalid_fingerprint"
+  | "invalid_schema"
+  | "unresolved_actor"
+  | "missing_header"
+  | "missing_row"
+  | "navigation_timeout"
+  | "response_timeout"
   | "auth";
 
 function encrypted(body: Parameters<typeof serialize>[0]): Uint8Array {
@@ -42,15 +52,28 @@ test("Given local group pages When resuming a feed Then it reuses only matching 
     );
     if (requestUrl.pathname === "/api/group/1125/submission") {
       apiRequests.push(requestUrl);
-      if (mode === "rejected") {
-        response.statusCode = 403;
+      if (mode === "response_timeout") return;
+      if (mode === "rejected" || mode === "rejected_429") {
+        response.statusCode = mode === "rejected" ? 403 : 429;
         response.end();
         return;
       }
-      response.setHeader("x-fp", fingerprint);
+      if (mode === "server_error") {
+        response.statusCode = 500;
+        response.end();
+        return;
+      }
+      response.setHeader(
+        "x-fp",
+        mode === "invalid_fingerprint" ? "not-a-fingerprint" : fingerprint,
+      );
       response.setHeader("cache-control", "no-store");
       if (mode === "malformed") {
         response.end(Buffer.from("malformed"));
+        return;
+      }
+      if (mode === "invalid_schema") {
+        response.end(encrypted({ data: { invalid: true } }));
         return;
       }
       const second = requestUrl.searchParams.get("cursor") === "cursor-a";
@@ -65,7 +88,7 @@ test("Given local group pages When resuming a feed Then it reuses only matching 
                     p: 1339,
                     r: mode === "non_ac" ? "WA" : "AC",
                     s: 100,
-                    u: "member",
+                    u: mode === "unresolved_actor" ? "unknown" : "member",
                     t: 1788608362887,
                   },
                 ]),
@@ -82,6 +105,10 @@ test("Given local group pages When resuming a feed Then it reuses only matching 
     }
     if (requestUrl.pathname === "/group/1125/submission") {
       documentNavigations += 1;
+      if (mode === "navigation_timeout") {
+        setTimeout(() => response.end("late"), 1_500);
+        return;
+      }
       if (mode === "auth") {
         response.statusCode = 302;
         response.setHeader("location", "/auth/signin");
@@ -90,9 +117,9 @@ test("Given local group pages When resuming a feed Then it reuses only matching 
       }
       response.setHeader("content-type", "text/html; charset=utf-8");
       response.end(`
-        <table><thead><tr><th scope="col">제출</th><th scope="col">문제</th><th scope="col">결과</th><th scope="col">점수</th><th scope="col">사용자</th><th scope="col">언어</th><th scope="col">메모리</th><th scope="col">시간</th><th scope="col">제출일</th></tr></thead><tbody>${mode === "empty" ? "" : "<tr><td>ready</td></tr>"}</tbody></table>
-        <button onclick="fetch('/api/group/1125/submission?result=AC&cursor=cursor-a', {headers:{'x-fp':'aa'}}).then(response => response.arrayBuffer())">더 불러오기</button>
-        <script>fetch('/api/group/1125/submission?result=AC', {headers:{'x-fp':'aa'}}).then(response => response.arrayBuffer())</script>
+        <table><thead><tr>${mode === "missing_header" ? "" : '<th scope="col">제출</th>'}</tr></thead><tbody>${mode === "empty" || mode === "missing_row" ? "" : "<tr><td>ready</td></tr>"}</tbody></table>
+        <button onclick="fetch('/api/group/1125/submission?result=AC&cursor=cursor-a', ${mode === "invalid_fingerprint" ? "{}" : "{headers:{'x-fp':'aa'}}"}).then(response => response.arrayBuffer())">더 불러오기</button>
+        <script>fetch('/api/group/1125/submission?result=AC', ${mode === "invalid_fingerprint" ? "{}" : "{headers:{'x-fp':'aa'}}"}).then(response => response.arrayBuffer())</script>
       `);
       return;
     }
@@ -123,9 +150,13 @@ test("Given local group pages When resuming a feed Then it reuses only matching 
     headless: true,
     ...(existsSync(chromium.executablePath()) ? {} : { channel: "chrome" }),
   });
+  const trace = new CycleTrace("fixture-cycle");
   const collector = new GroupFeedCollector(
     { baseUrl, pageTimeoutMs: 3000 },
     new JungolRequestCoordinator({ delay: async () => {} }),
+    undefined,
+    undefined,
+    trace,
   );
   const page = await browser.newPage();
 
@@ -145,6 +176,12 @@ test("Given local group pages When resuming a feed Then it reuses only matching 
     ["42"],
   );
   assert.equal(second.nextCursor, null);
+  assert.equal(
+    trace
+      .snapshot()
+      .events.some((event) => event.stage === "submission_response_observed"),
+    true,
+  );
 
   // Given
   apiRequests.length = 0;
@@ -192,21 +229,48 @@ test("Given local group pages When resuming a feed Then it reuses only matching 
     collector.readPage(wrongCursorPage, [member], wrongCursorFirst.nextCursor),
     { code: "group_feed_invalid_cursor" },
   );
+  assert.equal(trace.snapshot().firstFailure?.stage, "submission_cursor");
 
-  for (const failure of ["malformed", "non_ac", "rejected"] as const) {
+  for (const [failure, code, stage] of [
+    ["malformed", "invalid_bson", "submission_bson"],
+    ["invalid_fingerprint", "invalid_fingerprint", "submission_fingerprint"],
+    ["invalid_schema", "invalid_envelope", "submission_schema"],
+    ["unresolved_actor", "group_actor_unresolved", "submission_actor"],
+    ["missing_header", "group_feed_header_failed", "submission_header_wait"],
+    ["missing_row", "group_feed_rows_failed", "submission_rows_wait"],
+    ["rejected", "jungol_http_rejected", "submission_response_status"],
+    ["rejected_429", "jungol_http_rejected", "submission_response_status"],
+    ["server_error", "group_feed_http_failed", "submission_response_status"],
+    ["non_ac", "group_feed_non_ac_result", "submission_schema"],
+    ["navigation_timeout", "group_feed_navigation_failed", "page_navigation"],
+    [
+      "response_timeout",
+      "group_feed_responsewait_failed",
+      "submission_response_wait",
+    ],
+  ] as const) {
     // Given
     mode = failure;
     const failurePage = await browser.newPage();
 
     // When / Then
-    await assert.rejects(collector.readPage(failurePage, [member], null), {
-      code:
-        failure === "malformed"
-          ? "invalid_bson"
-          : failure === "non_ac"
-            ? "group_feed_non_ac_result"
-            : "jungol_http_rejected",
-    });
+    const failureTrace = new CycleTrace(`fixture-${failure}`);
+    const failureCollector = new GroupFeedCollector(
+      { baseUrl, pageTimeoutMs: failure.includes("timeout") ? 500 : 3_000 },
+      new JungolRequestCoordinator({ delay: async () => {} }),
+      undefined,
+      undefined,
+      failureTrace,
+    );
+    try {
+      await assert.rejects(
+        failureCollector.readPage(failurePage, [member], null),
+        { code },
+      );
+      assert.equal(failureTrace.snapshot().firstFailure?.stage, stage);
+    } finally {
+      await failurePage.close();
+    }
   }
 
   // Given

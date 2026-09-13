@@ -7,12 +7,39 @@ export type BrowserSettings = {
   readonly pageTimeoutMs: number;
 };
 export type PageCloser = Pick<Page, "close">;
+export type PageFailureContext = {
+  readonly code:
+    | "browser_failed"
+    | "group_feed_request_queue_wait_failed"
+    | "group_feed_navigation_failed"
+    | "group_feed_loadmore_failed"
+    | "group_feed_responsewait_failed"
+    | "group_feed_header_failed"
+    | "group_feed_rows_failed";
+  readonly stage:
+    | "page_operation"
+    | "request_queue_wait"
+    | "navigation"
+    | "loadmore"
+    | "responsewait"
+    | "header"
+    | "rows";
+  readonly pageNumber?: number | undefined;
+  readonly timeoutMs?: number | undefined;
+  readonly endpointPath?: string | undefined;
+};
+
+const defaultFailureContext: PageFailureContext = {
+  code: "browser_failed",
+  stage: "page_operation",
+};
 /** AbortSignal을 Playwright page 종료로 연결하고 외부 예외를 안전한 코드로 변환한다. */
 export class PageOperation {
   async run<T>(
     page: PageCloser,
     signal: AbortSignal | undefined,
     work: () => Promise<T>,
+    failureContext: PageFailureContext = defaultFailureContext,
   ): Promise<T> {
     if (signal?.aborted) throw new JungolError("cancelled");
     const cancel = () => {
@@ -28,8 +55,8 @@ export class PageOperation {
       if (error instanceof JungolError || error instanceof BoundaryError)
         throw error;
       if (error instanceof errors.TimeoutError)
-        throw new JungolError("browser_failed", {
-          stage: "page_operation",
+        throw new JungolError(failureContext.code, {
+          stage: failureContext.stage,
           reason: "timeout",
         });
       if (error instanceof Error) {
@@ -44,12 +71,12 @@ export class PageOperation {
           code === "ENOTFOUND" ||
           code === "ETIMEDOUT"
         )
-          throw new JungolError("browser_failed", {
-            stage: "page_operation",
+          throw new JungolError(failureContext.code, {
+            stage: failureContext.stage,
             reason: "network",
             transportCode: code,
           });
-        throw new JungolError("browser_failed");
+        throw new JungolError(failureContext.code);
       }
       throw error;
     } finally {

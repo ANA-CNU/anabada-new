@@ -15,13 +15,31 @@ export type JungolErrorCode =
   | "jungol_http_rejected"
   | "account_summary_invalid"
   | "account_summary_http_failed"
-  | "account_summary_mismatch";
+  | "account_summary_mismatch"
+  | "group_feed_request_queue_wait_failed"
+  | "group_feed_navigation_failed"
+  | "group_feed_loadmore_failed"
+  | "group_feed_responsewait_failed"
+  | "group_feed_header_failed"
+  | "group_feed_rows_failed";
 
 /** 원문 응답·URL·예외를 포함하지 않는 collector 전용 진단 단계다. */
 export type SafeJungolStage =
   | "account_summary"
   | "account_summary_readiness"
-  | "page_operation";
+  | "page_operation"
+  | "request_queue_wait"
+  | "navigation"
+  | "loadmore"
+  | "responsewait"
+  | "status"
+  | "fingerprint"
+  | "bson"
+  | "schema"
+  | "header"
+  | "rows"
+  | "actor"
+  | "cursor";
 export type SafeJungolReason = "http" | "mismatch" | "timeout" | "network";
 export type SafeJungolDiagnostics = {
   readonly stage: SafeJungolStage;
@@ -46,6 +64,18 @@ const diagnosticStages = new Set<SafeJungolStage>([
   "account_summary",
   "account_summary_readiness",
   "page_operation",
+  "request_queue_wait",
+  "navigation",
+  "loadmore",
+  "responsewait",
+  "status",
+  "fingerprint",
+  "bson",
+  "schema",
+  "header",
+  "rows",
+  "actor",
+  "cursor",
 ]);
 const diagnosticReasons = new Set<SafeJungolReason>([
   "http",
