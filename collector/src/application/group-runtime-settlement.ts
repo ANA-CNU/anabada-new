@@ -8,6 +8,7 @@ import {
   GroupFeedRepository,
   type SettlementInboxRow,
 } from "../mysql/group-feed.js";
+import type { SettlementAttemptOutcome } from "../settlement-outcome.js";
 import { AccountFlowLog } from "./flow-log.js";
 import type {
   GroupSettlementFailure,
@@ -69,6 +70,7 @@ export class GroupSettlementRuntime {
         groups.set(row.accountId, [...(groups.get(row.accountId) ?? []), row]);
       let insertedAttemptCount = 0;
       let duplicateAttemptCount = 0;
+      const settlementOutcomes: SettlementAttemptOutcome[] = [];
       const failures: GroupSettlementFailure[] = [];
       for (const [accountId, rowsForAccount] of groups) {
         const trace = new AccountFlowLog();
@@ -94,6 +96,7 @@ export class GroupSettlementRuntime {
           );
           insertedAttemptCount += result.insertedAttemptCount;
           duplicateAttemptCount += result.duplicateAttemptCount;
+          settlementOutcomes.push(...result.outcomes);
         } catch (error) {
           if (signal.aborted) throw error;
           if (this.errors.isCircuit(error)) throw error;
@@ -122,6 +125,7 @@ export class GroupSettlementRuntime {
         failures,
         insertedAttemptCount,
         duplicateAttemptCount,
+        settlementOutcomes,
         inboxEmpty,
       };
       return result;

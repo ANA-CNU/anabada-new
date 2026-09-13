@@ -23,7 +23,7 @@ const success: CycleReport = {
 };
 
 for (const overflow of [false, true]) {
-  test(`successful trace reaches the webhook with bounded safe timings (overflow=${overflow})`, async () => {
+  test(`successful receipt excludes diagnostic timings (overflow=${overflow})`, async () => {
     // Given: 실제 trace 버퍼에 여러 요청의 완료 기록을 누적한다.
     let now = 0;
     const trace = new CycleTrace("receipt-fixture", () => now);
@@ -59,14 +59,12 @@ for (const overflow of [false, true]) {
     await reporter.complete(active, success);
     trace.dispose();
 
-    // Then: 요약은 버퍼 해제와 독립적이며 원문 context는 전달하지 않는다.
+    // Then: 업무 결과 요약은 진단 trace를 노출하지 않는다.
     const message = messages[0] ?? "";
     assert.equal(messages.length, 1);
     assert.match(message, /`committed`/);
-    assert.match(message, /`submission_response_wait`/);
-    assert.match(message, /`transaction_commit`/);
-    if (!overflow) assert.match(message, /`250ms`/);
-    else assert.match(message, /생략된 이전 로그: `[1-9][0-9]*`/);
+    assert.doesNotMatch(message, /submission_response_wait/);
+    assert.doesNotMatch(message, /transaction_commit/);
     assert.doesNotMatch(message, /private-fixture/);
     assert.ok(message.length <= 2000);
     for (const line of message.split("\n"))

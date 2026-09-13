@@ -11,6 +11,7 @@ import type { ProblemId } from "../domain.js";
 import type { SafeJungolDiagnostics } from "../jungol/errors.js";
 import type { ProblemMetadata } from "../jungol/metadata.js";
 import type { CollectedSubmissions } from "../jungol/submission.js";
+import type { SettlementAttemptOutcome } from "../settlement-outcome.js";
 import type { CycleTraceSnapshot } from "./cycle-diagnostics.js";
 import type {
   AccountFlowStep,
@@ -73,6 +74,9 @@ export type CycleReport = {
   readonly acceptedAttemptCount: number;
   readonly insertedAttemptCount: number;
   readonly duplicateAttemptCount: number;
+  readonly settlementOutcomes?: readonly SettlementAttemptOutcome[];
+  readonly initializedAccountCount?: number;
+  readonly initializedSolvedCount?: number;
   readonly errorCode: string | null;
   readonly accountFailureCount: number;
   readonly accountFailures: readonly AccountFailure[];

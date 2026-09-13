@@ -36,6 +36,15 @@ export class GroupCycleReportMapper {
       acceptedAttemptCount: result.scan.acceptedCount,
       insertedAttemptCount: result.settlement.insertedAttemptCount,
       duplicateAttemptCount: result.settlement.duplicateAttemptCount,
+      ...(result.settlement.settlementOutcomes
+        ? { settlementOutcomes: result.settlement.settlementOutcomes }
+        : {}),
+      ...(result.settlement.initializedAccountCount !== undefined
+        ? { initializedAccountCount: result.settlement.initializedAccountCount }
+        : {}),
+      ...(result.settlement.initializedSolvedCount !== undefined
+        ? { initializedSolvedCount: result.settlement.initializedSolvedCount }
+        : {}),
       errorCode: failures[0]?.code ?? null,
       accountFailureCount: failures.length,
       accountFailures: failures.slice(0, 5),

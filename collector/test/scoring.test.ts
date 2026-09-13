@@ -76,6 +76,26 @@ test("daily eligibility uses first solve, tier zero, threshold and KST day", () 
   );
 });
 
+test("Given a daily score conflict When deciding a reason Then existing daily precedence is retained", () => {
+  const policy = new DailyScorePolicy(new KstCalendar());
+
+  const decision = policy.decide({
+    userId: 1,
+    problemRowId: 1,
+    problemNumber: 10,
+    submittedAt: new Date(0),
+    firstSolve: false,
+    problemTier: 0,
+    userTier: 20,
+    alreadyAwarded: true,
+  });
+
+  assert.deepEqual(decision, {
+    kind: "no_award",
+    reason: "daily_already_awarded",
+  });
+});
+
 test("monthly bias window rolls over the year at midnight KST", () => {
   const [start, end] = new KstCalendar().monthWindow(
     new Date("2026-12-31T15:00:00Z"),

@@ -14,6 +14,7 @@ import type { AccountUnitOfWork } from "../mysql/unit-of-work.js";
 import { UserRepository } from "../mysql/users.js";
 import type { ProjectionResult } from "../projection.js";
 import type { KstCalendar } from "../scoring/daily.js";
+import type { SettlementAttemptOutcome } from "../settlement-outcome.js";
 import type { CycleTrace } from "./cycle-diagnostics.js";
 import type { PreparedCycle, PreparedSettlement } from "./cycle-preparation.js";
 
@@ -22,6 +23,9 @@ export type CycleCommitResult = {
   readonly scannedPageCount: number;
   readonly insertedAttemptCount: number;
   readonly duplicateAttemptCount: number;
+  readonly settlementOutcomes: readonly SettlementAttemptOutcome[];
+  readonly initializedAccountCount: number;
+  readonly initializedSolvedCount: number;
   readonly settledUserCount: number;
   readonly inboxEmpty: boolean;
   readonly finalized: boolean;
@@ -126,6 +130,7 @@ export class CycleCommitService {
       this.assertSettlementSnapshot(prepared.settlements, settlementRows);
     let insertedAttemptCount = 0;
     let duplicateAttemptCount = 0;
+    const settlementOutcomes: SettlementAttemptOutcome[] = [];
     if (prepared.collection.complete) {
       for (const settlement of prepared.settlements) {
         signal.throwIfAborted();
@@ -141,6 +146,7 @@ export class CycleCommitService {
         );
         insertedAttemptCount += result.insertedAttemptCount;
         duplicateAttemptCount += result.duplicateAttemptCount;
+        settlementOutcomes.push(...result.outcomes);
       }
     }
     const inboxEmpty =
@@ -174,6 +180,13 @@ export class CycleCommitService {
       scannedPageCount: prepared.collection.scannedPageCount,
       insertedAttemptCount,
       duplicateAttemptCount,
+      settlementOutcomes,
+      initializedAccountCount: prepared.initializations.length,
+      initializedSolvedCount: prepared.initializations.reduce(
+        (count, initialization) =>
+          count + initialization.snapshot.solved.length,
+        0,
+      ),
       settledUserCount: prepared.collection.complete
         ? prepared.settlements.length
         : 0,

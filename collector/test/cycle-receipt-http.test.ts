@@ -61,12 +61,13 @@ test("Given a successful pending cycle When its receipt is delivered Then the Di
 
   assert.equal(method, "POST");
   const receipt = receiptSchema.parse(JSON.parse(received));
-  assert.match(receipt.content, /ANABADA collector 정상 완료/);
+  assert.match(receipt.content, /Jungol 수집 완료/);
   assert.match(receipt.content, /상태: `success_pending`/);
   assert.match(receipt.content, /삽입 AC: `4`건/);
   assert.match(receipt.content, /중복 AC: `2`건/);
   assert.match(receipt.content, /정산 성공 사용자: `2`명/);
-  assert.match(receipt.content, /실행 시간: `1분 5초`/);
+  assert.match(receipt.content, /소요 `1분 5초`/);
+  assert.match(receipt.content, /수집 진행 중 · 정산 대기/);
 });
 
 class FakeTimer implements CycleLifecycleTimer {

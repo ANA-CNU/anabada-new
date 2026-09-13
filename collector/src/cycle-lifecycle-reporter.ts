@@ -1,8 +1,6 @@
 import type { Logger } from "pino";
-import type {
-  CycleTrace,
-  CycleTraceSnapshot,
-} from "./application/cycle-diagnostics.js";
+import { inlineCode } from "./alert-markdown.js";
+import type { CycleTrace } from "./application/cycle-diagnostics.js";
 import type { CycleReport } from "./application/cycle-types.js";
 import type { EmergencyWebhookTransport } from "./emergency-alert.js";
 
@@ -30,6 +28,10 @@ type ActiveCycle = {
   cancel: (() => void) | undefined;
   finished: boolean;
   inFlight: Promise<void> | undefined;
+};
+
+type PageNumberContext = {
+  readonly pageNumber?: string | number | boolean | null;
 };
 
 export type CycleLifecycleStart = {
@@ -79,7 +81,10 @@ export class CycleLifecycleReporter {
     this.clear(active);
     await active.inFlight;
     if (report.status !== "success") return;
-    await this.deliver(this.receiptMessage(active, report, completedAt));
+    const snapshot = active.trace?.snapshot() ?? report.cycleTrace;
+    if (snapshot && snapshot.transactionStatus !== "committed") return;
+    for (const content of this.receiptMessages(active, report, completedAt))
+      await this.deliver(content);
   }
 
   async stop(active: ActiveCycle | undefined): Promise<void> {
@@ -120,6 +125,12 @@ export class CycleLifecycleReporter {
       snapshot?.events.at(-1)?.stage ??
       this.options.stage?.() ??
       "unknown";
+    const pageEvent = snapshot?.events.toReversed().find((event) => {
+      const context: PageNumberContext = event.context;
+      return typeof context.pageNumber === "number";
+    });
+    const pageContext: PageNumberContext | undefined = pageEvent?.context;
+    const pageNumber = pageContext?.pageNumber;
     return this.bound([
       "# ⏱️ ANABADA collector 지연 알림",
       "",
@@ -127,67 +138,93 @@ export class CycleLifecycleReporter {
       `- 시작 시각: ${this.code(this.kst(active.startedAt))}`,
       `- 경과 시간: ${this.code("20분 이상")}`,
       `- 현재 단계: ${this.code(stage)}`,
+      ...(typeof pageNumber === "number"
+        ? [`- 재탐색 페이지: ${this.code(pageNumber)}`]
+        : []),
+      ...(snapshot?.progress?.scannedPageCount
+        ? [`- 읽은 페이지: ${this.code(snapshot.progress.scannedPageCount)}`]
+        : []),
       `- DB transaction: ${this.code(snapshot?.transactionStatus ?? "not_started")}`,
       "",
       "요청 간 3초 대기는 정상 정책입니다. 현재 단계의 로그, 응답 대기, DB 잠금을 확인하세요.",
     ]);
   }
 
-  private receiptMessage(
+  private receiptMessages(
     active: ActiveCycle,
     report: CycleReport,
     completedAt: Date,
-  ): string {
+  ): readonly string[] {
     const pending = report.pending === true ? "success_pending" : "success";
     const snapshot = active.trace?.snapshot() ?? report.cycleTrace;
-    return this.bound([
-      "# ✅ ANABADA collector 정상 완료",
+    const outcomes = report.settlementOutcomes ?? [];
+    const lines = [
+      "# Jungol 수집 완료",
       "",
+      `시작 ${this.code(this.kst(active.startedAt))} → 종료 ${this.code(this.kst(completedAt))} · 소요 ${this.code(this.duration(completedAt.getTime() - active.startedAt.getTime()))}`,
+      "",
+      "## 풀이 및 점수",
+      ...this.outcomeLines(outcomes),
+      ...(report.initializedAccountCount
+        ? [
+            `- 신규 사용자 초기화: ${this.code(report.initializedAccountCount)}명 / 과거 풀이 ${this.code(report.initializedSolvedCount ?? 0)}개, 점수 없음`,
+          ]
+        : []),
+      ...(outcomes.length === 0 &&
+      !report.initializedAccountCount &&
+      !report.pending
+        ? ["새로 반영한 풀이와 점수가 없습니다"]
+        : []),
+      ...(report.pending ? ["수집 진행 중 · 정산 대기"] : []),
+      "",
+      "## 요약",
       `- cycle: ${this.code(active.id)}`,
       `- 상태: ${this.code(pending)}`,
-      `- 시작 시각: ${this.code(this.kst(active.startedAt))}`,
-      `- 종료 시각: ${this.code(this.kst(completedAt))}`,
-      `- 실행 시간: ${this.code(this.duration(completedAt.getTime() - active.startedAt.getTime()))}`,
       `- DB transaction: ${this.code(snapshot?.transactionStatus ?? "unknown")}`,
-      `- 그룹 사용자: ${this.code(report.rankCount)}명`,
-      `- 조회 페이지: ${this.code(snapshot?.progress?.scannedPageCount ?? "unknown")}`,
       `- 삽입 AC: ${this.code(report.insertedAttemptCount)}건`,
       `- 중복 AC: ${this.code(report.duplicateAttemptCount)}건`,
       `- 정산 성공 사용자: ${this.code(report.successUserCount)}명`,
       `- 수집 AC: ${this.code(report.acceptedAttemptCount)}건`,
-      ...(report.pending
-        ? ["- 남은 수집·정산은 다음 cycle에서 이어서 처리합니다."]
-        : []),
-      ...this.successTrace(snapshot),
-    ]);
+    ];
+    return this.split(lines);
   }
 
-  private successTrace(
-    snapshot: CycleTraceSnapshot | undefined,
+  private outcomeLines(
+    outcomes: NonNullable<CycleReport["settlementOutcomes"]>,
   ): readonly string[] {
-    if (!snapshot) return [];
-    const stages = new Map<string, { count: number; durationMs: number }>();
-    for (const event of snapshot.events) {
-      if (event.outcome !== "completed") continue;
-      const total = stages.get(event.stage) ?? { count: 0, durationMs: 0 };
-      stages.set(event.stage, {
-        count: total.count + 1,
-        durationMs: total.durationMs + event.durationMs,
-      });
+    return outcomes.flatMap((outcome) => {
+      const daily = this.dailyText(outcome.daily);
+      const prefix = `- ${inlineCode(outcome.jungolName)} · ${inlineCode(`#${outcome.problemId}`)} 해결 (${inlineCode(this.kstDay(outcome.submittedAt))}) → `;
+      const events = outcome.eventIds.map(
+        (eventId) =>
+          `이벤트 ${inlineCode(`#event${eventId}`)} ${inlineCode("+1")}`,
+      );
+      if (events.length === 0) return [`${prefix}${daily}`];
+      const lines: string[] = [];
+      for (let index = 0; index < events.length; index += 20) {
+        const chunk = events.slice(index, index + 20);
+        lines.push(
+          `${prefix}${index === 0 ? `${daily}, ` : ""}${chunk.join(", ")}`,
+        );
+      }
+      return lines;
+    });
+  }
+
+  private dailyText(
+    daily: NonNullable<CycleReport["settlementOutcomes"]>[number]["daily"],
+  ): string {
+    if (daily.kind === "awarded") return `일일 점수 ${inlineCode("+1")}`;
+    switch (daily.reason) {
+      case "initial_cutoff":
+        return "일일 점수 미지급: 초기 기준선 제출";
+      case "repeat_solve":
+        return "일일 점수 미지급: 이미 해결한 문제";
+      case "daily_already_awarded":
+        return "일일 점수 미지급: 해당 제출일의 일일 점수를 이미 받음";
+      case "tier_too_low":
+        return `일일 점수 미지급: tier 조건 미충족 (문제 ${inlineCode(daily.problemTier)}, 사용자 ${inlineCode(daily.userTier)})`;
     }
-    const selected = [...stages.entries()]
-      .sort((left, right) => right[1].durationMs - left[1].durationMs)
-      .slice(0, 8);
-    return [
-      "",
-      "## 단계별 소요 시간",
-      "보관된 완료 로그 기준, 오래 걸린 최대 8개 단계입니다. 상·하위 단계 시간은 겹칩니다.",
-      `- 생략된 이전 로그: ${this.code(snapshot.droppedEventCount)}건`,
-      ...selected.map(
-        ([stage, total]) =>
-          `- ${this.code(stage)}: ${this.code(total.count)}회 · 누적 ${this.code(`${Math.round(total.durationMs)}ms`)}`,
-      ),
-    ];
   }
 
   private bound(lines: readonly string[]): string {
@@ -200,6 +237,24 @@ export class CycleLifecycleReporter {
       length = nextLength;
     }
     return kept.join("\n");
+  }
+
+  private split(lines: readonly string[]): readonly string[] {
+    const messages: string[] = [];
+    let current: string[] = [];
+    let length = 0;
+    for (const line of lines) {
+      const next = line.length + (current.length === 0 ? 0 : 1);
+      if (current.length > 0 && length + next >= 2_000) {
+        messages.push(current.join("\n"));
+        current = ["# Jungol 수집 완료 (계속)", ""];
+        length = "# Jungol 수집 완료 (계속)".length + 1;
+      }
+      current.push(line);
+      length += line.length + (current.length === 1 ? 0 : 1);
+    }
+    if (current.length > 0) messages.push(current.join("\n"));
+    return messages;
   }
 
   private code(value: string | number): string {
@@ -220,6 +275,15 @@ export class CycleLifecycleReporter {
       second: "2-digit",
       hour12: false,
     }).format(value)} KST`;
+  }
+
+  private kstDay(value: Date): string {
+    return new Intl.DateTimeFormat("sv-SE", {
+      timeZone: "Asia/Seoul",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(value);
   }
 
   private duration(milliseconds: number): string {

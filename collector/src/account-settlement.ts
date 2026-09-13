@@ -14,6 +14,18 @@ import { UserRepository } from "./mysql/users.js";
 import { DailyScorePolicy, type KstCalendar } from "./scoring/daily.js";
 import { EventManager } from "./scoring/events.js";
 import { AcRatingTierMapper } from "./scoring/tier.js";
+import {
+  dailyOutcomeFromDecision,
+  orderAcceptedAttempts,
+  type SettlementAttemptOutcome,
+  type SettlementDailyOutcome,
+} from "./settlement-outcome.js";
+
+export type {
+  SettlementAttemptOutcome,
+  SettlementDailyOutcome,
+} from "./settlement-outcome.js";
+export { orderAcceptedAttempts } from "./settlement-outcome.js";
 
 export type PreparedAccountBatch = {
   readonly member: RankMemberSnapshot;
@@ -27,17 +39,8 @@ export type PreparedAccountBatch = {
 export type AccountSettlementResult = {
   readonly insertedAttemptCount: number;
   readonly duplicateAttemptCount: number;
+  readonly outcomes: readonly SettlementAttemptOutcome[];
 };
-
-export function orderAcceptedAttempts(
-  attempts: readonly AcceptedAttempt[],
-): readonly AcceptedAttempt[] {
-  return [...attempts].sort(
-    (left, right) =>
-      left.submittedAt.getTime() - right.submittedAt.getTime() ||
-      (BigInt(left.submissionId) < BigInt(right.submissionId) ? -1 : 1),
-  );
-}
 
 /** 준비된 account batch는 사용자 잠금 뒤 원장·점수·cursor·inbox 삭제를 함께 확정한다. */
 export class AccountSettlementService {
@@ -91,6 +94,7 @@ export class AccountSettlementService {
     );
     const cutoff = BigInt(user.initialSubmissionId);
     let insertedAttemptCount = 0;
+    const outcomes: SettlementAttemptOutcome[] = [];
     for (const attempt of orderedAttempts) {
       batch.signal?.throwIfAborted();
       if (duplicates.has(attempt.submissionId)) continue;
@@ -116,8 +120,21 @@ export class AccountSettlementService {
       if (problemRowId === null) continue;
       insertedAttemptCount += 1;
       solved.set(attempt.problemId, repetition + 1);
-      if (BigInt(attempt.submissionId) <= cutoff) continue;
-      const daily = this.dailyPolicy.evaluate({
+      if (BigInt(attempt.submissionId) <= cutoff) {
+        outcomes.push(
+          this.outcome(
+            batch,
+            attempt,
+            {
+              kind: "not_awarded",
+              reason: "initial_cutoff",
+            },
+            [],
+          ),
+        );
+        continue;
+      }
+      const daily = this.dailyPolicy.decide({
         userId: user.id,
         problemRowId,
         problemNumber: attempt.problemId,
@@ -127,8 +144,9 @@ export class AccountSettlementService {
         userTier: tier,
         alreadyAwarded: awardedDays.has(this.calendar.day(attempt.submittedAt)),
       });
-      if (daily) {
-        await this.stage(
+      let dailyOutcome: SettlementDailyOutcome;
+      if (daily.kind === "award") {
+        const persisted = await this.stage(
           batch.trace,
           "daily_score",
           {
@@ -137,18 +155,26 @@ export class AccountSettlementService {
             problemId: attempt.problemId,
             operationId: "daily_score",
           },
-          () => scores.insert(daily),
+          () => scores.insert(daily.award),
         );
-        awardedDays.add(daily.scoreDay);
-      }
+        if (persisted === "inserted") {
+          dailyOutcome = { kind: "awarded", scoreDay: daily.award.scoreDay };
+        } else
+          dailyOutcome = {
+            kind: "not_awarded",
+            reason: "daily_already_awarded",
+          };
+        awardedDays.add(daily.award.scoreDay);
+      } else dailyOutcome = dailyOutcomeFromDecision(daily);
+      const eventIds: number[] = [];
       for (const award of events.detect({
         syncMode: "incremental",
         userId: user.id,
         problemRowId,
         problemNumber: attempt.problemId,
         submittedAt: attempt.submittedAt,
-      }))
-        await this.stage(
+      })) {
+        const persisted = await this.stage(
           batch.trace,
           "event_score",
           {
@@ -159,6 +185,10 @@ export class AccountSettlementService {
           },
           () => scores.insert(award),
         );
+        if (persisted === "inserted" && award.eventId !== null)
+          eventIds.push(award.eventId);
+      }
+      outcomes.push(this.outcome(batch, attempt, dailyOutcome, eventIds));
     }
     const cursor =
       batch.highestSubmissionId > BigInt(user.solution)
@@ -200,6 +230,24 @@ export class AccountSettlementService {
     return {
       insertedAttemptCount,
       duplicateAttemptCount: orderedAttempts.length - insertedAttemptCount,
+      outcomes,
+    };
+  }
+
+  private outcome(
+    batch: PreparedAccountBatch,
+    attempt: AcceptedAttempt,
+    daily: SettlementDailyOutcome,
+    eventIds: readonly number[],
+  ): SettlementAttemptOutcome {
+    return {
+      accountId: batch.member.accountId,
+      jungolName: batch.member.jungolName,
+      problemId: attempt.problemId,
+      submissionId: attempt.submissionId,
+      submittedAt: attempt.submittedAt,
+      daily,
+      eventIds,
     };
   }
 

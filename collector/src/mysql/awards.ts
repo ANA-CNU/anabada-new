@@ -49,28 +49,43 @@ export class ScoreHistoryRepository {
     return new Set(rows.map((row) => row.day));
   }
 
-  async insert(award: ScoreAward): Promise<void> {
-    const [result] = await this.connection.execute<ResultSetHeader>(
-      "INSERT INTO score_history (user_id, problem_id, rule_type, award_key, score_day, event_id, bias, `desc`, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?) ON DUPLICATE KEY UPDATE id=id",
-      [
-        award.userId,
-        award.problemRowId,
-        award.ruleType,
-        award.awardKey,
-        award.scoreDay,
-        award.eventId,
-        award.description,
-        award.createdAt,
-      ],
-    );
-    if (result.affectedRows === 1 && result.insertId > 0) return;
+  async insert(award: ScoreAward): Promise<"inserted" | "duplicate"> {
+    try {
+      await this.connection.execute<ResultSetHeader>(
+        "INSERT INTO score_history (user_id, problem_id, rule_type, award_key, score_day, event_id, bias, `desc`, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)",
+        [
+          award.userId,
+          award.problemRowId,
+          award.ruleType,
+          award.awardKey,
+          award.scoreDay,
+          award.eventId,
+          award.description,
+          award.createdAt,
+        ],
+      );
+      return "inserted";
+    } catch (error) {
+      if (!this.isDuplicateKey(error)) throw error;
+      const existing = await this.readAwardForUpdate(award.awardKey);
+      if (!existing) throw new PersistenceError("score_conflict");
+      this.assertSameAward(existing, award);
+      return "duplicate";
+    }
+  }
+
+  private async readAwardForUpdate(
+    awardKey: string,
+  ): Promise<AwardRow | undefined> {
     const [rows] = await this.connection.execute<AwardRow[]>(
       "SELECT s.user_id AS userId, s.problem_id AS problemId, p.problem AS problemNumber, s.event_id AS eventId, s.rule_type AS ruleType, DATE_FORMAT(s.score_day,'%Y-%m-%d') AS scoreDay FROM score_history s LEFT JOIN problem p ON p.id=s.problem_id WHERE s.award_key=? FOR UPDATE",
-      [award.awardKey],
+      [awardKey],
     );
-    const existing = rows[0];
+    return rows[0];
+  }
+
+  private assertSameAward(existing: AwardRow, award: ScoreAward): void {
     if (
-      !existing ||
       existing.userId !== award.userId ||
       existing.eventId !== award.eventId ||
       existing.ruleType !== award.ruleType ||
@@ -80,6 +95,14 @@ export class ScoreHistoryRepository {
         : existing.problemNumber !== award.problemNumber)
     )
       throw new PersistenceError("score_conflict");
+  }
+
+  private isDuplicateKey(error: unknown): boolean {
+    return (
+      error instanceof Error &&
+      Object.hasOwn(error, "code") &&
+      Reflect.get(error, "code") === "ER_DUP_ENTRY"
+    );
   }
 }
 

@@ -1,5 +1,6 @@
 import type { RankMemberSnapshot } from "../domain/sync.js";
 import type { SafeJungolDiagnostics } from "../jungol/errors.js";
+import type { SettlementAttemptOutcome } from "../settlement-outcome.js";
 import type { CycleTraceSnapshot } from "./cycle-diagnostics.js";
 import {
   type AccountFlowStep,
@@ -21,6 +22,9 @@ export type GroupSettlementResult = {
   readonly failures: readonly GroupSettlementFailure[];
   readonly insertedAttemptCount: number;
   readonly duplicateAttemptCount: number;
+  readonly settlementOutcomes?: readonly SettlementAttemptOutcome[];
+  readonly initializedAccountCount?: number;
+  readonly initializedSolvedCount?: number;
   readonly inboxEmpty: boolean;
 };
 

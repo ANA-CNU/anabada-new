@@ -37,22 +37,56 @@ export class DailyScorePolicy {
     readonly userTier: number;
     readonly alreadyAwarded: boolean;
   }): ScoreAward | null {
-    if (
-      input.alreadyAwarded ||
-      !input.firstSolve ||
-      !(input.problemTier >= 11 || input.problemTier >= input.userTier - 5)
-    )
-      return null;
+    const decision = this.decide(input);
+    return decision.kind === "award" ? decision.award : null;
+  }
+
+  decide(input: {
+    readonly userId: number;
+    readonly problemRowId: number;
+    readonly problemNumber: number;
+    readonly submittedAt: Date;
+    readonly firstSolve: boolean;
+    readonly problemTier: number;
+    readonly userTier: number;
+    readonly alreadyAwarded: boolean;
+  }): DailyScoreDecision {
+    if (input.alreadyAwarded)
+      return { kind: "no_award", reason: "daily_already_awarded" };
+    if (!input.firstSolve) return { kind: "no_award", reason: "repeat_solve" };
+    if (!(input.problemTier >= 11 || input.problemTier >= input.userTier - 5))
+      return {
+        kind: "no_award",
+        reason: "tier_too_low",
+        problemTier: input.problemTier,
+        userTier: input.userTier,
+      };
     const day = this.calendar.day(input.submittedAt);
-    return new ScoreAward(
-      "daily",
-      `daily:${input.userId}:${day}`,
-      input.userId,
-      input.problemRowId,
-      input.problemNumber,
-      null,
-      day,
-      input.submittedAt,
-    );
+    return {
+      kind: "award",
+      award: new ScoreAward(
+        "daily",
+        `daily:${input.userId}:${day}`,
+        input.userId,
+        input.problemRowId,
+        input.problemNumber,
+        null,
+        day,
+        input.submittedAt,
+      ),
+    };
   }
 }
+
+export type DailyScoreDecision =
+  | { readonly kind: "award"; readonly award: ScoreAward }
+  | {
+      readonly kind: "no_award";
+      readonly reason: "daily_already_awarded" | "repeat_solve";
+    }
+  | {
+      readonly kind: "no_award";
+      readonly reason: "tier_too_low";
+      readonly problemTier: number;
+      readonly userTier: number;
+    };

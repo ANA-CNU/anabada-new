@@ -635,13 +635,16 @@ export async function runCycleAtomicMysqlCases(
       }).runAtomic(new AbortController().signal);
       assert.equal(first.status, "success_pending");
       assert.equal(first.settlement.settledUserCount, 10);
+      // biome-ignore lint/complexity/useLiteralKeys: State는 fixture SQL 결과의 index signature다.
       assert.equal((await state(pool))["inbox"]?.length, 1);
       const second = await runtime(pool, {
         memberList: elevenMembers,
       }).runAtomic(new AbortController().signal);
       assert.equal(second.settlement.insertedAttemptCount, 1);
       const settled = await state(pool);
+      // biome-ignore lint/complexity/useLiteralKeys: State는 fixture SQL 결과의 index signature다.
       assert.equal(settled["inbox"]?.length, 0);
+      // biome-ignore lint/complexity/useLiteralKeys: State는 fixture SQL 결과의 index signature다.
       assert.equal(settled["problems"]?.length, 12);
     },
   );
@@ -654,11 +657,19 @@ export async function runCycleAtomicMysqlCases(
       const cycle = runtime(pool);
       const first = await cycle.runAtomic(new AbortController().signal);
       assert.equal(first.status, "success");
+      assert.equal(first.settlement.settlementOutcomes?.length, 2);
+      assert.ok(
+        first.settlement.settlementOutcomes?.every(
+          (outcome) =>
+            outcome.daily.kind === "awarded" && outcome.eventIds.length === 1,
+        ),
+      );
       const committed = await state(pool);
       const { inbox } = committed;
       assert.equal(inbox?.length, 0);
       const second = await cycle.runAtomic(new AbortController().signal);
       assert.equal(second.status, "success");
+      assert.deepEqual(second.settlement.settlementOutcomes, []);
       assert.deepEqual(await state(pool), committed);
     },
   );

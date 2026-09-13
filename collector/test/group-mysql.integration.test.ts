@@ -214,13 +214,13 @@ test(
       await t.test(
         "migration ledger is idempotent and reset preserves only approved legacy rows",
         async () => {
-          assert.equal(await count(pool, "migrations"), 2);
+          assert.equal(await count(pool, "migrations"), 3);
           assert.equal(await count(pool, "problem"), 0);
           assert.equal(await count(pool, "ranking_boards"), 0);
           const [scores] = await pool.query<ScoreRow[]>(
             "SELECT rule_type,total_point FROM score_history JOIN user_bias_total ON user_bias_total.user_id=score_history.user_id ORDER BY score_history.id",
           );
-          assert.deepEqual(scores, [{ rule_type: "manual", total_point: 7 }]);
+          assert.deepEqual(scores, [{ rule_type: "custom", total_point: 7 }]);
           const [users] = await pool.query<
             (UserRow &
               RowDataPacket & {
@@ -481,7 +481,24 @@ test(
               ),
             ],
           };
-          await service.commit(repeatedEvent);
+          const repeatedResult = await service.commit(repeatedEvent);
+          assert.equal(repeatedResult.insertedAttemptCount, 1);
+          assert.equal(repeatedResult.duplicateAttemptCount, 0);
+          assert.deepEqual(
+            repeatedResult.outcomes.map((outcome) => ({
+              daily: outcome.daily,
+              eventIds: outcome.eventIds,
+            })),
+            [
+              {
+                daily: {
+                  kind: "not_awarded",
+                  reason: "daily_already_awarded",
+                },
+                eventIds: [],
+              },
+            ],
+          );
           assert.equal(await count(pool, "collector_ac_inbox"), 0);
           const [afterRepeatedEvent] = await pool.query<SettlementStateRow[]>(
             "SELECT u.corrects,u.submissions,u.solution,COALESCE(b.total_point,0) AS points,(SELECT COUNT(*) FROM score_history s WHERE s.user_id=u.id) AS scores FROM user u LEFT JOIN user_bias_total b ON b.user_id=u.id WHERE u.jungol_account_id=400",
@@ -514,7 +531,7 @@ test(
             cursor_reached: 0,
           });
           await pool.query(
-            "INSERT INTO score_history (user_id,bias,rule_type,created_at) VALUES ((SELECT id FROM user WHERE jungol_account_id=400),999,'manual','2026-09-07')",
+            "INSERT INTO score_history (user_id,bias,rule_type,created_at) VALUES ((SELECT id FROM user WHERE jungol_account_id=400),999,'custom','2026-09-07')",
           );
           await pool.query(
             "UPDATE user SET ignored=0 WHERE jungol_account_id=400",
