@@ -147,6 +147,45 @@ test("Given unsafe diagnostic extras When formatting an incident Then only allow
   assert.match(message, /그룹 rank 기대 `3` \/ 프로필 표시 `10`/);
 });
 
+test("Given a rethrown DOM failure When formatting the incident Then it preserves the original typed code and safe source frame", () => {
+  // Given
+  const result = new CollectorIncidentFactory().fromCycle({
+    ...cycleReport,
+    status: "failed",
+    errorCode: "group_feed_rows_timeout",
+    commonFailures: [
+      {
+        stage: "cycle",
+        code: "group_feed_rows_timeout",
+        diagnostics: new JungolError("group_feed_rows_timeout", {
+          stage: "group_feed_rows_growth_wait",
+          reason: "timeout",
+          timeoutMs: 30_000,
+          pageNumber: 3,
+          previousRowCount: 100,
+          currentRowCount: 100,
+          location: {
+            method: "GroupFeedCollector.loadNextPage",
+            source: "collector/src/jungol/group-feed.ts",
+            line: 211,
+          },
+        }).diagnostics,
+      },
+    ],
+  });
+  assert.ok(result);
+
+  // When
+  const message = new EmergencyAlertFormatter().format(result);
+
+  // Then
+  assert.match(message, /\*\*오류 코드:\*\* `group_feed_rows_timeout`/);
+  assert.match(
+    message,
+    /위치 `GroupFeedCollector\.loadNextPage \(collector\/src\/jungol\/group-feed\.ts:211\)`/,
+  );
+});
+
 test("Given sanitized HTTP and network diagnostics When formatting an incident Then it preserves only their operational codes", () => {
   const result = new CollectorIncidentFactory().fromCycle({
     ...cycleReport,

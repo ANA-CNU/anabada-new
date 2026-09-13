@@ -66,6 +66,14 @@ const safeContextNames = new Set([
   "actorHandle",
   "imageObserved",
   "titleObserved",
+  "previousRowCount",
+  "currentRowCount",
+  "lastSubmissionId",
+  "loadingVisible",
+  "source",
+  "sourceLine",
+  "sourceMethod",
+  "originalErrorKind",
 ]);
 
 /** cycle 단위 안전 진단을 보관하며 원문 오류와 비밀을 trace 경계 밖으로 차단한다. */
@@ -312,6 +320,31 @@ export class CycleTrace {
       ...(diagnostics?.titleObserved === undefined
         ? {}
         : { titleObserved: diagnostics.titleObserved }),
+      ...(diagnostics?.pageNumber === undefined
+        ? {}
+        : { pageNumber: diagnostics.pageNumber }),
+      ...(diagnostics?.previousRowCount === undefined
+        ? {}
+        : { previousRowCount: diagnostics.previousRowCount }),
+      ...(diagnostics?.currentRowCount === undefined
+        ? {}
+        : { currentRowCount: diagnostics.currentRowCount }),
+      ...(diagnostics?.lastSubmissionId === undefined
+        ? {}
+        : { lastSubmissionId: diagnostics.lastSubmissionId }),
+      ...(diagnostics?.loadingVisible === undefined
+        ? {}
+        : { loadingVisible: diagnostics.loadingVisible }),
+      ...(diagnostics?.location === undefined
+        ? {}
+        : {
+            source: diagnostics.location.source,
+            sourceLine: diagnostics.location.line,
+            sourceMethod: diagnostics.location.method,
+          }),
+      ...(diagnostics?.originalErrorKind === undefined
+        ? {}
+        : { originalErrorKind: diagnostics.originalErrorKind }),
     };
   }
 }

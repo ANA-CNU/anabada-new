@@ -1,6 +1,7 @@
 import { errors, type Page } from "playwright";
+import { sourceLocationFrom } from "../application/safe-source-location.js";
 import { BoundaryError } from "../errors.js";
-import { JungolError } from "./errors.js";
+import { JungolError, type SafeJungolDiagnostics } from "./errors.js";
 
 export type BrowserSettings = {
   readonly baseUrl: string;
@@ -55,10 +56,10 @@ export class PageOperation {
       if (error instanceof JungolError || error instanceof BoundaryError)
         throw error;
       if (error instanceof errors.TimeoutError)
-        throw new JungolError(failureContext.code, {
-          stage: failureContext.stage,
-          reason: "timeout",
-        });
+        throw new JungolError(
+          failureContext.code,
+          this.diagnostics(failureContext, "timeout", error),
+        );
       if (error instanceof Error) {
         const code =
           /\b(ECONNREFUSED|ECONNRESET|ENETUNREACH|ENOTFOUND|ETIMEDOUT)\b/.exec(
@@ -72,15 +73,42 @@ export class PageOperation {
           code === "ETIMEDOUT"
         )
           throw new JungolError(failureContext.code, {
-            stage: failureContext.stage,
-            reason: "network",
+            ...this.diagnostics(failureContext, "network", error),
             transportCode: code,
           });
-        throw new JungolError(failureContext.code);
+        throw new JungolError(
+          failureContext.code,
+          this.diagnostics(failureContext, "internal", error),
+        );
       }
       throw error;
     } finally {
       signal?.removeEventListener("abort", cancel);
     }
+  }
+
+  private diagnostics(
+    context: PageFailureContext,
+    reason: SafeJungolDiagnostics["reason"],
+    error: Error,
+  ): SafeJungolDiagnostics {
+    const location = sourceLocationFrom(error, "PageOperation.run");
+    return {
+      stage: context.stage,
+      reason,
+      ...(context.pageNumber === undefined
+        ? {}
+        : { pageNumber: context.pageNumber }),
+      ...(context.timeoutMs === undefined
+        ? {}
+        : { timeoutMs: context.timeoutMs }),
+      ...(location === undefined ? {} : { location }),
+      ...(error.name === "Error" ||
+      error.name === "TypeError" ||
+      error.name === "RangeError" ||
+      error.name === "TimeoutError"
+        ? { originalErrorKind: error.name }
+        : {}),
+    };
   }
 }

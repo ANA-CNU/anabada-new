@@ -23,7 +23,14 @@ export type JungolErrorCode =
   | "group_feed_loadmore_failed"
   | "group_feed_responsewait_failed"
   | "group_feed_header_failed"
-  | "group_feed_rows_failed";
+  | "group_feed_rows_failed"
+  | "group_feed_filter_invalid"
+  | "group_feed_table_timeout"
+  | "group_feed_row_invalid"
+  | "group_feed_timestamp_missing"
+  | "group_feed_actor_unmatched"
+  | "group_feed_rows_timeout"
+  | "group_feed_cursor_not_found";
 
 /** 원문 응답·URL·예외를 포함하지 않는 collector 전용 진단 단계다. */
 export type SafeJungolStage =
@@ -43,8 +50,32 @@ export type SafeJungolStage =
   | "header"
   | "rows"
   | "actor"
-  | "cursor";
-export type SafeJungolReason = "http" | "mismatch" | "timeout" | "network";
+  | "cursor"
+  | "group_feed_queue_wait"
+  | "group_feed_navigation"
+  | "group_feed_auth_check"
+  | "group_feed_filter_check"
+  | "group_feed_table_ready"
+  | "group_feed_rows_parse"
+  | "group_feed_actor_resolution"
+  | "group_feed_load_more_click"
+  | "group_feed_rows_growth_wait"
+  | "group_feed_cursor_check";
+export type SafeJungolReason =
+  | "http"
+  | "mismatch"
+  | "timeout"
+  | "network"
+  | "auth"
+  | "challenge"
+  | "partial_row"
+  | "missing_timestamp"
+  | "internal";
+export type SafeCodeLocation = {
+  readonly method: string;
+  readonly source: string;
+  readonly line: number;
+};
 export type SafeJungolDiagnostics = {
   readonly stage: SafeJungolStage;
   readonly reason: SafeJungolReason;
@@ -58,6 +89,18 @@ export type SafeJungolDiagnostics = {
   readonly problemId?: number | undefined;
   readonly imageObserved?: boolean | undefined;
   readonly titleObserved?: boolean | undefined;
+  readonly pageNumber?: number | undefined;
+  readonly previousRowCount?: number | undefined;
+  readonly currentRowCount?: number | undefined;
+  readonly lastSubmissionId?: string | undefined;
+  readonly loadingVisible?: boolean | undefined;
+  readonly location?: SafeCodeLocation | undefined;
+  readonly originalErrorKind?:
+    | "Error"
+    | "TypeError"
+    | "RangeError"
+    | "TimeoutError"
+    | undefined;
   readonly transportCode?:
     | "ECONNREFUSED"
     | "ECONNRESET"
@@ -85,12 +128,27 @@ const diagnosticStages = new Set<SafeJungolStage>([
   "rows",
   "actor",
   "cursor",
+  "group_feed_queue_wait",
+  "group_feed_navigation",
+  "group_feed_auth_check",
+  "group_feed_filter_check",
+  "group_feed_table_ready",
+  "group_feed_rows_parse",
+  "group_feed_actor_resolution",
+  "group_feed_load_more_click",
+  "group_feed_rows_growth_wait",
+  "group_feed_cursor_check",
 ]);
 const diagnosticReasons = new Set<SafeJungolReason>([
   "http",
   "mismatch",
   "timeout",
   "network",
+  "auth",
+  "challenge",
+  "partial_row",
+  "missing_timestamp",
+  "internal",
 ]);
 const transportCodes = new Set([
   "ECONNREFUSED",
@@ -116,6 +174,13 @@ type SafeJungolDiagnosticsDraft = {
   problemId?: number | undefined;
   imageObserved?: boolean | undefined;
   titleObserved?: boolean | undefined;
+  pageNumber?: number | undefined;
+  previousRowCount?: number | undefined;
+  currentRowCount?: number | undefined;
+  lastSubmissionId?: string | undefined;
+  loadingVisible?: boolean | undefined;
+  location?: SafeCodeLocation | undefined;
+  originalErrorKind?: SafeJungolDiagnostics["originalErrorKind"];
   transportCode?: SafeJungolDiagnostics["transportCode"];
 };
 
@@ -141,6 +206,9 @@ const safeDiagnostics = (
     "expectedCount",
     "timeoutMs",
     "problemId",
+    "pageNumber",
+    "previousRowCount",
+    "currentRowCount",
   ] as const;
   for (const field of fields) {
     const parsed = nonnegativeInteger(value[field]);
@@ -150,6 +218,22 @@ const safeDiagnostics = (
     const observed = value[field];
     if (typeof observed === "boolean") result[field] = observed;
   }
+  if (typeof value.loadingVisible === "boolean")
+    result.loadingVisible = value.loadingVisible;
+  if (
+    typeof value.lastSubmissionId === "string" &&
+    /^[0-9]{1,20}$/.test(value.lastSubmissionId)
+  )
+    result.lastSubmissionId = value.lastSubmissionId;
+  const location = safeCodeLocation(value.location);
+  if (location) result.location = location;
+  if (
+    value.originalErrorKind === "Error" ||
+    value.originalErrorKind === "TypeError" ||
+    value.originalErrorKind === "RangeError" ||
+    value.originalErrorKind === "TimeoutError"
+  )
+    result.originalErrorKind = value.originalErrorKind;
   if (
     typeof value.httpStatus === "number" &&
     Number.isInteger(value.httpStatus) &&
@@ -160,6 +244,22 @@ const safeDiagnostics = (
   if (value.transportCode && transportCodes.has(value.transportCode))
     result.transportCode = value.transportCode;
   return result;
+};
+
+const safeCodeLocation = (
+  value: SafeCodeLocation | undefined,
+): SafeCodeLocation | undefined => {
+  if (
+    !value ||
+    !/^[A-Za-z][A-Za-z0-9_.]{0,159}$/.test(value.method) ||
+    !/^collector\/(src|dist)\/(?!.*\.\.)[A-Za-z0-9_./-]+\.(ts|js)$/.test(
+      value.source,
+    ) ||
+    !Number.isSafeInteger(value.line) ||
+    value.line < 1
+  )
+    return undefined;
+  return { method: value.method, source: value.source, line: value.line };
 };
 export class JungolError extends Error {
   override readonly name = "JungolError";

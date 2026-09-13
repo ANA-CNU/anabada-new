@@ -7,16 +7,16 @@
     "node": ">=22 <25"
   },
   "scripts": {
-    "start": "node dist/cli.js start",
-    "run-once": "node dist/cli.js run-once",
-    "healthcheck": "node dist/cli.js healthcheck",
+    "start": "node --enable-source-maps dist/cli.js start",
+    "run-once": "node --enable-source-maps dist/cli.js run-once",
+    "healthcheck": "node --enable-source-maps dist/cli.js healthcheck",
     "test": "node --import tsx --test test/*.test.ts",
     "test:mysql": "node test/mysql-integration.mjs",
     "test:group:mysql": "node test/group-mysql-integration.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "build": "tsc -p tsconfig.build.json",
-    "check-config": "node dist/cli.js check-config"
+    "check-config": "node --enable-source-maps dist/cli.js check-config"
   },
   "dependencies": {
     "bson": "7.3.2",

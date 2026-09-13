@@ -49,6 +49,7 @@ test("Given a partial cycle When creating an incident Then exposes only operatio
   assert.equal(result?.code, "rank_mismatch");
   assert.deepEqual(result?.facts, [
     "상태: `partial` / 성공: `1`명 / 실패: `1`명",
+    "실행 commit `unknown`",
   ]);
 });
 

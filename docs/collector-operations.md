@@ -24,13 +24,22 @@
 
 ## 완료 기록의 의미
 
-성공적으로 끝난 cycle은 시작·종료 시각(KST), 경과 시간, 실제로 새로 삽입한 AC 수,
-중복 건수, 잔여 작업 여부를 기록한다.
+성공적으로 commit된 cycle은 `WEBHOOK_URL`로 시작·종료 시각(KST), 경과 시간, 실제로 새로
+삽입한 AC와 제출별 점수 결과를 보낸다. 수신함만 저장되어 정산이 다음 cycle로 남은 경우에는
+`수집 진행 중 · 정산 대기`로 표시하며, 이를 점수 미지급으로 표현하지 않는다.
 
 - AC 수는 새로 저장된 accepted submission 수이며 점수나 지급 건수를 뜻하지 않는다.
 - 중복은 이미 처리되어 다시 삽입하지 않은 submission을 뜻한다.
 - `success_pending`은 후속 처리 여부를 나타내는 boolean 상태다. 이는 다음 cycle 또는
   재시도로 넘길 잔여 작업이 있는지를 뜻하며, pending 건수나 작업 수가 아니다.
+- 상세 목록은 이번 transaction에서 새로 저장된 제출만 포함한다. 기존 제출 중복은 건수로만
+  요약한다. 일일·이벤트 점수는 실제로 새 score history 행이 INSERT된 경우에만 `+1`로
+  표시하며, 일일 미지급은 초기 기준선·반복 해결·동일 일자 지급 완료·tier 조건 미충족을
+  구분한다.
+- 새 계정 기준선은 `신규 사용자 초기화: N명 / 과거 풀이 N개, 점수 없음`으로 요약한다.
+- `rolled_back`, `rollback_failed`, `commit_unknown` 또는 commit 전 종료에는 성공 결과
+  webhook을 보내지 않는다. Discord 본문은 inline code로 안전하게 표시하고 mention을
+  비활성화하며, 2,000자 미만 메시지로 순서대로 나눈다.
 
 DB 반영과 webhook 전송은 분리된 책임이다. DB의 `hook`은 추첨 보드 알림을 위한 데이터이고,
 `WEBHOOK_URL`은 collector의 지연·실패·정상 완료 운영 알림을 위한 별도 endpoint다. 두

@@ -43,7 +43,11 @@ services:
       anabada-mysql: {condition: service_healthy}
   jungol-collector:
     # 외부 포트를 열지 않는 내부 수집기. 같은 DB를 사용하고 프로필 볼륨으로 Chromium 로그인 상태를 보존한다.
-    build: {context: ./collector, dockerfile: Dockerfile}
+    build:
+      context: ./collector
+      dockerfile: Dockerfile
+      args:
+        COLLECTOR_REVISION: ${COLLECTOR_REVISION:-unknown}
     init: true
     restart: unless-stopped
     # Chromium 브라우저의 shared memory 부족으로 인한 불안정을 방지한다.

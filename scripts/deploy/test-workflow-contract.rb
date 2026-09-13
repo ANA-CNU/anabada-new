@@ -90,11 +90,12 @@ check(remote_deploy.include?('Deployment repository path is not a Git working tr
   check(!config.key?('secrets'), 'Top-level secrets forbidden')
   config.fetch('services').each do |name, service|
     check(!service.key?('env_file') && !service.key?('secrets'), "Secret injection forbidden: #{name}")
-    keys = service.to_yaml.scan(/\$\{([A-Z_]+)/).flatten.uniq.sort
+    keys = service.to_yaml.scan(/\$\{([A-Z_]+)/).flatten.uniq.reject { |key| key == 'COLLECTOR_REVISION' }.sort
     check(keys == expected.fetch(name).sort, "Wrong secret distribution: #{mode}/#{name}")
   end
   collector = config.fetch('services').fetch('jungol-collector')
   check(collector.fetch('environment').keys.sort == %w[DB_PASSWORD JUNGOL_PASSWORD JUNGOL_USERNAME WEBHOOK_URL], 'Collector settings must be static')
+  check(collector.fetch('build').fetch('args').fetch('COLLECTOR_REVISION') == '${COLLECTOR_REVISION:-unknown}', 'Collector revision must be a build-only argument')
   if mode == 'dev'
     check(!config.fetch('services').key?('jungol-migrator'), 'Dev must not include the automatic migrator')
   else

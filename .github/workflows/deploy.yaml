@@ -105,6 +105,7 @@ jobs:
           # 완성된 파일만 0600으로 설치하고 rename하여 부분 작성된 .env가 노출되지 않게 한다.
           install -m 0600 "$1/.env" .env.next
           mv -f .env.next .env
+          export COLLECTOR_REVISION="$(git rev-parse HEAD)"
           docker compose --env-file .env -f docker-compose.prod.yaml config --quiet
           timeout 1200 docker compose --env-file .env -f docker-compose.prod.yaml up -d --build --remove-orphans --wait --wait-timeout 180
           # 변경되지 않은 nginx도 이전 backend 컨테이너 IP를 계속 가리킬 수 있어 배포마다 재시작한다.
