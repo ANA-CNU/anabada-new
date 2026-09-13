@@ -2,6 +2,8 @@ export type JungolErrorCode =
   | "invalid_rank"
   | "duplicate_account"
   | "browser_failed"
+  | "problem_metadata_timeout"
+  | "problem_metadata_http_failed"
   | "cancelled"
   | "login_failed"
   | "auth_required"
@@ -25,6 +27,8 @@ export type JungolErrorCode =
 
 /** 원문 응답·URL·예외를 포함하지 않는 collector 전용 진단 단계다. */
 export type SafeJungolStage =
+  | "problem_metadata_readiness"
+  | "problem_metadata_navigation"
   | "account_summary"
   | "account_summary_readiness"
   | "page_operation"
@@ -51,6 +55,9 @@ export type SafeJungolDiagnostics = {
   readonly expectedCount?: number | undefined;
   readonly httpStatus?: number | undefined;
   readonly timeoutMs?: number | undefined;
+  readonly problemId?: number | undefined;
+  readonly imageObserved?: boolean | undefined;
+  readonly titleObserved?: boolean | undefined;
   readonly transportCode?:
     | "ECONNREFUSED"
     | "ECONNRESET"
@@ -61,6 +68,8 @@ export type SafeJungolDiagnostics = {
 };
 
 const diagnosticStages = new Set<SafeJungolStage>([
+  "problem_metadata_readiness",
+  "problem_metadata_navigation",
   "account_summary",
   "account_summary_readiness",
   "page_operation",
@@ -104,6 +113,9 @@ type SafeJungolDiagnosticsDraft = {
   expectedCount?: number | undefined;
   httpStatus?: number | undefined;
   timeoutMs?: number | undefined;
+  problemId?: number | undefined;
+  imageObserved?: boolean | undefined;
+  titleObserved?: boolean | undefined;
   transportCode?: SafeJungolDiagnostics["transportCode"];
 };
 
@@ -128,10 +140,15 @@ const safeDiagnostics = (
     "distinctLinkCount",
     "expectedCount",
     "timeoutMs",
+    "problemId",
   ] as const;
   for (const field of fields) {
     const parsed = nonnegativeInteger(value[field]);
     if (parsed !== undefined) result[field] = parsed;
+  }
+  for (const field of ["imageObserved", "titleObserved"] as const) {
+    const observed = value[field];
+    if (typeof observed === "boolean") result[field] = observed;
   }
   if (
     typeof value.httpStatus === "number" &&

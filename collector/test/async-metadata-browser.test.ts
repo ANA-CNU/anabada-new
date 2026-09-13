@@ -140,18 +140,18 @@ for (const tier of ["0", "32"]) {
   });
 }
 
-test("Given metadata never appears When its readiness timeout expires Then bounded fallback is used", async (t) => {
+test("Given metadata never appears When its readiness timeout expires Then the cycle receives a failure instead of tier zero", async (t) => {
   const { page, settings, requests } = await asyncBrowserFixture(
     t,
     "<main>unavailable metadata</main>",
     new Map(),
   );
-  assert.deepEqual(
-    await new ProblemMetadataResolver(
+  await assert.rejects(
+    new ProblemMetadataResolver(
       { ...settings, pageTimeoutMs: 100 },
       requests,
     ).resolve(page, problemIdSchema.parse(1)),
-    { problemId: 1, title: null, tier: 0 },
+    { code: "problem_metadata_timeout" },
   );
 });
 

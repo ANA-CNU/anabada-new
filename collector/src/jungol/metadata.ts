@@ -16,7 +16,7 @@ const metadataSchema = z
     tier: z.coerce.number().int().min(0).max(31),
   })
   .readonly();
-/** AC 문제만 보강하고 조회 불능은 제목 NULL·난이도 0이라는 명시적 fallback으로 바꾼다. */
+/** 정상 로딩된 문제의 난이도를 읽으며 timeout은 추정값으로 숨기지 않는다. */
 export class ProblemMetadataResolver {
   private readonly cache = new Map<ProblemId, ProblemMetadata>();
   constructor(
@@ -54,15 +54,31 @@ export class ProblemMetadataResolver {
           "problem_metadata",
           signal,
           async () => {
-            const response = await page.goto(
-              new URL(`/problem/${problemId}`, this.settings.baseUrl).href,
-              {
-                waitUntil: "domcontentloaded",
-                timeout: this.settings.pageTimeoutMs,
-              },
-            );
+            const response = await page
+              .goto(
+                new URL(`/problem/${problemId}`, this.settings.baseUrl).href,
+                {
+                  waitUntil: "domcontentloaded",
+                  timeout: this.settings.pageTimeoutMs,
+                },
+              )
+              .catch((error: unknown) => {
+                if (!(error instanceof errors.TimeoutError)) throw error;
+                throw new JungolError("problem_metadata_timeout", {
+                  stage: "problem_metadata_navigation",
+                  reason: "timeout",
+                  problemId,
+                  timeoutMs: this.settings.pageTimeoutMs,
+                });
+              });
             rejectJungolHttpStatus(response?.status());
-            if (!response?.ok()) return fallback;
+            if (!response?.ok())
+              throw new JungolError("problem_metadata_http_failed", {
+                stage: "status",
+                reason: "http",
+                problemId,
+                httpStatus: response?.status(),
+              });
             await this.requireAccessible(page, rejectedStatus);
             // HTML 도착과 metadata 준비는 다르다. tier 표시가 생기기 전에 0을 캐시하지 않는다.
             try {
@@ -73,18 +89,35 @@ export class ProblemMetadataResolver {
                   );
                   const tier = document.querySelector("[data-tier]");
                   const icon = title?.querySelector('img[src*="/solved/"]');
-                  if (!title?.textContent?.trim() || (!tier && !icon))
+                  const statementReady = Array.from(
+                    document.querySelectorAll("article h2"),
+                  ).some(
+                    (heading) =>
+                      /^문제(?:\s|$)/.test(heading.textContent?.trim() ?? "") &&
+                      !!heading.parentElement
+                        ?.querySelector("p,pre,ul,ol,table")
+                        ?.textContent?.trim(),
+                  );
+                  if (
+                    !title?.textContent?.trim() ||
+                    (!tier && !icon && !statementReady)
+                  )
                     return false;
                   const imageTier = icon
                     ?.getAttribute("src")
                     ?.match(/\/solved\/(\d+)\.svg(?:\?|$)/)?.[1];
+                  if (
+                    icon &&
+                    (imageTier === undefined || Number(imageTier) > 31)
+                  )
+                    return false;
                   return {
                     title: (title.matches("[data-problem-title]")
                       ? title.textContent
                       : (title.querySelector(":scope > span:not(.limit)")
                           ?.textContent ?? title.textContent)
                     )?.trim(),
-                    tier: tier?.getAttribute("data-tier") ?? imageTier ?? 0,
+                    tier: imageTier ?? tier?.getAttribute("data-tier") ?? 0,
                   };
                 },
                 undefined,
@@ -98,16 +131,27 @@ export class ProblemMetadataResolver {
             } catch (error) {
               if (!(error instanceof errors.TimeoutError)) throw error;
               await this.requireAccessible(page, rejectedStatus);
-              return fallback;
+              const observed = await page.evaluate(() => {
+                const title = document.querySelector(
+                  "[data-problem-title], h1",
+                );
+                return {
+                  titleObserved: !!title?.textContent?.trim(),
+                  imageObserved: !!title?.querySelector('img[src*="/solved/"]'),
+                };
+              });
+              throw new JungolError("problem_metadata_timeout", {
+                stage: "problem_metadata_readiness",
+                reason: "timeout",
+                problemId,
+                timeoutMs: this.settings.pageTimeoutMs,
+                ...observed,
+              });
             }
           },
         );
         return response;
       });
-    } catch (error) {
-      if (error instanceof JungolError && error.code === "browser_failed")
-        result = fallback;
-      else throw error;
     } finally {
       page.off("response", observeResponse);
     }

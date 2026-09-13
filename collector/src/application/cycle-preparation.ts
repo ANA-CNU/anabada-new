@@ -420,7 +420,11 @@ export class CyclePreparationService {
   private async metadataFor(problemId: ProblemId, signal: AbortSignal) {
     const cached = this.metadata.get(problemId);
     if (cached) return cached;
-    const metadata = await this.dependencies.metadata.read(problemId, signal);
+    const metadata = this.trace
+      ? await this.trace.run("problem_metadata", { problemId }, () =>
+          this.dependencies.metadata.read(problemId, signal),
+        )
+      : await this.dependencies.metadata.read(problemId, signal);
     this.metadata.set(problemId, metadata);
     return metadata;
   }

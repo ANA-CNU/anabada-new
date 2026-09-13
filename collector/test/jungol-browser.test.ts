@@ -42,7 +42,9 @@ test("Given a local Jungol fixture When browsing Then rank, raw pagination and f
       );
       return;
     }
-    response.end("<main>unavailable metadata</main>");
+    response.end(
+      "<h1><span>Unrated problem</span></h1><article><section><h2>문제</h2><p>완전히 로딩된 문제 본문</p></section></article>",
+    );
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   t.after(
@@ -109,7 +111,7 @@ test("Given a local Jungol fixture When browsing Then rank, raw pagination and f
     ).resolve(page, problemIdSchema.parse(1339));
     assert.deepEqual(metadata, {
       problemId: 1339,
-      title: null,
+      title: "Unrated problem",
       tier: 0,
     });
     await page.route("**/api/submission*", (route) =>

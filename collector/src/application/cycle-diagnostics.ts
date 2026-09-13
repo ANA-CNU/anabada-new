@@ -64,6 +64,8 @@ const safeContextNames = new Set([
   "problemId",
   "endpointPath",
   "actorHandle",
+  "imageObserved",
+  "titleObserved",
 ]);
 
 /** cycle 단위 안전 진단을 보관하며 원문 오류와 비밀을 trace 경계 밖으로 차단한다. */
@@ -294,6 +296,22 @@ export class CycleTrace {
       httpStatus <= 599
     )
       context.httpStatus = httpStatus;
-    return context;
+    const diagnostics =
+      error instanceof JungolError ? error.diagnostics : undefined;
+    return {
+      ...context,
+      ...(diagnostics?.problemId === undefined
+        ? {}
+        : { problemId: diagnostics.problemId }),
+      ...(diagnostics?.timeoutMs === undefined
+        ? {}
+        : { timeoutMs: diagnostics.timeoutMs }),
+      ...(diagnostics?.imageObserved === undefined
+        ? {}
+        : { imageObserved: diagnostics.imageObserved }),
+      ...(diagnostics?.titleObserved === undefined
+        ? {}
+        : { titleObserved: diagnostics.titleObserved }),
+    };
   }
 }

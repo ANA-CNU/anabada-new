@@ -30,6 +30,7 @@ import { ProjectionService } from "../src/projection.js";
 import { KstCalendar } from "../src/scoring/daily.js";
 import { WeightedRankingPolicy } from "../src/scoring/ranking.js";
 import { runCycleAtomicMysqlCases } from "./cycle-atomic-mysql-cases.js";
+import { runDailyMissedCases } from "./daily-missed-mysql-cases.js";
 import { runGroupRuntimeCases } from "./group-runtime-mysql-cases.js";
 import { runUserRegistrationCases } from "./user-registration-mysql-cases.js";
 
@@ -542,6 +543,7 @@ test(
       );
       await runGroupRuntimeCases(t, pool);
       await runCycleAtomicMysqlCases(t, pool);
+      await runDailyMissedCases(t, pool);
       await runUserRegistrationCases(t, pool);
     } finally {
       await pool.end();

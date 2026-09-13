@@ -68,6 +68,8 @@ export class IncidentFacts {
       operationId: "작업",
       httpStatus: "HTTP 상태",
       responseObserved: "응답 수신",
+      imageObserved: "tier 이미지 요소 관찰",
+      titleObserved: "문제 제목 관찰",
     };
     return Object.entries(labels).flatMap(([key, label]) => {
       const value = context[key];
@@ -106,6 +108,18 @@ export class IncidentFacts {
     value: SafeJungolDiagnostics | undefined,
   ): readonly string[] {
     if (!value) return [];
+    if (value.stage === "problem_metadata_navigation")
+      return [
+        `문제 ${inlineCode(value.problemId ?? "unknown")} / 단계 ${inlineCode(value.stage)} / 제한 ${inlineCode(`${value.timeoutMs ?? "unknown"}ms`)}`,
+        "문제 페이지 이동이 제한 시간 안에 완료되지 않아 tier 이미지 유무를 확인하지 못했습니다. 이번 cycle은 저장하지 않습니다.",
+      ];
+    if (value.stage === "problem_metadata_readiness")
+      return [
+        `문제 ${inlineCode(value.problemId ?? "unknown")} / 단계 ${inlineCode(value.stage)} / 제한 ${inlineCode(`${value.timeoutMs ?? "unknown"}ms`)}`,
+        value.imageObserved
+          ? "tier 이미지 요소는 확인했지만 제한 시간 안에 문제 제목·난이도 정보를 확정하지 못했습니다. 이번 cycle은 저장하지 않습니다."
+          : "tier 이미지 요소를 확인하지 못했고 문제 데이터의 정상 로딩 완료도 확인하지 못했습니다. 이미지가 없는 정상 문제로 간주하지 않고 이번 cycle은 저장하지 않습니다.",
+      ];
     const reason = {
       mismatch: "그룹 rank와 개인 해결 목록 수가 일치하지 않습니다",
       timeout:
