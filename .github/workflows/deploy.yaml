@@ -60,7 +60,7 @@ jobs:
           cleanup() {
             if [[ "$remote_dir" =~ ^/tmp/jungol-deploy\.[a-zA-Z0-9]+$ ]]; then
               # shellcheck disable=SC2029
-              timeout 30 ssh "${ssh_options[@]}" "$target" "rm -f '$remote_dir/.env'; rmdir '$remote_dir'" || true
+              timeout 30 ssh "${ssh_options[@]}" "$target" "if [ -d '$remote_dir' ]; then rm -f '$remote_dir/.env'; rmdir '$remote_dir'; fi" || true
             fi
             rm -f "$secret_dir/key" "$secret_dir/.env"
             rmdir "$secret_dir"

@@ -28,6 +28,18 @@ check(steps.first['name'] == 'Validate required GitHub secrets', 'Validation mus
 check(steps[1]['uses'] == 'actions/checkout@v4', 'Checkout must follow validation')
 validate = steps.first.fetch('run')
 deploy = steps.find { |step| step['name'] == 'Render root environment and deploy' }.fetch('run')
+cleanup_line = deploy.lines.find { |line| line.include?('timeout 30 ssh') }
+cleanup_command = cleanup_line&.match(/"\$target" "(.*)" \|\| true/)&.[](1)
+check(!cleanup_command.nil?, 'Missing remote cleanup command')
+Dir.mktmpdir('deployment-cleanup-contract-') do |dir|
+  transit = File.join(dir, 'transit')
+  Dir.mkdir(transit)
+  File.write(File.join(transit, '.env'), 'fixture')
+  2.times do
+    output, errors, status = Open3.capture3('bash', '-c', cleanup_command.gsub('$remote_dir', transit))
+    check(status.success? && output.empty? && errors.empty?, 'Remote cleanup must be silent and successful when repeated')
+  end
+end
 check(!validate.match?(/\bWEBHOOK_URL\b/), 'Optional webhook must not become a required GitHub secret')
 check(!deploy.match?(/runtime-secrets|\.secrets|\bsource\b|JUNGOL_DB_PASSWORD/), 'Obsolete secret provisioning')
 %w[StrictHostKeyChecking=accept-new BatchMode=yes].each { |text| check(deploy.include?(text), "Missing SSH safety: #{text}") }
