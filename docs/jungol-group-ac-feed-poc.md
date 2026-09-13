@@ -169,3 +169,48 @@ explicit numeric 또는 numeric-parseable string current-rating field가 발견�
 현재 profile의 dash/다음-tier presentation을 `0` 또는 Unrated로 변환하는 adapter는
 만들지 않는다. 정산에 rating이 필요하면 별도로 검증된 source와 user-approved
 unrated policy가 필요하다.
+
+## 직접 재조사: API 대기 timeout과 DOM 대체 가능성 (2026-09-13 KST)
+
+이번 조사는 메인 에이전트가 직접 수행했다. 운영 서버에는 접속하지 않았고,
+로컬 production collector image와 일회용 MySQL 9.3.0 tmpfs를 사용했다.
+Jungol 자격 증명은 루트 `.env`에서 container에 전달했으며 웹훅은 비활성화했다.
+모든 의도적 페이지 이동·더 불러오기는 기존 3초 coordinator를 통과했다.
+
+### 관측 결과
+
+| 검증 | 실제 결과 |
+| --- | --- |
+| 실제 `JungolSession` 로그인 | 성공 |
+| 그룹 AC 첫 요청 | `/api/group/1125/submission`, `result=AC`, HTTP 200 |
+| 실제 `RankCollector` | 구성원 16명 |
+| 실제 `GroupFeedCollector` 첫/다음 페이지 | 원본 제출 각각 40건 해독 성공 |
+| API 본문 없이 DOM에서 더 불러오기 | 표 행 수 43 → 75로 증가 |
+| 제출 화면의 인증 필요 문구·challenge 화면 | 관측되지 않음 |
+| JavaScript page error | 관측되지 않음 |
+| Cloudflare background JS 검사 | 요청·200 응답 관측, 이후 실제 그룹 API 정상 발생 |
+| 새 DB·새 profile에서 실제 `run-once` | exit 0, 약 151초, 실패 사용자 0명 |
+| 첫 실행 후 일회용 DB | 사용자 16명 모두 초기화, 기준선 277행, 점수 0행, checkpoint 생성 |
+| 진단 observer 없는 정상 CLI 재시작 | exit 0, 약 51초, 그룹 1페이지, 2명·AC 11행 반영, 실패 0명 |
+| 정상 재실행 후 일회용 DB | 원장 288행(기준선 277 + 실제 AC 11), 점수 0행, 수신함 0행, checkpoint idle |
+
+이 결과는 **앞선 timeout의 원인 확정이나 간헐 장애 수정 증거가 아니다.**
+같은 코드로 현재 실제 요청이 성공한다는 증거다. 이전의 좁은 probe는 기대한 API
+경로만 감시했고 실패 시 DOM·인증·JS 상태를 남기지 않았으므로, 그 결과만으로
+Cloudflare 차단·JS 오류·로그인 상태·요청 관측 누락 중 하나를 확정할 수 없다.
+
+### DOM 파싱에서 확인한 한계
+
+- DOM에서 제출 번호, 계정 숫자 ID 링크, 문제 번호, `정답 100점`을 읽을 수 있었다.
+- 시각은 `오전 05:51` 같은 축약 표현이었다. 확인한 셀과 자식 요소에는 원본
+  `datetime` 또는 `title` 속성이 없었다. hover만으로 전체 날짜도 확보하지 못했다.
+- 시각 링크는 같은 화면의 `sid` query를 사용한다. 클릭해서 상세 시각을 얻는
+  경로의 계약은 이번 조사에서 검증하지 않았다.
+- 접힌 반복 제출이 있으므로 DOM 행 수를 원본 제출 수로 취급할 수 없다.
+- 최초 document HTML에는 화면 첫 제출 ID가 없었다. 이번 관측에서는 JavaScript
+  데이터 로딩 이후 표가 채워졌으므로, API가 정말 차단되어 표도 비었다면 DOM
+  파싱 자체가 그 차단을 해결하지는 못한다.
+
+따라서 DOM은 페이지 준비·인증·로딩 실패를 분류하는 보조 증거로 사용할 수 있지만,
+정확한 제출일과 반복 제출을 잃는 형태의 점수 저장 fallback은 추가하지 않았다.
+추측에 의한 timeout 상향, 제출 skip, cursor 수정도 수행하지 않았다.

@@ -268,9 +268,44 @@ test("Given local group pages When resuming a feed Then it reuses only matching 
         { code },
       );
       assert.equal(failureTrace.snapshot().firstFailure?.stage, stage);
+      const { pageNumber } =
+        failureTrace.snapshot().firstFailure?.context ?? {};
+      assert.equal(pageNumber, 1);
     } finally {
       await failurePage.close();
     }
+  }
+
+  mode = "normal";
+  const paginationFailurePage = await browser.newPage();
+  const paginationFailureTrace = new CycleTrace("fixture-pagination-timeout");
+  const paginationFailureCollector = new GroupFeedCollector(
+    { baseUrl, pageTimeoutMs: 500 },
+    new JungolRequestCoordinator({ delay: async () => {} }),
+    undefined,
+    undefined,
+    paginationFailureTrace,
+  );
+  try {
+    const firstPage = await paginationFailureCollector.readPage(
+      paginationFailurePage,
+      [member],
+      null,
+    );
+    mode = "response_timeout";
+    await assert.rejects(
+      paginationFailureCollector.readPage(
+        paginationFailurePage,
+        [member],
+        firstPage.nextCursor,
+      ),
+      { code: "group_feed_responsewait_failed" },
+    );
+    const { pageNumber } =
+      paginationFailureTrace.snapshot().firstFailure?.context ?? {};
+    assert.equal(pageNumber, 2);
+  } finally {
+    await paginationFailurePage.close();
   }
 
   // Given

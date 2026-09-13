@@ -285,7 +285,7 @@ export class GroupFeedCollector {
         return result;
       } catch (error) {
         this.pageState.delete(page);
-        this.recordFailure(error);
+        this.recordFailure(error, page);
         throw error;
       } finally {
         if (expectedCursor !== null && !canLoadMore)
@@ -300,25 +300,35 @@ export class GroupFeedCollector {
     context: PageFailureContext,
     operation: () => Promise<Value>,
   ): Promise<Value> {
+    const pageNumber = context.pageNumber ?? this.pageNumbers.get(page) ?? 1;
+    const resolvedContext: PageFailureContext = {
+      ...context,
+      pageNumber,
+    };
     const pageOperation = () =>
-      this.pages.run(page, signal, operation, context);
+      this.pages.run(page, signal, operation, resolvedContext);
     return this.trace
       ? this.trace.run(
-          this.traceStage(context.stage),
+          this.traceStage(resolvedContext.stage),
           {
-            code: context.code,
-            pageNumber: context.pageNumber ?? 0,
-            timeoutMs: context.timeoutMs ?? this.settings.pageTimeoutMs,
-            endpointPath: context.endpointPath ?? "/api/group/1125/submission",
+            code: resolvedContext.code,
+            pageNumber,
+            timeoutMs: resolvedContext.timeoutMs ?? this.settings.pageTimeoutMs,
+            endpointPath:
+              resolvedContext.endpointPath ?? "/api/group/1125/submission",
           },
           pageOperation,
         )
       : pageOperation();
   }
 
-  private recordFailure(error: unknown): void {
+  private recordFailure(error: unknown, page: Page): void {
+    const pageNumber = this.pageNumbers.get(page) ?? 1;
     if (error instanceof GroupFeedCursorError)
-      this.trace?.fail("submission_cursor", error, { code: error.code });
+      this.trace?.fail("submission_cursor", error, {
+        code: error.code,
+        pageNumber,
+      });
     else if (error instanceof GroupFeedContractError)
       this.trace?.fail(
         error.code === "group_feed_non_ac_result"
@@ -327,6 +337,7 @@ export class GroupFeedCollector {
         error,
         {
           code: error.code,
+          pageNumber,
           ...(error.httpStatus === undefined
             ? {}
             : { httpStatus: error.httpStatus }),
@@ -335,6 +346,7 @@ export class GroupFeedCollector {
     else if (error instanceof GroupActorUnresolvedError)
       this.trace?.fail("submission_actor", error, {
         code: error.code,
+        pageNumber,
         submissionId: error.diagnostics.submissionId,
         problemId: error.diagnostics.problemId,
         actorHandle: error.diagnostics.actorHandle,
@@ -345,6 +357,7 @@ export class GroupFeedCollector {
     else if (error instanceof BoundaryError)
       this.trace?.fail(this.boundaryStage(error.code), error, {
         code: error.code,
+        pageNumber,
       });
     else if (error instanceof JungolError)
       this.trace?.fail(
@@ -354,6 +367,7 @@ export class GroupFeedCollector {
         error,
         {
           code: error.code,
+          pageNumber,
           ...(error.diagnostics?.httpStatus === undefined
             ? {}
             : { httpStatus: error.diagnostics.httpStatus }),
