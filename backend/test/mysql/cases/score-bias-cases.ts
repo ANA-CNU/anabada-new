@@ -38,7 +38,7 @@ export async function runScoreBiasCases(
         {
           user_id: 1,
           bias: 9,
-          desc: "manual canonical",
+          desc: "custom canonical",
           event_id: 201,
           problem_id: "101",
         },
@@ -68,11 +68,11 @@ export async function runScoreBiasCases(
       { user_id: 1, reason: "문제가 이벤트에 연결되어 있지 않습니다." },
     ],
   });
-  expect(await scoreRows(context, "manual canonical")).toEqual([
+  expect(await scoreRows(context, "custom canonical")).toEqual([
     expect.objectContaining({
       user_id: 1,
       bias: 9,
-      rule_type: "manual",
+      rule_type: "custom",
       award_key: null,
       score_day: null,
       event_id: 201,
@@ -80,7 +80,7 @@ export async function runScoreBiasCases(
     }),
   ]);
   expect(await scoreRows(context, "new user_id")).toEqual([
-    expect.objectContaining({ user_id: 4, bias: -2, rule_type: "manual" }),
+    expect.objectContaining({ user_id: 4, bias: -2, rule_type: "custom" }),
   ]);
   expect(
     context.observedOperationIds.has(sqlOperations.scoreHistoryUserExists.id),
@@ -120,7 +120,7 @@ export async function runScoreBiasCases(
         display_name: "alpha",
         jungol_name: "alpha",
         korean_name: "가나다",
-        rule_type: "manual",
+        rule_type: "custom",
         score_day: null,
         event_id: 201,
         problem_id: "101",
@@ -134,19 +134,19 @@ export async function runScoreBiasCases(
     context.observedOperationIds.has(sqlOperations.scoreHistoryList.id),
   ).toBe(true);
 
-  const canonicalRows = await scoreRows(context, "manual canonical");
+  const canonicalRows = await scoreRows(context, "custom canonical");
   const canonical = canonicalRows[0];
   if (canonical === undefined)
     throw new Error("missing canonical score fixture");
   const update = await context.handle(
     jsonScoreRequest(`/api/score-history/${canonical.id}`, "PUT", {
-      desc: "manual updated",
+      desc: "custom updated",
       bias: 12,
     }),
   );
   expect(update.status).toBe(200);
   expect(await update.json()).toEqual({ success: true, message: "수정 완료" });
-  expect(await scoreRows(context, "manual updated")).toEqual([
+  expect(await scoreRows(context, "custom updated")).toEqual([
     expect.objectContaining({ id: canonical.id, bias: 12 }),
   ]);
   const invalidPatch = await context.handle(
@@ -155,7 +155,7 @@ export async function runScoreBiasCases(
     }),
   );
   expect(invalidPatch.status).toBe(400);
-  expect(await scoreRows(context, "manual updated")).toEqual([
+  expect(await scoreRows(context, "custom updated")).toEqual([
     expect.objectContaining({ id: canonical.id, user_id: 1, bias: 12 }),
   ]);
   const missingUpdate = await context.handle(

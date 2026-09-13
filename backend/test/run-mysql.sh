@@ -17,3 +17,4 @@ $compose run --rm jungol-migrator
 $compose run --rm backend-sql-test
 $compose run --rm jungol-migrator
 $compose run --rm backend-sql-test bun test test/mysql/noop.test.ts --timeout 30000
+$compose run --rm backend-sql-test sh -c 'bunx tsc --noEmit -p test/cross/tsconfig.json && bun test test/cross/custom-daily.test.ts --timeout 30000'

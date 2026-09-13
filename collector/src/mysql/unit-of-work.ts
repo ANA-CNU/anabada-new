@@ -151,7 +151,10 @@ export class AccountUnitOfWork {
       });
   }
 
-  private sqlContext(stage: string, error: unknown) {
+  private sqlContext(
+    stage: string,
+    error: unknown,
+  ): import("../application/cycle-diagnostics.js").SafeCycleContext {
     if (typeof error !== "object" || error === null)
       return { operationId: stage };
     const candidate = error as { sqlState?: unknown; errno?: unknown };

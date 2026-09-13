@@ -9,7 +9,7 @@ export async function runRankingScoreCases(
   context: MysqlTestContext,
 ): Promise<void> {
   await context.rawPool.execute(
-    "INSERT INTO score_history (id, user_id, `desc`, bias, rule_type, award_key, score_day, event_id, problem_id, created_at) VALUES (405, 3, '제외 대상', 9, 'manual', NULL, NULL, NULL, 101, '2026-09-03 00:00:00')",
+    "INSERT INTO score_history (id, user_id, `desc`, bias, rule_type, award_key, score_day, event_id, problem_id, created_at) VALUES (405, 3, '제외 대상', 9, 'custom', NULL, NULL, NULL, 101, '2026-09-03 00:00:00')",
   );
   await expectRankingJson(
     context,

@@ -70,7 +70,7 @@ ON DUPLICATE KEY UPDATE user_id=VALUES(user_id), `desc`=VALUES(`desc`), bias=1, 
 
 INSERT INTO score_history (id, user_id, `desc`, bias, rule_type, award_key, score_day, event_id, problem_id, created_at)
 WITH RECURSIVE n AS (SELECT 1 AS value UNION ALL SELECT value + 1 FROM n WHERE value < 30)
-SELECT 93200 + value, 80000 + value, IF(value % 7 = 0, '데모 수동 감점', '데모 수동 보정'), IF(value % 7 = 0, -2, 2 + value % 3), 'manual', NULL, NULL, NULL, NULL, UTC_TIMESTAMP()
+SELECT 93200 + value, 80000 + value, IF(value % 7 = 0, '데모 수동 감점', '데모 수동 보정'), IF(value % 7 = 0, -2, 2 + value % 3), 'custom', NULL, NULL, NULL, NULL, UTC_TIMESTAMP()
 FROM n
 ON DUPLICATE KEY UPDATE `desc`=VALUES(`desc`), bias=VALUES(bias), created_at=VALUES(created_at);
 

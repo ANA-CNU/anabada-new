@@ -232,7 +232,7 @@ async function seedPreview(connection: PoolConnection): Promise<void> {
       ]),
     );
     await connection.execute(
-      `INSERT INTO score_history (id, user_id, \`desc\`, bias, rule_type, award_key, score_day, event_id, problem_id, created_at) VALUES ${previewUsers.map(() => "(?, ?, '미리보기 보너스', ?, 'manual', NULL, NULL, NULL, NULL, '2026-09-08 20:00:00')").join(", ")}`,
+      `INSERT INTO score_history (id, user_id, \`desc\`, bias, rule_type, award_key, score_day, event_id, problem_id, created_at) VALUES ${previewUsers.map(() => "(?, ?, '미리보기 보너스', ?, 'custom', NULL, NULL, NULL, NULL, '2026-09-08 20:00:00')").join(", ")}`,
       previewUsers.flatMap((user, index) => [
         14_301 + index,
         user.id,

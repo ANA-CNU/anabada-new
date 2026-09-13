@@ -31,7 +31,7 @@ export const adminScoreHistorySchema = z.object({
   korean_name: z.string().nullable(),
   desc: z.string().nullable(),
   bias: z.number().int(),
-  rule_type: z.enum(["manual", "daily", "event"]),
+  rule_type: z.enum(["custom", "daily", "event"]),
   score_day: scoreDay,
   event_id: z.number().int().positive().nullable(),
   problem_id: z.string().regex(/^\d+$/).nullable(),
@@ -100,7 +100,7 @@ export class ScoreHistoryRepository {
     if (records.length === 0) return;
     await this.database.execute(
       operations.insert,
-      `INSERT INTO score_history (user_id, bias, rule_type, award_key, score_day, \`desc\`, event_id, problem_id, created_at) VALUES ${records.map(() => "(?, ?, 'manual', NULL, NULL, ?, ?, ?, CURRENT_TIMESTAMP)").join(", ")}`,
+      `INSERT INTO score_history (user_id, bias, rule_type, award_key, score_day, \`desc\`, event_id, problem_id, created_at) VALUES ${records.map(() => "(?, ?, 'custom', NULL, NULL, ?, ?, ?, CURRENT_TIMESTAMP)").join(", ")}`,
       records.flatMap((record) => [
         record.user_id,
         record.bias,

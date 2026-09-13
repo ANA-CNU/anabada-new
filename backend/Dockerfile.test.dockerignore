@@ -10,3 +10,8 @@
 !backend/test/**
 !backend/tests
 !backend/tests/**
+!collector
+!collector/package.json
+!collector/package-lock.json
+!collector/src
+!collector/src/**

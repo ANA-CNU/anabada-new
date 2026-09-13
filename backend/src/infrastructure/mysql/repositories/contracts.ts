@@ -42,7 +42,7 @@ export const scoreHistoryDtoSchema = z.object({
   display_name: z.string(),
   desc: z.string().nullable(),
   bias: z.number().int(),
-  rule_type: z.enum(["manual", "daily", "event"]),
+  rule_type: z.enum(["custom", "daily", "event"]),
   score_day: z.string().nullable(),
   event_id: z.number().int().nullable(),
   problem_id: decimalString.nullable(),

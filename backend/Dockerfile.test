@@ -1,3 +1,9 @@
+FROM node:22-alpine AS collector-test-dependencies
+WORKDIR /collector
+COPY collector/package.json collector/package-lock.json ./
+RUN npm ci --ignore-scripts
+COPY collector/src ./src
+
 FROM oven/bun:1.4.2-alpine
 
 WORKDIR /app
@@ -7,6 +13,7 @@ RUN bun install --frozen-lockfile
 COPY backend/src ./src
 COPY backend/test ./test
 COPY backend/tests ./tests
+COPY --from=collector-test-dependencies /collector /collector
 RUN chown -R bun:bun /app
 USER bun
 CMD ["bun", "run", "test:mysql"]

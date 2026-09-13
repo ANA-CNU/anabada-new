@@ -11,6 +11,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { runCustomMigrationInterruptions } from "./custom-migration-interruptions.mjs";
 
 const root = resolve(import.meta.dirname, "../..");
 const id = randomUUID();
@@ -93,14 +94,37 @@ try {
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250);
   }
 
-  check(runMigrator().status === 0, "fresh migration failed");
+  check(docker([
+    "run", "--rm", "--network", network, "-e", "DB_PASSWORD", image,
+    "node", "--input-type=module", "-e", `
+      import { MigrationCatalog } from './dist/catalog.js';
+      import { MigrationRunner } from './dist/runner.js';
+      import { MigrationRepository, MysqlMigrationConnectionFactory } from './dist/repository.js';
+      import { parseConfiguration } from './dist/config.js';
+      import { createLogger } from './dist/logger.js';
+      const catalog = await new MigrationCatalog('/app').load();
+      await new MigrationRunner(new MigrationRepository(parseConfiguration(process.env), new MysqlMigrationConnectionFactory()), createLogger()).run(catalog.filter(entry => entry.version <= 3));
+    `,
+  ]).status === 0, "pre-custom migration bootstrap failed");
+  sql("INSERT INTO jungol_bada.user (id,jungol_name,jungol_account_id) VALUES (700,'custom_upgrade',700); INSERT INTO jungol_bada.score_history (id,user_id,bias,rule_type,`desc`,created_at) VALUES (700,700,-3,'manual','preserve reason','2026-09-13 00:00:00'); INSERT INTO jungol_bada.score_history (id,user_id,bias,rule_type,award_key,score_day) VALUES (701,700,1,'daily','daily:700:2026-09-13','2026-09-13'),(702,700,1,'event','event:700:700:1','2026-09-13'); INSERT INTO jungol_bada.user_bias_total (user_id,total_point,score_month) VALUES (700,-1,'2026-09-01')");
+  const preservedScore = sql("SELECT id,user_id,bias,`desc`,created_at FROM jungol_bada.score_history WHERE id=700");
+  check(runMigrator().status === 0, "custom upgrade migration failed");
+  check(sql("SELECT id,user_id,bias,`desc`,created_at FROM jungol_bada.score_history WHERE id=700") === preservedScore, "custom upgrade changed score data");
+  check(sql("SELECT GROUP_CONCAT(rule_type ORDER BY id) FROM jungol_bada.score_history WHERE id BETWEEN 700 AND 702") === "custom,daily,event", "upgrade did not preserve automatic types");
+  check(sql("SELECT total_point FROM jungol_bada.user_bias_total WHERE user_id=700") === "-1", "upgrade changed cache");
+  sql("INSERT INTO jungol_bada.score_history (id,user_id,bias) VALUES (703,700,5)");
+  check(sql("SELECT rule_type FROM jungol_bada.score_history WHERE id=703") === "custom", "default is not custom");
+  for (const rule of ["manual", "daily", "event"])
+    check(docker(["exec", "-e", "MYSQL_PWD", mysql, "mysql", "-uroot", "-e", `INSERT INTO jungol_bada.score_history (user_id,bias,rule_type) VALUES (700,-2,'${rule}')`]).status !== 0, "invalid score contract was accepted");
   check(sql("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='jungol_bada'") === "12", "fresh migration did not create the active schema and migrations table");
-  check(sql("SELECT COUNT(*) FROM jungol_bada.migrations") === "2", "active migration ledger count was not recorded");
-  check(sql("SELECT GROUP_CONCAT(version ORDER BY version) FROM jungol_bada.migrations") === "2,3", "active migrations were not recorded");
+  check(sql("SELECT COUNT(*) FROM jungol_bada.migrations") === "3", "active migration ledger count was not recorded");
+  check(sql("SELECT GROUP_CONCAT(version ORDER BY version) FROM jungol_bada.migrations") === "2,3,4", "active migrations were not recorded");
   check(sql("SELECT COUNT(*) FROM jungol_bada.migrations WHERE LENGTH(checksum_sha256) <> 64") === "0", "checksum was not recorded");
   sql("INSERT INTO jungol_bada.user (jungol_name, jungol_account_id) VALUES ('sentinel', 999999)");
   check(runMigrator().status === 0, "second migration was not a no-op");
   check(sql("SELECT COUNT(*) FROM jungol_bada.user WHERE jungol_name='sentinel'") === "1", "no-op migration lost sentinel");
+
+  await runCustomMigrationInterruptions({ docker, sql, image, network, runMigrator });
 
   sql("DROP DATABASE jungol_bada; CREATE DATABASE jungol_bada; CREATE TABLE jungol_bada.value_probe (id INT PRIMARY KEY); INSERT INTO jungol_bada.value_probe VALUES (1)");
   check(runMigrator().status !== 0, "unmanaged database unexpectedly migrated");
@@ -113,15 +137,15 @@ try {
   check(sql("SELECT COUNT(*) FROM jungol_bada.user WHERE jungol_name='sentinel_after_reset'") === "1", "checksum failure changed data");
   sql(`UPDATE jungol_bada.migrations SET checksum_sha256='${checksum}' WHERE version=2`);
 
-  cpSync(join(root, "scripts/database/test-fixtures/003_fail_after_sentinel.sql"), join(fixture, "004_fail_after_sentinel.sql"));
+  cpSync(join(root, "scripts/database/test-fixtures/003_fail_after_sentinel.sql"), join(fixture, "005_fail_after_sentinel.sql"));
   const fixtureMounts = [
-    "-v", `${join(fixture, "004_fail_after_sentinel.sql")}:/app/004_fail_after_sentinel.sql:ro`,
+    "-v", `${join(fixture, "005_fail_after_sentinel.sql")}:/app/005_fail_after_sentinel.sql:ro`,
   ];
   check(runMigrator(fixtureMounts).status !== 0, "failing pending migration unexpectedly succeeded");
   check(sql("SELECT COUNT(*) FROM jungol_bada.migration_failure_probe") === "1", "failing migration did not execute its probe");
-  check(sql("SELECT COUNT(*) FROM jungol_bada.migrations WHERE version=4") === "0", "failed migration was recorded");
+  check(sql("SELECT COUNT(*) FROM jungol_bada.migrations WHERE version=5") === "0", "failed migration was recorded");
   check(sql("SELECT COUNT(*) FROM jungol_bada.user WHERE jungol_name='sentinel_after_reset'") === "1", "failed migration lost sentinel");
-  writeFileSync(join(fixture, "004_fail_after_sentinel.sql"), "SELECT SLEEP(2); CREATE TABLE lock_probe (id INT PRIMARY KEY);\n");
+  writeFileSync(join(fixture, "005_fail_after_sentinel.sql"), "SELECT SLEEP(2); CREATE TABLE lock_probe (id INT PRIMARY KEY);\n");
   const [first, second] = await Promise.all([
     runMigratorAsync(fixtureMounts),
     runMigratorAsync(fixtureMounts),
@@ -130,7 +154,7 @@ try {
     first.code === 0 && second.code === 0,
     `concurrent migrators did not serialize: ${first.errorCode ?? first.code},${second.errorCode ?? second.code}`,
   );
-  check(sql("SELECT COUNT(*) FROM jungol_bada.migrations WHERE version=4") === "1", "concurrent migration was not recorded once");
+  check(sql("SELECT COUNT(*) FROM jungol_bada.migrations WHERE version=5") === "1", "concurrent migration was not recorded once");
   check(output(["image", "inspect", image, "--format", "{{.Config.User}}"] ) === "node", "migrator image is not non-root");
   check(docker(["run", "--rm", "--entrypoint", "sh", image, "-ec", "test -z \"$(find /app -type f \\( -name '000_*' -o -name '001_*' \\) -print -quit)\""]).status === 0, "migrator image contains legacy SQL");
 } finally {

@@ -37,7 +37,7 @@ export class HealthRepository {
       (await this.database.selectOne(
         sqlOperations.healthMigrations,
         "SELECT version FROM migrations WHERE version >= ? ORDER BY version DESC LIMIT 1",
-        [3],
+        [4],
         migrationSchema,
       )) !== undefined
     );

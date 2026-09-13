@@ -35,7 +35,7 @@ export class SeedDatabase {
         "INSERT INTO event_problem (id, event_id, problem, added_at) VALUES (301, 201, 1000, '2026-09-01 00:00:00'), (302, 202, 2000, '2026-08-01 00:00:00')",
       );
       await connection.execute(
-        "INSERT INTO score_history (id, user_id, `desc`, bias, rule_type, award_key, score_day, event_id, problem_id, created_at) VALUES (401, 1, '일일', 1, 'daily', 'daily:101', '2026-09-01', NULL, 101, '2026-09-01 00:00:00'), (402, 1, '이벤트', 1, 'event', 'event:201:101', '2026-09-01', 201, 101, '2026-09-01 00:00:01'), (403, 1, '수동 차감', -3, 'manual', NULL, NULL, NULL, NULL, '2026-09-02 00:00:00'), (404, 2, '지난달 일일', 1, 'daily', 'daily:103', '2026-08-15', NULL, 103, '2026-08-15 00:00:00')",
+        "INSERT INTO score_history (id, user_id, `desc`, bias, rule_type, award_key, score_day, event_id, problem_id, created_at) VALUES (401, 1, '일일', 1, 'daily', 'daily:101', '2026-09-01', NULL, 101, '2026-09-01 00:00:00'), (402, 1, '이벤트', 1, 'event', 'event:201:101', '2026-09-01', 201, 101, '2026-09-01 00:00:01'), (403, 1, '수동 차감', -3, 'custom', NULL, NULL, NULL, NULL, '2026-09-02 00:00:00'), (404, 2, '지난달 일일', 1, 'daily', 'daily:103', '2026-08-15', NULL, 103, '2026-08-15 00:00:00')",
       );
       await connection.execute(
         "INSERT INTO ranking_boards (id, title, created_at, is_active) VALUES (501, '이전 보드', '2026-08-31 00:00:00', 0), (502, '현재 보드', '2026-09-08 00:00:00', 1)",
