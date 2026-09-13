@@ -1,5 +1,6 @@
 import type { RankMemberSnapshot } from "../domain/sync.js";
 import type { SafeJungolDiagnostics } from "../jungol/errors.js";
+import type { CycleTraceSnapshot } from "./cycle-diagnostics.js";
 import {
   type AccountFlowStep,
   type FlowTrace,
@@ -51,6 +52,10 @@ export interface GroupCycleAdapters {
   project(signal: AbortSignal): Promise<void>;
 }
 
+export interface AtomicGroupCycleAdapter {
+  runAtomic(signal: AbortSignal): Promise<GroupCycleResult>;
+}
+
 export type GroupCycleResult = {
   readonly status: GroupCycleStatus;
   readonly memberCount: number;
@@ -61,6 +66,7 @@ export type GroupCycleResult = {
   readonly settlement: GroupSettlementResult;
   readonly finalized: boolean;
   readonly trace: FlowTrace<GroupCycleFlowStep> | undefined;
+  readonly cycleTrace?: CycleTraceSnapshot | undefined;
 };
 
 export type GroupCycleStatus = "success" | "success_pending" | "partial";
@@ -87,6 +93,7 @@ export class GroupCycleExecutor {
 
   async run(signal: AbortSignal): Promise<GroupCycleResult> {
     signal.throwIfAborted();
+    if (this.isAtomic(this.adapters)) return this.adapters.runAtomic(signal);
     const trace = new GroupCycleFlowLog();
     this.flow = trace;
     try {
@@ -165,5 +172,11 @@ export class GroupCycleExecutor {
       trace.dispose();
       this.flow = undefined;
     }
+  }
+
+  private isAtomic(
+    adapters: GroupCycleAdapters,
+  ): adapters is GroupCycleAdapters & AtomicGroupCycleAdapter {
+    return "runAtomic" in adapters;
   }
 }

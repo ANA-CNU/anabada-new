@@ -1,3 +1,5 @@
+import type { PoolConnection } from "mysql2/promise";
+import type { CycleTrace } from "./application/cycle-diagnostics.js";
 import type { AcceptedAttempt, RankMemberSnapshot } from "./domain/sync.js";
 import { PersistenceError } from "./mysql/account-types.js";
 import { AttemptRepository } from "./mysql/attempts.js";
@@ -19,6 +21,7 @@ export type PreparedAccountBatch = {
   readonly highestSubmissionId: bigint;
   readonly now: Date;
   readonly signal?: AbortSignal;
+  readonly trace?: CycleTrace;
 };
 
 export type AccountSettlementResult = {
@@ -48,102 +51,164 @@ export class AccountSettlementService {
 
   async commit(batch: PreparedAccountBatch): Promise<AccountSettlementResult> {
     batch.signal?.throwIfAborted();
-    return this.unitOfWork.executeConnection(async (connection) => {
-      const users = new UserRepository(connection);
-      const user = await users.lockExisting(batch.member.accountId);
-      if (user.initializedAt === null || user.initialSubmissionId === null)
-        throw new PersistenceError("account_conflict");
-      if (
-        this.ratingTierMapper.toTier(batch.member.acRating) !==
-        batch.member.tier
+    return this.unitOfWork.executeConnection((connection) =>
+      this.commitOnConnection(connection, batch),
+    );
+  }
+
+  async commitOnConnection(
+    connection: PoolConnection,
+    batch: PreparedAccountBatch,
+  ): Promise<AccountSettlementResult> {
+    const users = new UserRepository(connection);
+    const user = await users.lockExisting(batch.member.accountId);
+    if (user.initializedAt === null || user.initialSubmissionId === null)
+      throw new PersistenceError("account_conflict");
+    if (
+      this.ratingTierMapper.toTier(batch.member.acRating) !== batch.member.tier
+    )
+      throw new PersistenceError("rating_tier_mismatch");
+    if (
+      batch.attempts.some(
+        (attempt) => BigInt(attempt.submissionId) > batch.highestSubmissionId,
       )
-        throw new PersistenceError("rating_tier_mismatch");
-      if (
-        batch.attempts.some(
-          (attempt) => BigInt(attempt.submissionId) > batch.highestSubmissionId,
-        )
-      )
-        throw new PersistenceError("stale_snapshot");
-      const orderedAttempts = orderAcceptedAttempts(batch.attempts);
-      const attemptRepository = new AttemptRepository(connection);
-      const duplicates = await attemptRepository.readDuplicates(
-        user.id,
-        orderedAttempts,
-      );
-      const solved = await attemptRepository.readSolvedCounts(user.id);
-      const scores = new ScoreHistoryRepository(connection);
-      const awardedDays = await scores.readDailyDays(user.id);
-      const events = new EventManager(
-        await new EventRepository(connection).readForProblems([
-          ...new Set(orderedAttempts.map((attempt) => attempt.problemId)),
-        ]),
-        this.calendar,
-      );
-      const cutoff = BigInt(user.initialSubmissionId);
-      let insertedAttemptCount = 0;
-      for (const attempt of orderedAttempts) {
-        batch.signal?.throwIfAborted();
-        if (duplicates.has(attempt.submissionId)) continue;
-        const repetition = solved.get(attempt.problemId) ?? 0;
-        const tier = batch.member.tier;
-        const problemRowId = await attemptRepository.insert({
-          userId: user.id,
-          userTier: tier,
-          attempt,
-          repetition,
-        });
-        if (problemRowId === null) continue;
-        insertedAttemptCount += 1;
-        solved.set(attempt.problemId, repetition + 1);
-        if (BigInt(attempt.submissionId) <= cutoff) continue;
-        const daily = this.dailyPolicy.evaluate({
-          userId: user.id,
-          problemRowId,
-          problemNumber: attempt.problemId,
-          submittedAt: attempt.submittedAt,
-          firstSolve: repetition === 0,
-          problemTier: attempt.effectiveTier,
-          userTier: tier,
-          alreadyAwarded: awardedDays.has(
-            this.calendar.day(attempt.submittedAt),
-          ),
-        });
-        if (daily) {
-          await scores.insert(daily);
-          awardedDays.add(daily.scoreDay);
-        }
-        for (const award of events.detect({
-          syncMode: "incremental",
-          userId: user.id,
-          problemRowId,
-          problemNumber: attempt.problemId,
-          submittedAt: attempt.submittedAt,
-        }))
-          await scores.insert(award);
-      }
-      const cursor =
-        batch.highestSubmissionId > BigInt(user.solution)
-          ? batch.highestSubmissionId
-          : BigInt(user.solution);
-      await users.completeSync({
-        userId: user.id,
-        member: batch.member,
-        highestInspectedSubmissionId: cursor,
-      });
-      await new BiasRepository(connection, this.calendar).refreshUser(
-        user.id,
-        batch.now,
-      );
-      await new GroupFeedRepository(connection).deleteInboxForAccount(
-        this.groupId,
-        batch.member.accountId,
-        batch.attempts.map((attempt) => attempt.submissionId),
-      );
+    )
+      throw new PersistenceError("stale_snapshot");
+    const orderedAttempts = orderAcceptedAttempts(batch.attempts);
+    const attemptRepository = new AttemptRepository(connection);
+    const duplicates = await attemptRepository.readDuplicates(
+      user.id,
+      orderedAttempts,
+    );
+    const solved = await attemptRepository.readSolvedCounts(user.id);
+    const scores = new ScoreHistoryRepository(connection);
+    const awardedDays = await scores.readDailyDays(user.id);
+    const events = new EventManager(
+      await new EventRepository(connection).readForProblems([
+        ...new Set(orderedAttempts.map((attempt) => attempt.problemId)),
+      ]),
+      this.calendar,
+    );
+    const cutoff = BigInt(user.initialSubmissionId);
+    let insertedAttemptCount = 0;
+    for (const attempt of orderedAttempts) {
       batch.signal?.throwIfAborted();
-      return {
-        insertedAttemptCount,
-        duplicateAttemptCount: orderedAttempts.length - insertedAttemptCount,
-      };
-    });
+      if (duplicates.has(attempt.submissionId)) continue;
+      const repetition = solved.get(attempt.problemId) ?? 0;
+      const tier = batch.member.tier;
+      const problemRowId = await this.stage(
+        batch.trace,
+        "attempt_insert",
+        {
+          accountId: batch.member.accountId,
+          submissionId: attempt.submissionId.toString(),
+          problemId: attempt.problemId,
+          operationId: "attempt_insert",
+        },
+        () =>
+          attemptRepository.insert({
+            userId: user.id,
+            userTier: tier,
+            attempt,
+            repetition,
+          }),
+      );
+      if (problemRowId === null) continue;
+      insertedAttemptCount += 1;
+      solved.set(attempt.problemId, repetition + 1);
+      if (BigInt(attempt.submissionId) <= cutoff) continue;
+      const daily = this.dailyPolicy.evaluate({
+        userId: user.id,
+        problemRowId,
+        problemNumber: attempt.problemId,
+        submittedAt: attempt.submittedAt,
+        firstSolve: repetition === 0,
+        problemTier: attempt.effectiveTier,
+        userTier: tier,
+        alreadyAwarded: awardedDays.has(this.calendar.day(attempt.submittedAt)),
+      });
+      if (daily) {
+        await this.stage(
+          batch.trace,
+          "daily_score",
+          {
+            accountId: batch.member.accountId,
+            submissionId: attempt.submissionId.toString(),
+            problemId: attempt.problemId,
+            operationId: "daily_score",
+          },
+          () => scores.insert(daily),
+        );
+        awardedDays.add(daily.scoreDay);
+      }
+      for (const award of events.detect({
+        syncMode: "incremental",
+        userId: user.id,
+        problemRowId,
+        problemNumber: attempt.problemId,
+        submittedAt: attempt.submittedAt,
+      }))
+        await this.stage(
+          batch.trace,
+          "event_score",
+          {
+            accountId: batch.member.accountId,
+            submissionId: attempt.submissionId.toString(),
+            problemId: attempt.problemId,
+            operationId: "event_score",
+          },
+          () => scores.insert(award),
+        );
+    }
+    const cursor =
+      batch.highestSubmissionId > BigInt(user.solution)
+        ? batch.highestSubmissionId
+        : BigInt(user.solution);
+    await this.stage(
+      batch.trace,
+      "user_counters",
+      { accountId: batch.member.accountId, operationId: "user_counters" },
+      () =>
+        users.completeSync({
+          userId: user.id,
+          member: batch.member,
+          highestInspectedSubmissionId: cursor,
+        }),
+    );
+    await this.stage(
+      batch.trace,
+      "user_cache",
+      { accountId: batch.member.accountId, operationId: "user_cache" },
+      () =>
+        new BiasRepository(connection, this.calendar).refreshUser(
+          user.id,
+          batch.now,
+        ),
+    );
+    await this.stage(
+      batch.trace,
+      "inbox_delete",
+      { accountId: batch.member.accountId, operationId: "inbox_delete" },
+      () =>
+        new GroupFeedRepository(connection).deleteInboxForAccount(
+          this.groupId,
+          batch.member.accountId,
+          batch.attempts.map((attempt) => attempt.submissionId),
+        ),
+    );
+    batch.signal?.throwIfAborted();
+    return {
+      insertedAttemptCount,
+      duplicateAttemptCount: orderedAttempts.length - insertedAttemptCount,
+    };
+  }
+
+  private stage<T>(
+    trace: CycleTrace | undefined,
+    stage: string,
+    context: import("./application/cycle-diagnostics.js").SafeCycleContext,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    return trace ? trace.run(stage, context, operation) : operation();
   }
 }

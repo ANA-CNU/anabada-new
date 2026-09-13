@@ -55,6 +55,15 @@ interface CountRow extends RowDataPacket {
 export class GroupFeedRepository {
   constructor(private readonly connection: PoolConnection) {}
 
+  async readCheckpoint(groupId: string): Promise<CollectorCheckpoint | null> {
+    const [rows] = await this.connection.execute<CheckpointRow[]>(
+      "SELECT committed_cursor AS committedCursor, window_upper_submission_id AS upperSubmissionId, window_lower_cursor AS windowLowerCursor, pagination_cursor AS paginationCursor, last_scanned_submission_id AS lastScannedSubmissionId, phase, overlap_observed_count AS overlapObservedCount, cursor_reached AS cursorReached FROM collector_checkpoint WHERE group_id=?",
+      [groupId],
+    );
+    const row = rows[0];
+    return row ? checkpointSchema.parse(row) : null;
+  }
+
   async lockCheckpoint(groupId: string): Promise<CollectorCheckpoint | null> {
     const [rows] = await this.connection.execute<CheckpointRow[]>(
       "SELECT committed_cursor AS committedCursor, window_upper_submission_id AS upperSubmissionId, window_lower_cursor AS windowLowerCursor, pagination_cursor AS paginationCursor, last_scanned_submission_id AS lastScannedSubmissionId, phase, overlap_observed_count AS overlapObservedCount, cursor_reached AS cursorReached FROM collector_checkpoint WHERE group_id=? FOR UPDATE",
@@ -178,6 +187,19 @@ export class GroupFeedRepository {
         return true;
       })
       .map((row) => this.parseInbox(row));
+  }
+
+  async readInboxSnapshot(
+    groupId: string,
+    limit = 200,
+  ): Promise<readonly SettlementInboxRow[]> {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 200)
+      throw new RangeError("invalid_group_settlement_limit");
+    const [rows] = await this.connection.query<InboxRow[]>(
+      "SELECT external_submission_id AS externalSubmissionId, jungol_account_id AS accountId, problem AS problemId, submitted_at AS submittedAt, score FROM collector_ac_inbox WHERE group_id=? ORDER BY submitted_at ASC, external_submission_id ASC LIMIT ?",
+      [groupId, limit],
+    );
+    return rows.map((row) => this.parseInbox(row));
   }
 
   async readOldestForAccount(

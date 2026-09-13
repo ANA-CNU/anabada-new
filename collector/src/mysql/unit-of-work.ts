@@ -1,5 +1,7 @@
 import type { Pool, PoolConnection } from "mysql2/promise";
+import type { CycleTrace } from "../application/cycle-diagnostics.js";
 import type { KstCalendar } from "../scoring/daily.js";
+import { CommitUnknownError } from "./account-types.js";
 import { AttemptRepository } from "./attempts.js";
 import {
   BiasRepository,
@@ -39,27 +41,84 @@ export class AccountUnitOfWork {
 
   async executeConnection<T>(
     operation: (connection: PoolConnection) => Promise<T>,
+    beforeCommit?: () => void,
+    onTransactionActive?: () => void,
+    onRollbackFailed?: () => void,
+    trace?: CycleTrace,
   ): Promise<T> {
-    return this.transaction(operation);
+    return this.transaction(
+      operation,
+      beforeCommit,
+      onTransactionActive,
+      onRollbackFailed,
+      trace,
+    );
+  }
+
+  /** 준비 단계는 쓰기 transaction을 열지 않고 현재 DB snapshot만 읽는다. */
+  async readConnection<T>(
+    operation: (connection: PoolConnection) => Promise<T>,
+  ): Promise<T> {
+    const connection = await this.pool.getConnection();
+    try {
+      return await operation(connection);
+    } finally {
+      connection.release();
+    }
   }
 
   private async transaction<T>(
     operation: (connection: PoolConnection) => Promise<T>,
+    beforeCommit?: () => void,
+    onTransactionActive?: () => void,
+    onRollbackFailed?: () => void,
+    trace?: CycleTrace,
   ): Promise<T> {
-    const connection = await this.pool.getConnection();
+    const connection = await (trace
+      ? trace.run("db_connection", {}, () => this.pool.getConnection())
+      : this.pool.getConnection());
     let destroyed = false;
+    let began = false;
     try {
-      await connection.query("SET SESSION innodb_lock_wait_timeout=15");
-      await connection.query(
-        "SET SESSION lock_wait_timeout=15, max_execution_time=30000",
+      await this.stage(trace, "session_configure", () =>
+        connection.query("SET SESSION innodb_lock_wait_timeout=15"),
       );
-      await connection.beginTransaction();
+      await this.stage(trace, "session_configure", () =>
+        connection.query(
+          "SET SESSION lock_wait_timeout=15, max_execution_time=30000",
+        ),
+      );
+      await this.stage(trace, "transaction_begin", () =>
+        connection.beginTransaction(),
+      );
+      began = true;
+      onTransactionActive?.();
+      trace?.transaction("active");
       const result = await operation(connection);
-      await connection.commit();
+      beforeCommit?.();
+      try {
+        await this.stage(trace, "transaction_commit", () =>
+          connection.commit(),
+        );
+        trace?.transaction("committed");
+      } catch (error) {
+        destroyed = true;
+        try {
+          connection.destroy();
+        } catch (destroyError) {
+          void destroyError;
+        }
+        trace?.transaction("commit_unknown");
+        throw new CommitUnknownError(error);
+      }
       return result;
     } catch (error) {
+      if (error instanceof CommitUnknownError || !began) throw error;
       try {
-        await connection.rollback();
+        await this.stage(trace, "transaction_rollback", () =>
+          connection.rollback(),
+        );
+        trace?.transaction("rolled_back");
       } catch (rollbackError) {
         destroyed = true;
         // rollback 실패 connection은 재사용하지 않고 원래 operation 오류를 보존한다.
@@ -68,11 +127,46 @@ export class AccountUnitOfWork {
         } catch (destroyError) {
           void destroyError;
         }
+        onRollbackFailed?.();
+        trace?.transaction("rollback_failed");
         void rollbackError;
       }
       throw error;
     } finally {
       if (!destroyed) connection.release();
     }
+  }
+
+  private stage<T>(
+    trace: CycleTrace | undefined,
+    stage: string,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    if (!trace) return operation();
+    return trace
+      .run(stage, { operationId: stage }, operation)
+      .catch((error) => {
+        trace.fail(stage, error, this.sqlContext(stage, error));
+        throw error;
+      });
+  }
+
+  private sqlContext(stage: string, error: unknown) {
+    if (typeof error !== "object" || error === null)
+      return { operationId: stage };
+    const candidate = error as { sqlState?: unknown; errno?: unknown };
+    return {
+      operationId: stage,
+      sqlState:
+        typeof candidate.sqlState === "string" &&
+        /^[A-Z0-9]{5}$/.test(candidate.sqlState)
+          ? candidate.sqlState
+          : null,
+      errno:
+        typeof candidate.errno === "number" &&
+        Number.isSafeInteger(candidate.errno)
+          ? candidate.errno
+          : null,
+    };
   }
 }

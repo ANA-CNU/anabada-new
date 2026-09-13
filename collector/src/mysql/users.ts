@@ -15,6 +15,7 @@ export interface StoredUser extends RowDataPacket {
 
 export interface LockedUser extends RowDataPacket {
   readonly id: number;
+  readonly accountId: string;
   readonly solution: string;
   readonly corrects: number;
   readonly submissions: number;
@@ -27,6 +28,17 @@ export type UserInitializationState = {
   readonly accountId: string;
   readonly initialized: boolean;
 };
+
+export interface PreparedUserState extends RowDataPacket {
+  readonly accountId: string;
+  readonly id: number;
+  readonly solution: string;
+  readonly corrects: number;
+  readonly submissions: number;
+  readonly tier: number;
+  readonly initializedAt: Date | null;
+  readonly initialSubmissionId: string | null;
+}
 
 /** user 테이블 SQL만 소유하며 transaction 시작·종료 권한은 갖지 않는다. */
 export class UserRepository {
@@ -60,12 +72,65 @@ export class UserRepository {
 
   async lockExisting(accountId: string): Promise<LockedUser> {
     const [rows] = await this.connection.execute<LockedUser[]>(
-      "SELECT id,solution,corrects,submissions,tier,initialized_at AS initializedAt,initial_submission_id AS initialSubmissionId FROM user WHERE jungol_account_id=? FOR UPDATE",
+      "SELECT id,jungol_account_id AS accountId,solution,corrects,submissions,tier,initialized_at AS initializedAt,initial_submission_id AS initialSubmissionId FROM user WHERE jungol_account_id=? FOR UPDATE",
       [accountId],
     );
     const user = rows[0];
     if (!user) throw new PersistenceError("account_conflict");
     return user;
+  }
+
+  async readInitializationStates(
+    accountIds: readonly string[],
+  ): Promise<ReadonlyMap<string, PreparedUserState>> {
+    if (accountIds.length === 0) return new Map();
+    const [rows] = await this.connection.query<PreparedUserState[]>(
+      "SELECT id,jungol_account_id AS accountId,solution,corrects,submissions,tier,initialized_at AS initializedAt,initial_submission_id AS initialSubmissionId FROM user WHERE jungol_account_id IN (?)",
+      [accountIds],
+    );
+    return new Map(rows.map((row) => [row.accountId, row]));
+  }
+
+  async lockRegisteredMembers(members: readonly RankMemberSnapshot[]): Promise<{
+    readonly users: readonly LockedUser[];
+    readonly insertedAccountIds: ReadonlySet<string>;
+  }> {
+    if (members.length === 0)
+      return { users: [], insertedAccountIds: new Set() };
+    const accountIds = members.map((member) => member.accountId);
+    const [existing] = await this.connection.query<LockedUser[]>(
+      "SELECT id,jungol_account_id AS accountId,solution,corrects,submissions,tier,initialized_at AS initializedAt,initial_submission_id AS initialSubmissionId FROM user WHERE jungol_account_id IN (?) ORDER BY id ASC FOR UPDATE",
+      [accountIds],
+    );
+    const existingIds = new Set(existing.map((user) => user.accountId));
+    const insertedAccountIds = new Set<string>();
+    for (const member of members
+      .filter((member) => !existingIds.has(member.accountId))
+      .sort((left, right) => left.accountId.localeCompare(right.accountId))) {
+      try {
+        await this.connection.execute(
+          "INSERT INTO user (jungol_name,jungol_account_id) VALUES (?,?)",
+          [member.jungolName, member.accountId],
+        );
+      } catch (error) {
+        if (
+          typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          error.code === "ER_DUP_ENTRY"
+        )
+          throw new PersistenceError("stale_snapshot");
+        throw error;
+      }
+      insertedAccountIds.add(member.accountId);
+    }
+    const [rows] = await this.connection.query<LockedUser[]>(
+      "SELECT id,jungol_account_id AS accountId,solution,corrects,submissions,tier,initialized_at AS initializedAt,initial_submission_id AS initialSubmissionId FROM user WHERE jungol_account_id IN (?) ORDER BY id ASC FOR UPDATE",
+      [accountIds],
+    );
+    if (rows.length !== members.length)
+      throw new PersistenceError("account_conflict");
+    return { users: rows, insertedAccountIds };
   }
 
   async refreshMetadata(member: RankMemberSnapshot): Promise<void> {

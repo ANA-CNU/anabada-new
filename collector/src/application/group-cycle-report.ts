@@ -1,5 +1,6 @@
 import { JungolError } from "../jungol/errors.js";
 import { ErrorCodeSanitizer } from "../logger.js";
+import { AtomicCycleFailure } from "./cycle-atomic-error.js";
 import type { CycleReport, CycleStatus } from "./cycle-types.js";
 import type { CycleFlowStep, FlowTrace } from "./flow-log.js";
 import { GroupCycleFailure, type GroupCycleResult } from "./group-cycle.js";
@@ -40,14 +41,28 @@ export class GroupCycleReportMapper {
       accountFailures: failures.slice(0, 5),
       commonFailures: [],
       pending: result.status === "success_pending",
+      cycleTrace: result.cycleTrace,
     };
   }
 
   failure(error: unknown, outerTrace?: FlowTrace<CycleFlowStep>): CycleReport {
-    const cause = error instanceof GroupCycleFailure ? error.cause : error;
+    const cause =
+      error instanceof GroupCycleFailure || error instanceof AtomicCycleFailure
+        ? error.cause
+        : error;
     const code = this.errors.code(cause);
+    const cycleTrace =
+      error instanceof AtomicCycleFailure ? error.cycleTrace : undefined;
+    const memberCount = cycleTrace?.progress?.memberCount;
+    const scannedAttemptCount = cycleTrace?.progress?.scannedAttemptCount;
+    const acceptedCount = cycleTrace?.progress?.acceptedCount;
     return {
       ...this.empty(this.failureStatus(code, "failed")),
+      rankCount: typeof memberCount === "number" ? memberCount : 0,
+      scannedAttemptCount:
+        typeof scannedAttemptCount === "number" ? scannedAttemptCount : 0,
+      acceptedAttemptCount:
+        typeof acceptedCount === "number" ? acceptedCount : 0,
       errorCode: code,
       commonFailures: [
         {
@@ -58,6 +73,7 @@ export class GroupCycleReportMapper {
           trace: error instanceof GroupCycleFailure ? error.trace : outerTrace,
         },
       ],
+      cycleTrace,
     };
   }
 

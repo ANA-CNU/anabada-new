@@ -29,6 +29,7 @@ import { UserRepository } from "../src/mysql/users.js";
 import { ProjectionService } from "../src/projection.js";
 import { KstCalendar } from "../src/scoring/daily.js";
 import { WeightedRankingPolicy } from "../src/scoring/ranking.js";
+import { runCycleAtomicMysqlCases } from "./cycle-atomic-mysql-cases.js";
 import { runGroupRuntimeCases } from "./group-runtime-mysql-cases.js";
 
 interface CountRow extends RowDataPacket {
@@ -536,6 +537,7 @@ test(
         },
       );
       await runGroupRuntimeCases(t, pool);
+      await runCycleAtomicMysqlCases(t, pool);
     } finally {
       await pool.end();
     }

@@ -1,8 +1,9 @@
 import { pino } from "pino";
+import { AtomicCycleFailure } from "./application/cycle-atomic-error.js";
 import { AccountFlowFailure } from "./application/flow-log.js";
 import { BoundaryError } from "./errors.js";
 import { JungolError } from "./jungol/errors.js";
-import { PersistenceError } from "./mysql/account-types.js";
+import { CommitUnknownError, PersistenceError } from "./mysql/account-types.js";
 import { LeaseError } from "./mysql/lease.js";
 import { WorkerPoolError } from "./worker-pool.js";
 
@@ -10,6 +11,8 @@ import { WorkerPoolError } from "./worker-pool.js";
 export class ErrorCodeSanitizer {
   code(error: unknown): string {
     if (error instanceof AccountFlowFailure) return this.code(error.cause);
+    if (error instanceof AtomicCycleFailure) return this.code(error.cause);
+    if (error instanceof CommitUnknownError) return "commit_unknown";
     if (
       error instanceof BoundaryError ||
       error instanceof JungolError ||

@@ -1,4 +1,5 @@
 import { mkdir } from "node:fs/promises";
+import { CycleTrace } from "./application/cycle-diagnostics.js";
 import { CollectorService } from "./application/service.js";
 import { SyncCycle } from "./application/sync-cycle.js";
 import type { CollectorConfig } from "./config.js";
@@ -14,7 +15,8 @@ import { DiscordWebhookClient } from "./webhook.js";
 
 type CycleFactory = (
   runtime: ConstructorParameters<typeof SyncCycle>[0],
-) => Pick<SyncCycle, "run" | "close"> & {
+) => Pick<SyncCycle, "close"> & {
+  run(signal: AbortSignal, trace?: CycleTrace): ReturnType<SyncCycle["run"]>;
   readonly currentStage?: () => string | undefined;
 };
 type RuntimeScheduling = Pick<
@@ -82,9 +84,14 @@ export class CollectorRuntime {
         status = "running";
         lastStartedAt = Date.now();
         await updateHealth();
-        activeCycle = lifecycle.start(new Date(lastStartedAt));
+        const cycleTrace = new CycleTrace(crypto.randomUUID());
+        activeCycle = lifecycle.start({
+          cycleId: cycleTrace.snapshot().cycleId,
+          startedAt: new Date(lastStartedAt),
+          trace: cycleTrace,
+        });
         try {
-          const summary = await cycle.run(signal);
+          const summary = await cycle.run(signal, cycleTrace);
           completedAt = Date.now();
           status =
             summary.status === "success" || summary.status === "skipped_overlap"
@@ -112,6 +119,7 @@ export class CollectorRuntime {
           );
         } finally {
           await lifecycle.stop(activeCycle);
+          cycleTrace.dispose();
           activeCycle = undefined;
           if (status === "running") status = "failed";
           lastCompletedAt = completedAt ?? Date.now();

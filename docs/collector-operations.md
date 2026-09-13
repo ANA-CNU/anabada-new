@@ -37,3 +37,22 @@ DB 반영과 webhook 전송은 분리된 책임이다. DB의 `hook`은 추첨 �
 대상은 서로 자동으로 복사하거나 전송하지 않는다. DB 반영이 성공한 뒤 운영 webhook 전송이
 실패해도 이미 반영된 수집 결과를 되돌리지 않으며, 운영 webhook의 선택적 비활성화도 DB
 수집 결과에 영향을 주지 않는다.
+
+## 원자 cycle과 복구 판단
+
+- cycle은 브라우저·Jungol API·metadata 조회와 필요한 DB 읽기 snapshot을 먼저 끝낸 뒤, 실제
+  DB 쓰기와 projection을 하나의 MySQL transaction에서 수행한다. transaction 안에서 Jungol이나
+  다른 네트워크 요청을 기다리지 않는다.
+- transaction 중 user, AC inbox, 점수, cache, checkpoint, projection 어느 단계든 실패하면
+  rollback을 시도한다. `rolled_back`은 해당 cycle의 쓰기가 모두 취소되었음을 뜻하며, 원인을
+  해결한 뒤 다음 scheduled cycle 또는 `run-once`를 재시도한다.
+- `rollback_failed`는 DB 연결 또는 서버 문제 때문에 rollback 완료를 확인하지 못한 상태다.
+  다음 자연 cycle은 checkpoint를 다시 읽어 상태를 판정한다. 담당자는 transaction 상태와 MySQL
+  로그를 확인하되 collector table을 수동 `DELETE`로 비우지 않는다.
+- `commit_unknown`도 commit 응답을 확정하지 못한 상태다. 성공·실패 어느 쪽으로도 가정하지
+  말고 다음 자연 cycle의 checkpoint 재조회 결과로 반영 여부를 판정한다. 운영자는 collector
+  table을 수동 `DELETE`로 수정하지 않는다.
+- commit 뒤 projection webhook 알림이 실패해도 이미 commit된 데이터는 되돌리지 않는다. 해당
+  알림은 warning으로 기록하며 다음 cycle의 idempotent 처리와 별도로 재전송 또는 점검한다.
+- 예전 phase별 API는 호환성·테스트 용도로만 남아 있다. 운영 cycle은 원자 `runAtomic` 경로만
+  사용하며 phase API를 새 운영 흐름에 연결하지 않는다.

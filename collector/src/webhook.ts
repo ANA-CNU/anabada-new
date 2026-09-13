@@ -238,8 +238,12 @@ export class ProjectionNotificationService {
 
   async run(signal: AbortSignal): Promise<ProjectionResult> {
     const result = await this.projection.rebuild();
+    await this.notify(result, signal);
+    return result;
+  }
+
+  async notify(result: ProjectionResult, signal: AbortSignal): Promise<void> {
     if (result.kind === "changed")
       await this.webhooks.broadcast(result.entries, signal);
-    return result;
   }
 }

@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { AtomicCycleFailure } from "../src/application/cycle-atomic-error.js";
+import { CycleTrace } from "../src/application/cycle-diagnostics.js";
 import type {
   CycleFlowStep,
   FlowTrace,
@@ -89,4 +91,26 @@ test("Given an outer lease failure When mapping the failure Then the report reta
   assert.equal(report.status, "failed");
   assert.equal(report.errorCode, "lease_acquisition_failed");
   assert.equal(report.commonFailures[0]?.trace?.events[0]?.step, "lease");
+});
+
+test("Given fifteen ranked members and a feed failure before a transaction When mapping the atomic failure Then independent preparation progress is reported", () => {
+  const cycleTrace = new CycleTrace("preparation-failure");
+  cycleTrace.progressUpdate({
+    memberCount: 15,
+    scannedPageCount: 1,
+    scannedAttemptCount: 4,
+    acceptedCount: 2,
+  });
+
+  const report = new GroupCycleReportMapper().failure(
+    new AtomicCycleFailure(
+      new RangeError("feed_failed"),
+      cycleTrace.snapshot(),
+    ),
+  );
+
+  assert.equal(report.rankCount, 15);
+  assert.equal(report.scannedAttemptCount, 4);
+  assert.equal(report.acceptedAttemptCount, 2);
+  assert.equal(report.cycleTrace?.transactionStatus, "not_started");
 });

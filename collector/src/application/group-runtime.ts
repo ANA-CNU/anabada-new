@@ -4,11 +4,17 @@ import type {
   RankMemberSnapshot,
 } from "../domain/sync.js";
 import { AccountInitialSnapshot, AccountSyncPlan } from "../domain/sync.js";
+import { ProblemTierEstimator } from "../group-domain.js";
 import { JungolError } from "../jungol/errors.js";
 import { MonthlyScoreCacheService } from "../monthly-score-cache.js";
 import { GroupFeedRepository } from "../mysql/group-feed.js";
 import type { AccountUnitOfWork } from "../mysql/unit-of-work.js";
+import type { ProjectionResult } from "../projection.js";
 import type { KstCalendar } from "../scoring/daily.js";
+import { AtomicCycleFailure } from "./cycle-atomic-error.js";
+import { type CycleCommitResult, CycleCommitService } from "./cycle-commit.js";
+import { CycleTrace } from "./cycle-diagnostics.js";
+import { CyclePreparationService } from "./cycle-preparation.js";
 import { AccountFlowLog } from "./flow-log.js";
 import type {
   GroupCycleAdapters,
@@ -62,6 +68,16 @@ export type GroupRuntimeDependencies = GroupSettlementRuntimeDependencies & {
   ) => Promise<readonly RankMemberSnapshot[]>;
   readonly profiles: GroupRuntimeProfilePort;
   readonly project: (signal: AbortSignal) => Promise<void>;
+  readonly projectOnConnection?: (
+    connection: import("mysql2/promise").PoolConnection,
+    now: Date,
+  ) => Promise<ProjectionResult>;
+  readonly notifyProjection?: (
+    result: ProjectionResult,
+    signal: AbortSignal,
+  ) => Promise<void>;
+  readonly warn?: (code: string) => void;
+  readonly cycleTrace?: CycleTrace;
   readonly now?: () => Date;
 };
 
@@ -91,6 +107,82 @@ export class GroupRuntime implements GroupCycleAdapters {
           ),
       );
     return checkpoint?.phase === "settling" ? "settling" : "collecting";
+  }
+
+  async runAtomic(
+    signal: AbortSignal,
+  ): Promise<import("./group-cycle.js").GroupCycleResult> {
+    if (!this.dependencies.projectOnConnection)
+      throw new RangeError("missing_atomic_projection");
+    const trace = this.dependencies.cycleTrace ?? new CycleTrace("local-cycle");
+    try {
+      return await this.runAtomicTraced(signal, trace);
+    } catch (error) {
+      throw new AtomicCycleFailure(error, trace.snapshot());
+    }
+  }
+
+  private async runAtomicTraced(
+    signal: AbortSignal,
+    trace: CycleTrace,
+  ): Promise<import("./group-cycle.js").GroupCycleResult> {
+    const preparation = new CyclePreparationService(
+      this.dependencies,
+      this.dependencies.tierEstimator ?? new ProblemTierEstimator(),
+      this.now,
+      trace,
+    );
+    const prepared = await trace.run("prepare", {}, () =>
+      preparation.prepare(signal),
+    );
+    const commit = new CycleCommitService({
+      groupId: this.dependencies.groupId,
+      unitOfWork: this.dependencies.accountUnitOfWork,
+      initialization: this.dependencies.initialization,
+      settlement: this.dependencies.settlement,
+      calendar: this.dependencies.calendar,
+      ...(this.dependencies.projectOnConnection
+        ? { projectOnConnection: this.dependencies.projectOnConnection }
+        : {}),
+    });
+    let committed: CycleCommitResult;
+    committed = await trace.run("commit", {}, () =>
+      commit.commit(prepared, signal, undefined, trace, undefined),
+    );
+    const notifyProjection = this.dependencies.notifyProjection;
+    if (committed.projection && notifyProjection)
+      try {
+        await trace.run("projection_notify", {}, () =>
+          notifyProjection(committed.projection as ProjectionResult, signal),
+        );
+      } catch (error) {
+        trace.fail("projection_notify", error, { code: "notification_failed" });
+        this.dependencies.warn?.("projection_notification_failed");
+      }
+    return {
+      status: committed.pending ? "success_pending" : "success",
+      memberCount: prepared.members.length,
+      initializationFailureCount: 0,
+      initializationFailures: [],
+      settlementFailureCount: 0,
+      scan: {
+        phase: committed.pending ? "collecting" : "settling",
+        status: committed.pending ? "pending" : "complete",
+        acceptedCount: committed.acceptedCount,
+        scannedPageCount: committed.scannedPageCount,
+      },
+      settlement: {
+        settledUserCount: committed.settledUserCount,
+        failedUserCount: 0,
+        failures: [],
+        insertedAttemptCount: committed.insertedAttemptCount,
+        duplicateAttemptCount: committed.duplicateAttemptCount,
+        inboxEmpty: committed.inboxEmpty,
+      },
+      finalized: committed.finalized,
+      trace: undefined,
+      cycleTrace: trace.snapshot(),
+    };
   }
 
   async members(signal: AbortSignal): Promise<readonly RankMemberSnapshot[]> {

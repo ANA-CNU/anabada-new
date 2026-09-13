@@ -22,6 +22,7 @@ import {
   WebhookBroadcaster,
   WebhookMessageFormatter,
 } from "../webhook.js";
+import { CycleTrace } from "./cycle-diagnostics.js";
 import type { CycleReport } from "./cycle-types.js";
 import { CycleFlowLog } from "./flow-log.js";
 import { GroupCycleExecutor, type GroupCycleResult } from "./group-cycle.js";
@@ -59,7 +60,7 @@ export class SyncCycle {
     return this.groupExecutor?.currentStage() ?? this.flow?.currentStep();
   }
 
-  async run(signal: AbortSignal) {
+  async run(signal: AbortSignal, suppliedTrace?: CycleTrace) {
     const { config, credentials, pool, logger, randomSeed } = this.runtime;
     const reports = new GroupCycleReportMapper();
     const leases = new CycleLeaseManager(pool);
@@ -79,15 +80,17 @@ export class SyncCycle {
           return this.session;
         };
         const calendar = new KstCalendar();
+        const cycleTrace = suppliedTrace ?? new CycleTrace(crypto.randomUUID());
         const unitOfWork = new AccountUnitOfWork(pool, calendar);
         const tiers = new AcRatingTierMapper();
+        const projectionService = new ProjectionService(
+          pool,
+          calendar,
+          new WeightedRankingPolicy(),
+          randomSeed,
+        );
         const projection = new ProjectionNotificationService(
-          new ProjectionService(
-            pool,
-            calendar,
-            new WeightedRankingPolicy(),
-            randomSeed,
-          ),
+          projectionService,
           new WebhookBroadcaster(
             new HookRepository(pool),
             new DiscordWebhookClient(),
@@ -102,7 +105,13 @@ export class SyncCycle {
           pageTimeoutMs: config.pageTimeoutMs,
           requests: this.requests,
           rank: new RankCollector(config, this.requests, tiers),
-          feed: new GroupFeedCollector(config, this.requests),
+          feed: new GroupFeedCollector(
+            config,
+            this.requests,
+            undefined,
+            undefined,
+            cycleTrace,
+          ),
           profile: new AccountProfileCollector(config, this.requests),
           metadata: this.metadata,
         });
@@ -129,6 +138,12 @@ export class SyncCycle {
           project: async (projectSignal) => {
             await projection.run(projectSignal);
           },
+          projectOnConnection: (connection, now) =>
+            projectionService.rebuildOnConnection(connection, now),
+          notifyProjection: (result, projectSignal) =>
+            projection.notify(result, projectSignal),
+          warn: (code) => logger.warn({ code }, "collector.post_commit_failed"),
+          cycleTrace,
         });
         await trace.runStep("login", async () =>
           (await session()).ensureLogin(credentials, signal),
@@ -145,20 +160,26 @@ export class SyncCycle {
     } finally {
       try {
         await browser?.close();
-      } catch (error) {
+      } catch (_error) {
         if (report.status === "success" || report.status === "skipped_overlap")
-          report = reports.failure(error);
+          logger.warn(
+            { code: "browser_close_failed", cycleTrace: report.cycleTrace },
+            "collector.post_commit_failed",
+          );
       } finally {
         try {
           const acquiredLease = lease;
           if (acquiredLease)
             await trace.runStep("release", () => acquiredLease.release());
-        } catch (error) {
+        } catch (_error) {
           if (
             report.status === "success" ||
             report.status === "skipped_overlap"
           )
-            report = reports.failure(error, trace.failureSnapshot());
+            logger.warn(
+              { code: "lease_release_failed", cycleTrace: report.cycleTrace },
+              "collector.post_commit_failed",
+            );
         }
         this.metadata.clearCycle();
         trace.dispose();
@@ -173,6 +194,7 @@ export class SyncCycle {
           code: failure.code,
           diagnostics: failure.diagnostics,
           trace: failure.trace,
+          cycleTrace: report.cycleTrace,
         },
         "cycle failed",
       );
