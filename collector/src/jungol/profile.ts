@@ -49,9 +49,11 @@ export class AccountProfileCollector {
           const advertised = Number(count[1]?.replaceAll(",", ""));
           if (advertised === 0 && !section) return { advertised, observed: 0 };
           if (!section || !list) return false;
+          const observed = list.querySelectorAll('a[href^="/problem/"]').length;
+          if (advertised > 0 && observed === 0) return false;
           return {
             advertised,
-            observed: list.querySelectorAll('a[href^="/problem/"]').length,
+            observed,
           };
         },
         undefined,

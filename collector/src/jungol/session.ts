@@ -57,11 +57,15 @@ export class JungolSession {
         const probe = await this.requests.schedule(
           "auth_probe",
           signal,
-          async () =>
-            page.goto(target.href, {
+          async () => {
+            const response = await page.goto(target.href, {
               waitUntil: "domcontentloaded",
               timeout: this.config.loginTimeoutMs,
-            }),
+            });
+            this.requireOpenResponse(response);
+            await this.waitForAuthSurface(page);
+            return response;
+          },
         );
         this.requireOpenResponse(probe);
         await this.requireChallengeRecovery(page);
@@ -133,6 +137,7 @@ export class JungolSession {
             throw new JungolError("auth_required");
           throw error;
         }
+        await this.waitForAuthSurface(page);
         await this.requireChallengeRecovery(page);
         if (
           await page
@@ -167,6 +172,42 @@ export class JungolSession {
     } finally {
       await page.close();
     }
+  }
+
+  private async waitForAuthSurface(page: Page): Promise<void> {
+    // 표의 빈 껍데기는 인증 증거가 아니다. hydration 뒤 로그인 안내 또는 실제 행을 기다린다.
+    const ready = await page.waitForFunction(
+      () => {
+        const text = document.body.innerText;
+        if (
+          location.pathname.includes("/auth/signin") ||
+          /로그인이 필요해요|그룹에 가입해야 해요|verify (?:that )?you are human|checking your browser|사람인지 확인/i.test(
+            text,
+          )
+        )
+          return true;
+        if (
+          Array.from(
+            document.querySelectorAll(
+              "#challenge-form, #challenge-running, .cf-turnstile, .g-recaptcha, .h-captcha",
+            ),
+          ).some(
+            (element) =>
+              element.getClientRects().length > 0 &&
+              getComputedStyle(element).visibility !== "hidden",
+          )
+        )
+          return true;
+        const table = document.querySelector("table");
+        return (
+          !!table?.querySelector("td") &&
+          !/로드 중|로딩 중|Loading\.\.\./i.test(table.textContent ?? "")
+        );
+      },
+      undefined,
+      { timeout: this.config.loginTimeoutMs },
+    );
+    await ready.dispose();
   }
 
   private async requireChallengeRecovery(page: Page): Promise<void> {

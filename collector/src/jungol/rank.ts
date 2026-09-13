@@ -78,6 +78,15 @@ export class RankCollector {
           .locator("tr")
           .nth(1)
           .waitFor({ state: "visible", timeout: this.settings.pageTimeoutMs });
+        const ready = await page.waitForFunction(
+          () => {
+            const text = document.querySelector("table")?.textContent ?? "";
+            return !/로드 중|로딩 중|Loading\.\.\./i.test(text);
+          },
+          undefined,
+          { timeout: this.settings.pageTimeoutMs },
+        );
+        await ready.dispose();
         const headers = await table.locator("th").allTextContents();
         if (
           !headersSchema.safeParse(headers.map((header) => header.trim()))
