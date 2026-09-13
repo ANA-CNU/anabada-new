@@ -1,5 +1,8 @@
 import type { Logger } from "pino";
-import type { CycleTrace } from "./application/cycle-diagnostics.js";
+import type {
+  CycleTrace,
+  CycleTraceSnapshot,
+} from "./application/cycle-diagnostics.js";
 import type { CycleReport } from "./application/cycle-types.js";
 import type { EmergencyWebhookTransport } from "./emergency-alert.js";
 
@@ -136,6 +139,7 @@ export class CycleLifecycleReporter {
     completedAt: Date,
   ): string {
     const pending = report.pending === true ? "success_pending" : "success";
+    const snapshot = active.trace?.snapshot() ?? report.cycleTrace;
     return this.bound([
       "# ✅ ANABADA collector 정상 완료",
       "",
@@ -144,11 +148,46 @@ export class CycleLifecycleReporter {
       `- 시작 시각: ${this.code(this.kst(active.startedAt))}`,
       `- 종료 시각: ${this.code(this.kst(completedAt))}`,
       `- 실행 시간: ${this.code(this.duration(completedAt.getTime() - active.startedAt.getTime()))}`,
+      `- DB transaction: ${this.code(snapshot?.transactionStatus ?? "unknown")}`,
+      `- 그룹 사용자: ${this.code(report.rankCount)}명`,
+      `- 조회 페이지: ${this.code(snapshot?.progress?.scannedPageCount ?? "unknown")}`,
       `- 삽입 AC: ${this.code(report.insertedAttemptCount)}건`,
       `- 중복 AC: ${this.code(report.duplicateAttemptCount)}건`,
       `- 정산 성공 사용자: ${this.code(report.successUserCount)}명`,
       `- 수집 AC: ${this.code(report.acceptedAttemptCount)}건`,
+      ...(report.pending
+        ? ["- 남은 수집·정산은 다음 cycle에서 이어서 처리합니다."]
+        : []),
+      ...this.successTrace(snapshot),
     ]);
+  }
+
+  private successTrace(
+    snapshot: CycleTraceSnapshot | undefined,
+  ): readonly string[] {
+    if (!snapshot) return [];
+    const stages = new Map<string, { count: number; durationMs: number }>();
+    for (const event of snapshot.events) {
+      if (event.outcome !== "completed") continue;
+      const total = stages.get(event.stage) ?? { count: 0, durationMs: 0 };
+      stages.set(event.stage, {
+        count: total.count + 1,
+        durationMs: total.durationMs + event.durationMs,
+      });
+    }
+    const selected = [...stages.entries()]
+      .sort((left, right) => right[1].durationMs - left[1].durationMs)
+      .slice(0, 8);
+    return [
+      "",
+      "## 단계별 소요 시간",
+      "보관된 완료 로그 기준, 오래 걸린 최대 8개 단계입니다. 상·하위 단계 시간은 겹칩니다.",
+      `- 생략된 이전 로그: ${this.code(snapshot.droppedEventCount)}건`,
+      ...selected.map(
+        ([stage, total]) =>
+          `- ${this.code(stage)}: ${this.code(total.count)}회 · 누적 ${this.code(`${Math.round(total.durationMs)}ms`)}`,
+      ),
+    ];
   }
 
   private bound(lines: readonly string[]): string {
