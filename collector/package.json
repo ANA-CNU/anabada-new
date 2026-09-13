@@ -11,6 +11,7 @@
     "run-once": "node --enable-source-maps dist/cli.js run-once",
     "healthcheck": "node --enable-source-maps dist/cli.js healthcheck",
     "test": "node --import tsx --test test/*.test.ts",
+    "test:jungol:live": "node --import tsx --test test/live/*.test.ts",
     "test:mysql": "node test/mysql-integration.mjs",
     "test:group:mysql": "node test/group-mysql-integration.mjs",
     "typecheck": "tsc --noEmit",

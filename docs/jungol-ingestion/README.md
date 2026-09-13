@@ -1,6 +1,6 @@
 # Jungol collector 운영·개발 가이드
 
-기준: 2026-09-08 작업 트리. 이 문서는 `collector/` 구현의 운영 계약입니다. [초기 기획](./planning-2026-09-07.md), [컨테이너 POC](./container-poc-2026-09-07.md), [랭킹→DB POC](./rank-worker-db-poc-2026-09-07.md)는 당시 증거를 보존한 역사 기록입니다. 역사 문서의 모든 결과 저장 및 5분 systemd 제안을 현재 배포에 적용하지 않습니다.
+기준: 2026-09-14 작업 트리. 이 문서는 `collector/` 구현의 운영 계약입니다. [초기 기획](./planning-2026-09-07.md), [컨테이너 POC](./container-poc-2026-09-07.md), [랭킹→DB POC](./rank-worker-db-poc-2026-09-07.md)는 당시 증거를 보존한 역사 기록입니다. 역사 문서의 모든 결과 저장 및 5분 systemd 제안을 현재 배포에 적용하지 않습니다.
 
 ## 데이터 정책과 검증 범위
 
@@ -14,33 +14,28 @@ backend와 collector는 새 `jungol_bada`를 사용합니다. 기존 `anabada`�
 
 | 책임 | 구현 |
 |---|---|
-| 조립·CLI·생명주기 | `CollectorBootstrap`, `CollectorApplication`, `CollectorRuntime`, `CollectorService` |
-| cycle 조정 | `SyncCycle`, `SyncCycleExecutor`, `SyncPlanner`, `AccountWorkerPool` |
-| 세션·랭킹·제출 | `JungolSession`, `RankCollector`, `AccountSummaryCollector`, `SubmissionCursorCollector`, `SubmissionCollector`, `SubmissionWireDecoder` |
-| 사용자 작업·메타 갱신 | `AccountSyncWorker`, `MetadataRefreshService` |
-| 사용자 transaction | `AccountSyncService`, `AccountUnitOfWork`, transaction-bound repository classes |
-| 점수와 projection | `DailyScorePolicy`, `EventManager`, `ProjectionService` |
-| 순위 변경 알림 | `ProjectionNotificationService`, `WebhookBroadcaster`, `DiscordWebhookClient`, `HookRepository` |
+| 조립·CLI·생명주기 | `SyncCycle`, `CollectorRuntime`, `CollectorService` |
+| 브라우저·그룹 feed | `JungolSession`, `RankCollector`, `GroupFeedCollector`, `GroupSubmissionDomParser`, `SubmissionTimestampReader` |
+| cycle 준비·window | `CyclePreparationService`, `GroupFeedScanPolicy`, `GroupFeedPageLease` |
+| 단일 commit·정산 | `CycleCommitService`, `AccountUnitOfWork`, `AccountSettlementService` |
+| 점수·projection·알림 | `KstCalendar`, `ProjectionService`, `ProjectionNotificationService`, `WebhookBroadcaster` |
 
 위 상대 경로는 `collector/src/` 기준입니다. 실행 주체는 backend cron이 아닌 독립 collector입니다.
 
-1. `CollectorService`는 시작 즉시 cycle을 실행하고 완료 후 고정 600000ms만큼 기다립니다. 따라서 기본은 **완료 후 10분 간격**이고 벽시계 cron의 매 10분 정각이 아닙니다. 단일 프로세스 cycle은 겹치지 않습니다.
+1. `CollectorService`는 다음 10분 경계에 맞춰 cycle을 실행합니다. 단일 프로세스 cycle은 겹치지 않으며, 실행 중인 cycle이 20분 이상이면 unhealthy입니다.
 2. DB advisory lease `jungol_bada:collector`를 얻습니다. 충돌하면 외부 요청 없이 이번 cycle을 끝냅니다. profile도 한 프로세스만 사용해야 합니다.
-3. persistent Chromium에서 그룹 접근을 확인하고 필요한 경우 로그인한 뒤 rank 전체를 읽습니다. 신규 account는 `/account/{id}`의 해결 목록과 `/account/{id}/submission` 첫 API 페이지의 최신 제출 번호만 읽습니다. 해결 목록 전체와 rank의 푼 문제 수가 일치해야 하며, 목록에는 synthetic baseline 행을 만들고 첫 제출 번호는 다음 증분 수집의 `user.solution`으로 저장합니다. 전체 제출 이력 pagination과 문제 metadata 요청은 하지 않습니다.
-4. 기존 account 중 `rank.solvedCount > stored.corrects`인 사용자만 제출 페이지를 최신에서 과거로 순회합니다. DB cursor `user.solution`을 만날 때까지 최대 100페이지를 읽습니다. 중단 경계 누락, 순서 오류, 페이지 제한, 응답 해석 실패는 불완전한 이력을 commit하지 않습니다. 해결 수가 같은 사용자는 submission 페이지를 열지 않고 `jungol_name`, `rank_wrong_count`, `ac_rating`, 변환된 `tier`만 사용자별 짧은 transaction으로 갱신합니다. 감소는 `rank_regression` 오류이며 어떤 사용자 값도 수정하지 않습니다.
-5. 네트워크 응답의 원본 시도를 복원하여 AC만 고르고 문제 메타데이터를 조회합니다. cursor 후보는 **검사한 모든 결과의 최고 제출 ID**이므로 rejected 행도 cursor 전진에 포함됩니다. 원본 payload나 쿠키를 저장하지 않습니다.
-6. 네트워크 작업 종료 후 사용자 한 명의 transaction을 시작합니다. user row를 잠그고 기존 cursor, 이번 구간에서 새로 발견한 distinct 문제 수와 rank 증가분을 확인합니다. 기존 사용자의 전체 과거 distinct 수와 `corrects`가 같다고 강제하지 않습니다. 불일치는 rank 재조회와 최대 한 번의 재수집 후에도 남으면 실패합니다.
-7. 제출 시각 순으로 중복 없는 AC를 저장하고 최초 해결 여부를 계산합니다. 일일 점수는 KST 날짜당 1회이며 최초 해결과 tier 조건을 만족해야 합니다. 현재 조건은 tier 미상(0), 문제 tier ≥11 또는 문제 tier ≥ 변환된 사용자 tier−5입니다. 원본 `ac_rating`은 이 계산에 사용하지 않습니다.
+3. persistent Chromium에서 로그인과 그룹 rank를 읽고, AC filter가 적용된 group submission DOM을 읽습니다. 행은 sid·account·problem identity와 실제 hover 절대시각이 모두 hydrate된 뒤에만 수집합니다. 모든 Jungol request는 concurrency 1, 완료 뒤 3초 간격입니다.
+4. 수집 window는 persisted `lastScannedSubmissionId`부터 엄격히 더 오래된 submission ID만 읽고, upper bound는 window 시작 때 동결합니다. marker를 찾지 못하면 head로 reset하지 않고 실패합니다. `더 불러오기`는 클릭 뒤 새 행 성장을 기다린 별도 request이며, 10 page 상한은 pending으로 저장해 다음 cycle에서 이어 읽고 기존 cursor 아래 10개 overlap으로 window를 끝냅니다.
+5. DOM에서 읽은 AC는 문제 metadata와 함께 transaction 밖에서 준비한다. 실제 tier 1–31은 우선 사용하고, tier 0만 bounded fallback estimator를 사용한다. tooltip 상대시각·원문 HTML·cookie·API payload는 저장하거나 추정하지 않는다.
+6. 준비된 rank, inbox, AC, 점수, checkpoint, 월 cache, projection은 하나의 cycle commit transaction에서 확정한다. 네트워크·prepare 실패는 durable write를 남기지 않으며 page lease도 무효화한다. commit 응답 연결 실패는 `commit_unknown`으로 분류해 DB 반영 여부를 단정하지 않는다.
+7. 제출 원래 KST 날짜로 daily/event를 계산한다. daily는 first solve이고 그날 daily가 없으며 effective tier가 11 이상 또는 user tier−5 이상일 때 원래 제출일당 한 번이고 event는 `[begin,end)`, event 생성·문제 추가 시각을 함께 확인한다.
 8. 초기 기준선은 각 해결 문제를 `1970-01-01T00:00:01Z`, `external_submission_id=NULL`, `accepted`, `problem_name=NULL`, tier 0, `repeatation=0`의 synthetic 행으로만 저장하며 일일·이벤트 점수와 `score_history`를 전혀 만들지 않습니다. 이 값은 실제 제출 시각이 아니라 과거 이력을 재생하지 않는 기준선 표식입니다. 증분에서만 `EventManager`가 문제 번호, `[begin,end)` 기간, 제출 시각 ≥ `event.created_at`, 제출 시각 ≥ `event_problem.added_at`을 모두 확인합니다. 반복 AC도 이벤트 조건을 만족할 수 있지만 사용자·이벤트·문제별 한 번만 지급합니다. unique `award_key`는 daily 및 event 재지급을 막습니다.
-9. AC 행, 점수, 사용자 통계와 cursor, 월간 합계를 같은 사용자 transaction에서 commit합니다. 실패한 사용자는 rollback하고 다른 성공 사용자는 유지합니다.
-10. worker 완료 후 별도 transaction으로 월간 `user_bias_total`, 가중 추첨 `ranking_boards`/`ranked_users` projection을 갱신합니다. 양수 점수·비제외 사용자가 없으면 새 board를 만들지 않습니다. projection 실패가 이미 성공한 사용자 commit을 되돌리지는 않으며 다음 cycle에서 다시 계산합니다.
-11. projection transaction이 새 내부 순위 snapshot을 commit한 경우에만 `hook.ignored=0`인 Discord webhook 전체에 결과를 보냅니다. 메시지는 서비스 링크와 최대 상위 10명의 `jungol_name`, 점수를 포함합니다. 2xx가 아닌 응답, 10초 timeout, 연결 실패와 기존 Discord 영구 오류 코드는 해당 hook을 `ignored=1`로 바꿔 다음 cycle부터 제외합니다. 전송과 비활성화 실패는 이미 commit한 사용자·점수·순위를 rollback하지 않으며 webhook URL과 응답 본문을 로그에 기록하지 않습니다.
+9. settlement는 inbox를 시간순으로 최대 200 row, 최대 10 user 단위로 처리한다. 성공 commit에는 projection 변경과 무관하게 `WEBHOOK_URL` receipt를 보내고, DB `hook` 알림은 projection 변경 때만 별도로 전송한다.
+10. webhook 전송 실패는 이미 commit한 cycle을 rollback하지 않으며, URL·cookie·원문 응답은 기록하지 않는다.
 
-### 랭킹 trigger와 지연 이벤트의 한계
+### 지연 이벤트와 window 한계
 
-이미 푼 문제의 반복 AC는 solved count를 늘리지 않습니다. 이벤트 중 반복 AC를 해도 이후 새 문제 해결이 없으면 worker가 생성되지 않아 **무기한 수집 누락**이 가능합니다. 오답만 제출하는 계정도 trigger가 없습니다. 전체 feed 안전망 또는 강제 전수 재수집 CLI는 구현되어 있지 않습니다.
-
-이후 새 문제를 풀어 지연 수집되면 점수는 수집 날짜가 아니라 원래 제출 timestamp를 사용합니다. 이미 종료한 이벤트여도 원래 기간과 생성/문제 추가 시각 조건을 만족하면 지급 가능합니다. 반대로 과거 제출 뒤 이벤트를 새로 만들거나 문제를 추가해도 retroactive award는 주지 않습니다. 이 정책은 반복 AC의 무기한 미수집을 해결하지 않습니다.
+group AC feed는 rank solved-count trigger에 의존하지 않는다. 다만 DOM marker·order·hover 시각을 확인할 수 없거나 10-page window가 끝나면 해당 cycle은 실패하거나 pending으로 남고, 추정 cursor 전진을 하지 않는다. 지연 수집된 AC도 점수는 수집일이 아니라 원래 제출 시각을 사용하며 retroactive event award는 하지 않는다.
 
 ## 자동 마이그레이션과 DB 권한
 
@@ -91,6 +86,27 @@ docker run --rm --init --ipc=host anabada-jungol-collector-test:local
 ```
 
 `npm --prefix collector run test:mysql`은 별도의 일회용 DB 통합 테스트입니다. `check-config`는 환경의 필수 인증 값을 검증하되 외부 로그인/DB 접속은 하지 않습니다. credential을 읽을 수 없으면 실패가 정상입니다. `run-once`는 dry-run이 아니며 실제 Jungol 요청과 DB 쓰기를 실행합니다.
+
+### 실제 Jungol DOM 계약 검증
+
+`npm test`와 PR 기본 검증은 실제 Jungol에 로그인하지 않는다. 실제 사이트에서 한 번의 최소 인증 세션으로 rank, AC feed, 날짜 `hover()`, `더 불러오기`, 문제 tier surface를 확인하는 opt-in 명령은 아래뿐이다. 이 검증은 운영 DB·webhook·운영 profile을 전달하지 않고, 각 실행마다 임시 Chromium profile을 삭제한다. credential이 없으면 skip하지 않고 실패한다.
+
+```sh
+export COLLECTOR_SOURCE_REVISION="$(git rev-parse HEAD)"
+if git diff --quiet && git diff --cached --quiet; then export COLLECTOR_SOURCE_DIRTY=false; else export COLLECTOR_SOURCE_DIRTY=true; fi
+docker build --target test --build-arg COLLECTOR_REVISION="$COLLECTOR_SOURCE_REVISION" -t anabada-jungol-live-contract:local collector
+docker run --rm --init \
+  --user pwuser \
+  -e JUNGOL_USERNAME -e JUNGOL_PASSWORD \
+  -e COLLECTOR_SOURCE_REVISION -e COLLECTOR_SOURCE_DIRTY \
+  anabada-jungol-live-contract:local npm run test:jungol:live
+```
+
+명령을 실행하기 전에는 **이 명령만을 위한 shell 환경에** `JUNGOL_USERNAME`과 `JUNGOL_PASSWORD` 두 값만 이미 export되어 있어야 한다. 루트 `.env`는 Compose dotenv 형식이므로 shell에서 source하지 않으며, `--env-file`로 전체 secret을 컨테이너에 전달하지도 않는다.
+
+테스트는 production `JungolSession`, `RankCollector`, `GroupFeedCollector`, `SubmissionTimestampReader`, `ProblemMetadataResolver`를 직접 사용한다. 즉, selector나 tooltip parser를 테스트에서 복제하지 않는다. tooltip은 상대 날짜를 추정하지 않고 `YYYY. M. D. 오전/오후 H:MM:SS` 한국 절대시각만 UTC로 정규화한다. `더 불러오기` 대상이 실제로 없으면 명시적인 목록 종료는 검증하되 pagination 성공으로 기록하지 않는다. 실제 빈 목록 상태는 아직 관찰하지 못했으므로 성공으로 기록하지 않는다. 출력에는 source revision/dirty 여부와 Chromium 버전·플랫폼만 남기며, cookie, credential, 원문 HTML, 행의 개인정보는 기록하지 않는다.
+
+2026-09-14 local evidence는 `bfe416dc393201a32074313e37c9a42505c866fe` 기준의 dirty worktree에서 Chromium `153.0.8010.12` (`linux/arm64`)로 위 opt-in test가 1/1 통과한 결과다. 이 결과는 같은 production reader를 통한 rank, AC 행 두 개의 hover 시각↔UTC normalized instant 일치, 더 불러오기 후의 older/disjoint page, problem tier 범위를 확인한다. 동일 image tag의 별도 서버 검증은 private source bundle을 `ana-coss`로 전송하는 단계가 별도 명시 승인을 필요로 해 아직 실행하지 않았다. 사용자 최신 요청은 **local 검증 후 main 출시 승인**으로 기준을 변경했으므로 local release는 진행할 수 있지만, **local pass는 server parity pass가 아니며** server 결과는 계속 미검증으로 기록한다.
 
 ## 설정 계약
 
@@ -178,7 +194,7 @@ production Environment의 해당 secret을 갱신한 뒤 검증된 배포를 실
 
 ## 상태 확인과 문제 대응
 
-`healthcheck`는 profile의 `collector-health.json`을 검사합니다. heartbeat는 30초, 허용 age는 90초이며 idle/running만 건강합니다. 실행 30분 초과 또는 degraded는 unhealthy입니다. health success는 실제 수집 최신성을 보장하지 않으므로 계정별 `corrects`, `submissions`, `solution` 증가량을 확인합니다. 자동 알림 연동 여부는 서버에서 별도 검증해야 합니다.
+`healthcheck`는 profile의 `collector-health.json`을 검사합니다. heartbeat는 30초, 허용 age는 90초이며 idle/running만 건강합니다. 실행 20분 이상 또는 degraded는 unhealthy입니다. health success는 실제 수집 최신성을 보장하지 않으므로 checkpoint·inbox·점수 결과를 별도로 확인합니다. 자동 알림 연동 여부는 서버에서 별도 검증해야 합니다.
 
 선택 `WEBHOOK_URL`을 설정하면 내부 순위 알림용 `hook` 테이블과 별개로 긴급 Discord 알림을 사용합니다. collector는 partial/failed cycle, 인증 만료, CAPTCHA·challenge circuit, health 기록 실패와 종료 timeout을 알립니다. backend는 기존 공통 `logger.error` 경계를 통해 요청·DB 오류를 알리며 404·validation 같은 요청 거절은 긴급 알림에서 제외합니다. 메시지는 서비스명, KST 시각, 정규화한 오류 코드, 영향과 즉시 확인 절차만 포함하며 예외 원문, 요청 query, 계정명, credential, cookie와 webhook URL은 포함하지 않습니다. 같은 서비스·오류 코드는 최초 성공 발송 뒤 30분 동안 중복 전송하지 않습니다. backend에서 발송 자체가 실패하면 오류 폭주를 막기 위해 1분 뒤 다시 시도할 수 있습니다.
 
@@ -216,8 +232,8 @@ docker compose --env-file .env -f docker-compose.prod.yaml up -d jungol-collecto
 - [ ] backend와 collector의 DB host/port/name 확인; 동일 root 계정과 DB_PASSWORD 사용 확인.
 - [ ] legacy 수집기/기존 sync scheduler 비활성화; collector 단일 replica.
 - [ ] 실제 서버에서 non-root Chromium, secrets, profile 재사용 및 컨테이너 재생성 확인.
-- [ ] 긴 이력 pagination, cursor 도달, AC-only와 rejected cursor 전진, 재실행 멱등성 검증.
-- [ ] 사용자 실패 시 cursor/점수 rollback, 다른 사용자 commit 유지, projection 복구 검증.
+- [ ] 긴 이력 pagination, cursor 도달, AC-only, 재실행 멱등성 검증.
+- [ ] 네트워크·prepare·commit 실패 시 whole-cycle rollback, checkpoint/inbox 보존, projection 복구 검증.
 - [ ] KST 일일 1점/이벤트 기간·생성일·추가일/지연 AC/반복 AC 한계 확인.
 - [ ] health·오류 알림과 인증/circuit 복구를 실제 서버에서 확인.
 - [ ] 운영 증거는 건수·익명화 오류 코드만 보존; credential/쿠키/핸들/HTML/BSON/개인 로그 제외.

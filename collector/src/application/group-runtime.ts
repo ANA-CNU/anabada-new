@@ -39,10 +39,14 @@ export type GroupInitializationProfile = {
 export interface GroupRuntimeFeedPort {
   head(signal: AbortSignal): Promise<bigint>;
   readPage(
-    cursor: string | null,
+    cursor: GroupFeedResumePosition,
     signal: AbortSignal,
   ): Promise<import("./group-feed-scan-policy.js").GroupFeedPage>;
 }
+
+export type GroupFeedResumePosition = {
+  readonly lastScannedSubmissionId: string | null;
+};
 
 export interface GroupRuntimeProfilePort {
   /** profile은 신규 계정의 historical solved-list 기준선에만 사용한다. */

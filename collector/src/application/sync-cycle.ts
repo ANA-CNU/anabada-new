@@ -28,7 +28,10 @@ import { CycleFlowLog } from "./flow-log.js";
 import { GroupCycleExecutor, type GroupCycleResult } from "./group-cycle.js";
 import { GroupCycleReportMapper } from "./group-cycle-report.js";
 import { GroupRuntime } from "./group-runtime.js";
-import { GroupRuntimeBrowser } from "./group-runtime-browser.js";
+import {
+  GroupFeedPageLease,
+  GroupRuntimeBrowser,
+} from "./group-runtime-browser.js";
 
 type Runtime = {
   readonly config: CollectorConfig;
@@ -45,6 +48,7 @@ export class SyncCycle {
   private readonly metadata: ProblemMetadataResolver;
   private flow: CycleFlowLog | undefined;
   private groupExecutor: GroupCycleExecutor | undefined;
+  private feedPage: GroupFeedPageLease | undefined;
 
   constructor(private readonly runtime: Runtime) {
     this.metadata = new ProblemMetadataResolver(runtime.config, this.requests);
@@ -52,8 +56,13 @@ export class SyncCycle {
 
   async close(): Promise<void> {
     this.requests.close();
-    await this.session?.close();
-    this.session = undefined;
+    try {
+      await this.feedPage?.invalidate();
+    } finally {
+      this.feedPage = undefined;
+      await this.session?.close();
+      this.session = undefined;
+    }
   }
 
   currentStage(): string | undefined {
@@ -69,6 +78,7 @@ export class SyncCycle {
     let lease: Awaited<ReturnType<CycleLeaseManager["acquire"]>> | null = null;
     let browser: GroupRuntimeBrowser | undefined;
     let groupResult: GroupCycleResult | undefined;
+    let retainFeedPage = false;
     let report: CycleReport = reports.overlap();
     this.metadata.clearCycle();
     try {
@@ -98,6 +108,9 @@ export class SyncCycle {
             logger,
           ),
         );
+        this.feedPage ??= new GroupFeedPageLease(async () =>
+          (await session()).newPage(),
+        );
         const cycleBrowser = new GroupRuntimeBrowser({
           newPage: async () => (await session()).newPage(),
           groupId: config.groupId,
@@ -105,15 +118,10 @@ export class SyncCycle {
           pageTimeoutMs: config.pageTimeoutMs,
           requests: this.requests,
           rank: new RankCollector(config, this.requests, tiers),
-          feed: new GroupFeedCollector(
-            config,
-            this.requests,
-            undefined,
-            undefined,
-            cycleTrace,
-          ),
+          feed: new GroupFeedCollector(config, this.requests, cycleTrace),
           profile: new AccountProfileCollector(config, this.requests),
           metadata: this.metadata,
+          feedPage: this.feedPage,
         });
         browser = cycleBrowser;
         const groupId = String(config.groupId);
@@ -153,6 +161,9 @@ export class SyncCycle {
         groupResult = await trace.runStep("worker_completion", () =>
           executor.run(signal),
         );
+        retainFeedPage =
+          groupResult.status === "success_pending" &&
+          groupResult.scan.phase === "collecting";
         report = reports.result(groupResult);
       }
     } catch (error) {
@@ -168,18 +179,27 @@ export class SyncCycle {
           );
       } finally {
         try {
-          const acquiredLease = lease;
-          if (acquiredLease)
-            await trace.runStep("release", () => acquiredLease.release());
+          if (!retainFeedPage) await this.feedPage?.invalidate();
         } catch (_error) {
-          if (
-            report.status === "success" ||
-            report.status === "skipped_overlap"
-          )
-            logger.warn(
-              { code: "lease_release_failed", cycleTrace: report.cycleTrace },
-              "collector.post_commit_failed",
-            );
+          logger.warn(
+            { code: "feed_page_close_failed", cycleTrace: report.cycleTrace },
+            "collector.post_commit_failed",
+          );
+        } finally {
+          try {
+            const acquiredLease = lease;
+            if (acquiredLease)
+              await trace.runStep("release", () => acquiredLease.release());
+          } catch (_error) {
+            if (
+              report.status === "success" ||
+              report.status === "skipped_overlap"
+            )
+              logger.warn(
+                { code: "lease_release_failed", cycleTrace: report.cycleTrace },
+                "collector.post_commit_failed",
+              );
+          }
         }
         this.metadata.clearCycle();
         trace.dispose();

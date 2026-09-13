@@ -28,6 +28,8 @@ export type JungolErrorCode =
   | "group_feed_table_timeout"
   | "group_feed_row_invalid"
   | "group_feed_timestamp_missing"
+  | "group_feed_timestamp_hover_failed"
+  | "group_feed_timestamp_parse_failed"
   | "group_feed_actor_unmatched"
   | "group_feed_rows_timeout"
   | "group_feed_cursor_not_found";
@@ -60,7 +62,9 @@ export type SafeJungolStage =
   | "group_feed_actor_resolution"
   | "group_feed_load_more_click"
   | "group_feed_rows_growth_wait"
-  | "group_feed_cursor_check";
+  | "group_feed_cursor_check"
+  | "group_feed_timestamp_hover"
+  | "group_feed_timestamp_parse";
 export type SafeJungolReason =
   | "http"
   | "mismatch"
@@ -92,6 +96,11 @@ export type SafeJungolDiagnostics = {
   readonly pageNumber?: number | undefined;
   readonly previousRowCount?: number | undefined;
   readonly currentRowCount?: number | undefined;
+  readonly cellCount?: number | undefined;
+  readonly descendantCellCount?: number | undefined;
+  readonly rowIndex?: number | undefined;
+  readonly hasSubmissionSid?: boolean | undefined;
+  readonly rowVisible?: boolean | undefined;
   readonly lastSubmissionId?: string | undefined;
   readonly loadingVisible?: boolean | undefined;
   readonly location?: SafeCodeLocation | undefined;
@@ -138,6 +147,8 @@ const diagnosticStages = new Set<SafeJungolStage>([
   "group_feed_load_more_click",
   "group_feed_rows_growth_wait",
   "group_feed_cursor_check",
+  "group_feed_timestamp_hover",
+  "group_feed_timestamp_parse",
 ]);
 const diagnosticReasons = new Set<SafeJungolReason>([
   "http",
@@ -177,6 +188,11 @@ type SafeJungolDiagnosticsDraft = {
   pageNumber?: number | undefined;
   previousRowCount?: number | undefined;
   currentRowCount?: number | undefined;
+  cellCount?: number | undefined;
+  descendantCellCount?: number | undefined;
+  rowIndex?: number | undefined;
+  hasSubmissionSid?: boolean | undefined;
+  rowVisible?: boolean | undefined;
   lastSubmissionId?: string | undefined;
   loadingVisible?: boolean | undefined;
   location?: SafeCodeLocation | undefined;
@@ -209,12 +225,20 @@ const safeDiagnostics = (
     "pageNumber",
     "previousRowCount",
     "currentRowCount",
+    "cellCount",
+    "descendantCellCount",
+    "rowIndex",
   ] as const;
   for (const field of fields) {
     const parsed = nonnegativeInteger(value[field]);
     if (parsed !== undefined) result[field] = parsed;
   }
-  for (const field of ["imageObserved", "titleObserved"] as const) {
+  for (const field of [
+    "imageObserved",
+    "titleObserved",
+    "hasSubmissionSid",
+    "rowVisible",
+  ] as const) {
     const observed = value[field];
     if (typeof observed === "boolean") result[field] = observed;
   }

@@ -1,4 +1,3 @@
-import { GroupFeedCursorError } from "../group-feed-error.js";
 import { GroupFeedRepository } from "../mysql/group-feed.js";
 import type { AccountUnitOfWork } from "../mysql/unit-of-work.js";
 import type { GroupScanResult } from "./group-cycle.js";
@@ -40,19 +39,10 @@ export class GroupWindowScanner {
           acceptedCount,
           scannedPageCount,
         );
-      let page: GroupFeedPage;
-      try {
-        page = await this.dependencies.feed.readPage(
-          checkpoint.paginationCursor,
-          signal,
-        );
-      } catch (error) {
-        if (!(error instanceof GroupFeedCursorError)) throw error;
-        await this.transaction((repository) =>
-          repository.resetPagination(this.dependencies.groupId),
-        );
-        continue;
-      }
+      const page: GroupFeedPage = await this.dependencies.feed.readPage(
+        { lastScannedSubmissionId: checkpoint.lastScannedSubmissionId },
+        signal,
+      );
       const upper = GroupFeedScanPolicy.freezeUpper(
         checkpoint.committedCursor,
         checkpoint.upperSubmissionId,
@@ -70,7 +60,6 @@ export class GroupWindowScanner {
         {
           upperInclusiveSubmissionId: upper,
           lowerCursor: lower,
-          paginationCursor: checkpoint.paginationCursor,
           overlapObservedCount: checkpoint.overlapObservedCount,
         },
         page,
@@ -85,7 +74,7 @@ export class GroupWindowScanner {
           groupId: this.dependencies.groupId,
           upperSubmissionId: upper,
           lowerCursor: lower,
-          paginationCursor: decision.nextCursor,
+          paginationCursor: null,
           lastScannedSubmissionId:
             last?.submissionId ?? checkpoint.lastScannedSubmissionId,
           overlapObservedCount: decision.overlapObservedCount,

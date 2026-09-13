@@ -120,6 +120,7 @@ export class CycleCommitService {
         feed.advanceCollection({
           groupId: this.dependencies.groupId,
           ...collectionNext,
+          paginationCursor: null,
         }),
       );
     }

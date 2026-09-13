@@ -7,7 +7,6 @@ import {
 } from "../domain/sync.js";
 import type { ProblemId } from "../domain.js";
 import type { ProblemTierEstimator } from "../group-domain.js";
-import { GroupFeedCursorError } from "../group-feed-error.js";
 import type { ProblemMetadata } from "../jungol/metadata.js";
 import { PersistenceError } from "../mysql/account-types.js";
 import {
@@ -43,7 +42,6 @@ export type PreparedCollection = {
   readonly next: {
     readonly upperSubmissionId: string;
     readonly lowerCursor: string;
-    readonly paginationCursor: string | null;
     readonly lastScannedSubmissionId: string | null;
     readonly overlapObservedCount: number;
     readonly cursorReached: boolean;
@@ -180,22 +178,10 @@ export class CyclePreparationService {
     let scannedAttemptCount = 0;
     for (let count = 0; count < 10; count += 1) {
       signal.throwIfAborted();
-      let page: GroupFeedPage;
-      try {
-        page = await this.dependencies.feed.readPage(
-          state.paginationCursor,
-          signal,
-        );
-      } catch (error) {
-        if (!(error instanceof GroupFeedCursorError)) throw error;
-        state = {
-          ...state,
-          paginationCursor: null,
-          lastScannedSubmissionId: null,
-          overlapObservedCount: 0,
-        };
-        continue;
-      }
+      const page: GroupFeedPage = await this.dependencies.feed.readPage(
+        { lastScannedSubmissionId: state.lastScannedSubmissionId },
+        signal,
+      );
       scannedAttemptCount += page.submissions.length;
       this.trace?.progressUpdate({
         scannedPageCount: count + 1,
@@ -219,7 +205,6 @@ export class CyclePreparationService {
         ...state,
         upperSubmissionId: next.upperSubmissionId,
         windowLowerCursor: next.lowerCursor,
-        paginationCursor: next.paginationCursor,
         lastScannedSubmissionId: next.lastScannedSubmissionId,
         overlapObservedCount: next.overlapObservedCount,
         cursorReached: false,
@@ -259,7 +244,6 @@ export class CyclePreparationService {
       {
         upperInclusiveSubmissionId: upper,
         lowerCursor: lower,
-        paginationCursor: checkpoint.paginationCursor,
         overlapObservedCount: checkpoint.overlapObservedCount,
       },
       page,
@@ -268,7 +252,6 @@ export class CyclePreparationService {
       accepted: decision.accepted,
       upperSubmissionId: upper,
       lowerCursor: lower,
-      paginationCursor: decision.nextCursor,
       lastScannedSubmissionId:
         page.submissions.at(-1)?.submissionId ??
         checkpoint.lastScannedSubmissionId,
@@ -340,7 +323,7 @@ export class CyclePreparationService {
           existing.problemId !== row.problemId)
       )
         throw new PersistenceError("submission_conflict");
-      unique.set(row.externalSubmissionId.toString(), row);
+      if (!existing) unique.set(row.externalSubmissionId.toString(), row);
     }
     return [...unique.values()];
   }

@@ -3,7 +3,10 @@ import { existsSync } from "node:fs";
 import test from "node:test";
 import { chromium } from "playwright";
 import type { GroupFeedPage } from "../src/application/group-feed-scan-policy.js";
-import { GroupRuntimeBrowser } from "../src/application/group-runtime-browser.js";
+import {
+  GroupFeedPageLease,
+  GroupRuntimeBrowser,
+} from "../src/application/group-runtime-browser.js";
 import { rankMemberSchema } from "../src/domain/sync.js";
 import { problemIdSchema, submissionIdSchema } from "../src/domain.js";
 import type { GroupFeedCollector } from "../src/jungol/group-feed.js";
@@ -29,6 +32,24 @@ const staleMember = rankMemberSchema.parse({
   tier: 1,
 });
 
+test("Given an owned feed page whose close fails When invalidated Then the lease still releases it for a fresh page", async () => {
+  let created = 0;
+  const lease = new GroupFeedPageLease(async () => {
+    created += 1;
+    return {
+      isClosed: () => false,
+      close: async () => {
+        if (created === 1) throw new RangeError("page_close_failed");
+      },
+    };
+  });
+  const first = await lease.acquire();
+  await assert.rejects(lease.invalidate(), /page_close_failed/);
+  const replacement = await lease.acquire();
+  assert.notEqual(replacement, first);
+  assert.equal(created, 2);
+});
+
 test("Given a captured rank member When resolving an existing member Then no profile read supplies its rating or tier", async () => {
   let profileCalls = 0;
   let feedReads = 0;
@@ -52,7 +73,6 @@ test("Given a captured rank member When resolving an existing member Then no pro
           feedReads += 1;
           return {
             submissions: [],
-            nextCursor: null,
             more: false,
           } satisfies GroupFeedPage;
         },
@@ -124,7 +144,6 @@ test("Given a new member When initializing Then profile supplies only solved pro
                 score: null,
               },
             ],
-            nextCursor: null,
             more: false,
           } satisfies GroupFeedPage;
         },

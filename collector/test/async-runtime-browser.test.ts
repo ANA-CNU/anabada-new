@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { serialize } from "bson";
 import { GroupRuntimeBrowser } from "../src/application/group-runtime-browser.js";
 import { problemIdSchema } from "../src/domain.js";
 import { GroupFeedCollector } from "../src/jungol/group-feed.js";
@@ -31,7 +30,7 @@ test("Given all real runtime browser adapters When rank, profile, feed and probl
     ],
     [
       "/group/1125/submission",
-      `<table><thead><tr><th>번호</th></tr></thead><tbody></tbody></table><script>fetch('/api/group/1125/submission?result=AC',{headers:{'x-fp':'aa'}}).then(r=>r.arrayBuffer()).then(()=>document.querySelector('tbody').innerHTML='<tr><td>12</td></tr>')</script>`,
+      `<style>.timestamp { display: none; } [role="button"]:hover + .timestamp { display: inline; }</style><table><thead><tr><th>번호</th><th>제출자</th><th>문제</th><th>결과</th><th>시간</th><th>메모리</th><th>길이</th><th>언어</th><th>시각</th></tr></thead><tbody></tbody></table><script>fetch('/fixture/feed').then(r=>r.text()).then(html=>document.querySelector('tbody').innerHTML=html)</script>`,
     ],
     [
       "/problem/1000",
@@ -44,7 +43,7 @@ test("Given all real runtime browser adapters When rank, profile, feed and probl
     new Map([
       ["/fixture/rank", rank],
       ["/fixture/profile", profile],
-      ["/api/group/1125/submission", feed],
+      ["/fixture/feed", feed],
       ["/fixture/metadata", metadata],
     ]),
   );
@@ -75,14 +74,7 @@ test("Given all real runtime browser adapters When rank, profile, feed and probl
   );
   await feed.requested;
   feed.release(
-    serialize({
-      data: {
-        list: [
-          { id: 12, p: 1000, u: "member", r: "AC", s: 100, t: 1788608362887 },
-        ],
-        paging: { cursor: "end", more: false },
-      },
-    }).map((byte) => byte ^ 0xaa),
+    '<tr><td>1</td><td><a href="/account/42">member</a></td><td><a href="/problem/1000">1000</a></td><td>정답 100점</td><td>1ms</td><td>1KB</td><td>1</td><td>C++</td><td><a href="/group/1125/submission?result=AC&sid=12">12</a><div role="button" tabindex="0">오전 1:00</div><span class="timestamp">2026. 9. 13. 오전 1:00:01</span></td></tr>',
   );
   const initialized = await initialization.result;
   assert.ok(initialized.ok);

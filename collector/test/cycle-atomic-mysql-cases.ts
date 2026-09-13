@@ -4,7 +4,10 @@ import type { Pool, RowDataPacket } from "mysql2/promise";
 import { AccountInitializationService } from "../src/account-initialization.js";
 import { AccountSettlementService } from "../src/account-settlement.js";
 import type { GroupFeedPage } from "../src/application/group-feed-scan-policy.js";
-import { GroupRuntime } from "../src/application/group-runtime.js";
+import {
+  type GroupFeedResumePosition,
+  GroupRuntime,
+} from "../src/application/group-runtime.js";
 import {
   AccountInitialSnapshot,
   AccountSyncPlan,
@@ -49,7 +52,9 @@ function runtime(
   options: {
     readonly failProjection?: boolean;
     readonly mutateUserDuringPreparation?: boolean;
-    readonly readPage?: (cursor: string | null) => Promise<GroupFeedPage>;
+    readonly readPage?: (
+      position: GroupFeedResumePosition,
+    ) => Promise<GroupFeedPage>;
     readonly memberList?: readonly (typeof members)[number][];
     readonly notifyProjection?: () => Promise<void>;
     readonly warn?: (code: string) => void;
@@ -68,8 +73,7 @@ function runtime(
     feed: {
       head: async () => 100n,
       readPage:
-        options.readPage ??
-        (async () => ({ submissions: [], nextCursor: null, more: false })),
+        options.readPage ?? (async () => ({ submissions: [], more: false })),
     },
     profiles: {
       initialize: async (member) => ({
@@ -222,7 +226,6 @@ export async function runCycleAtomicMysqlCases(
           head: async () => 100n,
           readPage: async () => ({
             submissions: [],
-            nextCursor: null,
             more: false,
           }),
         },
@@ -280,6 +283,57 @@ export async function runCycleAtomicMysqlCases(
           },
         ],
       );
+    },
+  );
+
+  await t.test(
+    "Given a persisted API inbox row When the DOM re-observes its ID with second precision and no score Then settlement retains the persisted timestamp and score",
+    async () => {
+      await cleanup(pool);
+      await seedSettling(pool);
+      await pool.query(
+        "UPDATE collector_checkpoint SET phase='collecting',cursor_reached=0,last_scanned_submission_id=NULL,overlap_observed_count=0 WHERE group_id=1125",
+      );
+      await pool.query(
+        "UPDATE collector_ac_inbox SET submitted_at='2026-09-10 01:00:00.987',score=321 WHERE external_submission_id=930102",
+      );
+      const result = await runtime(pool, {
+        readPage: async () => ({
+          submissions: [
+            {
+              accountId: members[1]?.accountId ?? assert.fail("missing member"),
+              submissionId: submissionIdSchema.parse(930102),
+              problemId: problemIdSchema.parse(9902),
+              submittedAt: new Date("2026-09-10T01:00:00.000Z"),
+              score: null,
+            },
+            {
+              accountId: members[0]?.accountId ?? assert.fail("missing member"),
+              submissionId: submissionIdSchema.parse(930101),
+              problemId: problemIdSchema.parse(9901),
+              submittedAt: new Date("2026-09-10T01:00:00.000Z"),
+              score: null,
+            },
+          ],
+          more: false,
+        }),
+      }).runAtomic(new AbortController().signal);
+      assert.equal(result.status, "success");
+      const [attempts] = await pool.query<
+        (RowDataPacket & {
+          readonly external_submission_id: string;
+          readonly submitted_at: Date;
+          readonly score: string | number;
+        })[]
+      >(
+        "SELECT external_submission_id,submitted_at,score FROM problem WHERE external_submission_id=930102",
+      );
+      assert.equal(attempts.length, 1);
+      assert.equal(
+        attempts[0]?.submitted_at.getTime(),
+        Date.parse("2026-09-10T01:00:00.987Z"),
+      );
+      assert.equal(Number(attempts[0]?.score), 321);
     },
   );
 
@@ -405,11 +459,14 @@ export async function runCycleAtomicMysqlCases(
       const beforePending = await state(pool);
       let reads = 0;
       const readPage = async (
-        cursor: string | null,
+        position: GroupFeedResumePosition,
       ): Promise<GroupFeedPage> => {
         const index = reads;
         reads += 1;
-        assert.equal(cursor, index === 0 ? null : `atomic-page-${index}`);
+        assert.equal(
+          position.lastScannedSubmissionId,
+          index === 0 ? null : String(930211 - index),
+        );
         const submissionId = 930210 - index;
         return {
           submissions: [
@@ -424,7 +481,6 @@ export async function runCycleAtomicMysqlCases(
               score: 100,
             },
           ],
-          nextCursor: index < 10 ? `atomic-page-${index + 1}` : null,
           more: index < 10,
         };
       };
@@ -466,7 +522,6 @@ export async function runCycleAtomicMysqlCases(
       const replay = await runtime(pool, {
         readPage: async () => ({
           submissions: [],
-          nextCursor: null,
           more: false,
         }),
       }).runAtomic(new AbortController().signal);
@@ -629,7 +684,6 @@ export async function runCycleAtomicMysqlCases(
               score: 100,
             },
           ],
-          nextCursor: null,
           more: false,
         }),
       }).runAtomic(new AbortController().signal);

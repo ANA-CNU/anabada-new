@@ -1,79 +1,70 @@
 import assert from "node:assert/strict";
-import { serialize } from "bson";
+import test from "node:test";
 import { rankMemberSchema } from "../src/domain/sync.js";
 import { GroupFeedCollector } from "../src/jungol/group-feed.js";
-import {
-  asyncBrowserFixture,
-  FetchGate,
-  browserTest as test,
-  tracked,
-} from "./async-browser-fixture.js";
+import { asyncBrowserFixture } from "./async-browser-fixture.js";
 
 const member = rankMemberSchema.parse({
   accountId: "42",
   jungolName: "member",
   solvedCount: 1,
   wrongCount: 0,
-  acRating: 0,
-  tier: 0,
+  acRating: 20,
+  tier: 1,
 });
-const wire = (id: number, more: boolean) =>
-  serialize({
-    data: {
-      list: [{ id, p: 1000, r: "AC", u: "member", s: 100, t: 1788608362887 }],
-      paging: { cursor: "next-page", more },
-    },
-  }).map((byte) => byte ^ 0xaa);
-const html = `<table><thead><tr><th scope="col">번호</th></tr></thead><tbody><tr><td>9</td></tr></tbody></table><button onclick="fetch('/api/group/1125/submission?result=AC&cursor=next-page',{headers:{'x-fp':'aa'}}).then(r=>r.arrayBuffer())">더 불러오기</button><script>fetch('/api/group/1125/submission?result=AC',{headers:{'x-fp':'aa'}}).then(r=>r.arrayBuffer())</script>`;
 
-test("Given a delayed load-more response When the actual group collector paginates Then it waits and reads the matching cursor once", async (t) => {
-  const firstGate = new FetchGate();
-  const nextGate = new FetchGate();
+const row = (id: number, timestamp: string) =>
+  `<tr><td>${id}</td><td><a href="/account/42">member</a></td><td><a href="/problem/1000">1000</a></td><td>정답 100점</td><td>1ms</td><td>1KB</td><td>1</td><td>C++</td><td><a href="?result=AC&sid=${id}"><div role="button" tabindex="0" onmouseenter="const t=document.createElement('span');t.id='tooltip';t.textContent='${timestamp}';document.body.append(t)" onmouseleave="document.querySelector('#tooltip')?.remove()">오전 1:00</div></a></td></tr>`;
+
+const table = (rows: string) =>
+  `<table><thead><tr><th>번호</th><th>제출자</th><th>문제</th><th>결과</th><th>시간</th><th>메모리</th><th>길이</th><th>언어</th><th>시각</th></tr></thead><tbody>${rows}</tbody></table>`;
+
+const delayedPage = (delay: number) => {
+  const first = row(9, "2026. 9. 13. 오전 1:00:01");
+  const second = row(8, "2026. 9. 12. 오후 1:00:02");
+  return `<main></main><script>setTimeout(()=>{document.querySelector('main').innerHTML=${JSON.stringify(`${table(first)}<button id="more">더 불러오기</button>`)};document.querySelector('#more').addEventListener('click',()=>{document.querySelector('tbody').insertAdjacentHTML('beforeend',${JSON.stringify(second)});document.querySelector('#more').remove()})},${delay})</script>`;
+};
+
+test("Given delayed DOM rows and load-more When the production feed reads pages Then it waits and returns only new older rows", async (t) => {
+  const html = delayedPage(100);
   const { page, settings, requests } = await asyncBrowserFixture(
     t,
     html,
-    new Map([
-      ["/api/group/1125/submission?result=AC", firstGate],
-      ["/api/group/1125/submission?result=AC&cursor=next-page", nextGate],
-    ]),
+    new Map(),
   );
   const collector = new GroupFeedCollector(settings, requests);
-  const first = tracked(collector.readPage(page, [member], null));
-  await firstGate.requested;
-  firstGate.release(wire(9, true));
-  const firstResult = await first.result;
-  assert.ok(firstResult.ok);
-  const next = tracked(
-    collector.readPage(page, [member], firstResult.value.nextCursor),
+
+  const first = await collector.readPage(page, [member], {
+    lastScannedSubmissionId: null,
+  });
+  assert.deepEqual(
+    first.submissions.map((submission) => submission.submissionId),
+    ["9"],
   );
-  await nextGate.requested;
-  assert.equal(next.settled(), false);
-  nextGate.release(wire(8, false));
-  const nextResult = await next.result;
-  assert.ok(nextResult.ok);
-  assert.equal(nextResult.value.submissions[0]?.submissionId, "8");
-  assert.equal(nextResult.value.more, false);
+  const second = await collector.readPage(page, [member], {
+    lastScannedSubmissionId: "9",
+  });
+  assert.deepEqual(
+    second.submissions.map((submission) => submission.submissionId),
+    ["8"],
+  );
+  assert.equal(second.more, false);
 });
 
-test("Given response headers before the BSON body When the collector observes HTTP 200 Then it still waits for complete bytes", async (t) => {
-  const gate = new FetchGate();
+test("Given a fresh page and persisted marker When the production feed restarts Then it replays to the marker before returning older rows", async (t) => {
+  const html = delayedPage(0);
   const { page, settings, requests } = await asyncBrowserFixture(
     t,
     html,
-    new Map([["/api/group/1125/submission", gate]]),
+    new Map(),
   );
-  const headers = page.waitForResponse(
-    (r) => new URL(r.url()).pathname === "/api/group/1125/submission",
+  const result = await new GroupFeedCollector(settings, requests).readPage(
+    page,
+    [member],
+    { lastScannedSubmissionId: "9" },
   );
-  const operation = tracked(
-    new GroupFeedCollector(settings, requests).readPage(page, [member], null),
+  assert.deepEqual(
+    result.submissions.map((submission) => submission.submissionId),
+    ["8"],
   );
-  await gate.requested;
-  gate.sendHeaders();
-  await headers;
-  assert.equal(operation.settled(), false);
-  gate.release(wire(9, false));
-  const result = await operation.result;
-  assert.ok(result.ok);
-  assert.equal(result.value.submissions[0]?.submissionId, "9");
 });

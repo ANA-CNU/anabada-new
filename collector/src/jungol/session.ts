@@ -27,7 +27,12 @@ export class JungolSession {
     try {
       const context = await chromium.launchPersistentContext(
         config.profileDir,
-        { headless: config.headless, timeout: config.loginTimeoutMs },
+        {
+          headless: config.headless,
+          locale: "ko-KR",
+          timezoneId: "Asia/Seoul",
+          timeout: config.loginTimeoutMs,
+        },
       );
       context.setDefaultTimeout(config.pageTimeoutMs);
       await requests.configureContext(context, config.baseUrl);

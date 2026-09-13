@@ -11,6 +11,7 @@ import type { AccountProfileCollector } from "../jungol/profile.js";
 import type { RankCollector } from "../jungol/rank.js";
 import type { JungolRequestCoordinator } from "../jungol/request-coordinator.js";
 import type {
+  GroupFeedResumePosition,
   GroupInitializationProfile,
   GroupRuntimeFeedPort,
   GroupRuntimeProfilePort,
@@ -31,17 +32,44 @@ type GroupRuntimeBrowserDependencies = {
   readonly feed: GroupFeedPort;
   readonly profile: ProfilePort;
   readonly metadata: MetadataPort;
+  readonly feedPage?: GroupFeedPageLease;
 };
+
+/** collecting window 동안만 DOM page를 보관하고 실패·완료 뒤에는 반드시 버린다. */
+export class GroupFeedPageLease<
+  TPage extends Pick<Page, "isClosed" | "close"> = Page,
+> {
+  private page: TPage | undefined;
+
+  constructor(private readonly newPage: () => Promise<TPage>) {}
+
+  async acquire(): Promise<TPage> {
+    if (this.page?.isClosed()) this.page = undefined;
+    this.page ??= await this.newPage();
+    return this.page;
+  }
+
+  async invalidate(): Promise<void> {
+    const page = this.page;
+    this.page = undefined;
+    if (page && !page.isClosed()) await page.close();
+  }
+}
 
 /** 랭크 snapshot을 rating·tier의 유일한 권위로 보관하고 profile은 초기 solved 목록에만 쓴다. */
 export class GroupRuntimeBrowser
   implements GroupRuntimeFeedPort, GroupRuntimeProfilePort
 {
   private readonly membersByAccountId = new Map<string, RankMemberSnapshot>();
-  private feedPage: Page | undefined;
+  private readonly feedPage: GroupFeedPageLease;
+  private readonly ownsFeedPage: boolean;
   private readonly pages = new PageOperation();
 
-  constructor(private readonly dependencies: GroupRuntimeBrowserDependencies) {}
+  constructor(private readonly dependencies: GroupRuntimeBrowserDependencies) {
+    this.feedPage =
+      dependencies.feedPage ?? new GroupFeedPageLease(dependencies.newPage);
+    this.ownsFeedPage = dependencies.feedPage === undefined;
+  }
 
   async members(signal: AbortSignal): Promise<readonly RankMemberSnapshot[]> {
     if (this.membersByAccountId.size > 0)
@@ -62,24 +90,28 @@ export class GroupRuntimeBrowser
   }
 
   async head(signal: AbortSignal): Promise<bigint> {
-    const page = await this.readFeedPage();
-    const first = await this.dependencies.feed.readPage(
-      page,
-      this.memberList(),
-      null,
-      signal,
-    );
-    return first.submissions[0]
-      ? BigInt(first.submissions[0].submissionId)
-      : 0n;
+    const page = await this.dependencies.newPage();
+    try {
+      const first = await this.dependencies.feed.readPage(
+        page,
+        this.memberList(),
+        { lastScannedSubmissionId: null },
+        signal,
+      );
+      return first.submissions[0]
+        ? BigInt(first.submissions[0].submissionId)
+        : 0n;
+    } finally {
+      await page.close();
+    }
   }
 
-  async readPage(cursor: string | null, signal: AbortSignal) {
-    const page = await this.readFeedPage();
+  async readPage(position: GroupFeedResumePosition, signal: AbortSignal) {
+    const page = await this.feedPage.acquire();
     return this.dependencies.feed.readPage(
       page,
       this.memberList(),
-      cursor,
+      position,
       signal,
     );
   }
@@ -142,9 +174,7 @@ export class GroupRuntimeBrowser
   }
 
   async close(): Promise<void> {
-    const page = this.feedPage;
-    this.feedPage = undefined;
-    if (page) await page.close();
+    if (this.ownsFeedPage) await this.feedPage.invalidate();
     this.membersByAccountId.clear();
   }
 
@@ -152,10 +182,5 @@ export class GroupRuntimeBrowser
     if (this.membersByAccountId.size === 0)
       throw new JungolError("invalid_rank");
     return [...this.membersByAccountId.values()];
-  }
-
-  private async readFeedPage(): Promise<Page> {
-    this.feedPage ??= await this.dependencies.newPage();
-    return this.feedPage;
   }
 }

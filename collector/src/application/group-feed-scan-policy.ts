@@ -2,14 +2,12 @@ import type { GroupAcceptedSubmission } from "../group-domain.js";
 
 export type GroupFeedPage = {
   readonly submissions: readonly GroupAcceptedSubmission[];
-  readonly nextCursor: string | null;
   readonly more: boolean;
 };
 
 export type GroupFeedScanState = {
   readonly upperInclusiveSubmissionId: string;
   readonly lowerCursor: string | null;
-  readonly paginationCursor: string | null;
   readonly overlapObservedCount: number;
 };
 
@@ -17,7 +15,6 @@ export type GroupFeedScanDecision = {
   readonly accepted: readonly GroupAcceptedSubmission[];
   readonly overlapObservedCount: number;
   readonly cursorReached: boolean;
-  readonly nextCursor: string | null;
 };
 
 export class GroupFeedScanPolicy {
@@ -27,7 +24,7 @@ export class GroupFeedScanPolicy {
     state: GroupFeedScanState,
     page: GroupFeedPage,
   ): GroupFeedScanDecision {
-    this.ensurePaging(state, page);
+    this.ensurePaging(page);
     this.ensureDescendingSubmissions(page);
     let overlapObservedCount = state.overlapObservedCount;
     const accepted: GroupAcceptedSubmission[] = [];
@@ -51,7 +48,6 @@ export class GroupFeedScanPolicy {
       accepted,
       overlapObservedCount,
       cursorReached,
-      nextCursor: cursorReached ? null : page.nextCursor,
     };
   }
 
@@ -75,14 +71,10 @@ export class GroupFeedScanPolicy {
     return BigInt(submissionId) >= BigInt(state.lowerCursor);
   }
 
-  private ensurePaging(state: GroupFeedScanState, page: GroupFeedPage): void {
+  private ensurePaging(page: GroupFeedPage): void {
     if (!page.more) return;
     if (page.submissions.length === 0)
       throw new RangeError("group_feed_empty_nonterminal_page");
-    if (page.nextCursor === null || page.nextCursor.trim().length === 0)
-      throw new RangeError("group_feed_missing_next_cursor");
-    if (page.nextCursor === state.paginationCursor)
-      throw new RangeError("group_feed_repeated_cursor");
   }
 
   private ensureDescendingSubmissions(page: GroupFeedPage): void {

@@ -85,10 +85,13 @@ export async function runGroupRuntimeCases(
           members: async () => [member],
           feed: {
             head: async () => 100n,
-            readPage: async (cursor) => {
+            readPage: async (position) => {
               const id = pages[reads++];
               if (id === undefined) throw new RangeError("unexpected_page");
-              assert.equal(cursor, reads === 1 ? null : `cursor-${reads - 1}`);
+              assert.equal(
+                position.lastScannedSubmissionId,
+                reads === 1 ? null : String(113 - reads),
+              );
               return {
                 submissions: [
                   {
@@ -99,7 +102,6 @@ export async function runGroupRuntimeCases(
                     score: null,
                   },
                 ],
-                nextCursor: reads < 11 ? `cursor-${reads}` : null,
                 more: reads < 11,
               };
             },
@@ -211,7 +213,6 @@ export async function runGroupRuntimeCases(
           head: async () => 100n,
           readPage: async () => ({
             submissions: [],
-            nextCursor: null,
             more: false,
           }),
         },
@@ -357,7 +358,6 @@ export async function runGroupRuntimeCases(
           head: async () => 100n,
           readPage: async () => ({
             submissions: [],
-            nextCursor: null,
             more: false,
           }),
         },

@@ -2,7 +2,7 @@ FROM mcr.microsoft.com/playwright:v1.63.0-noble AS build
 ARG COLLECTOR_REVISION=unknown
 WORKDIR /opt/collector
 COPY package.json package-lock.json ./
-RUN npm ci --ignore-scripts --no-audit --no-fund
+RUN npm ci --include=optional --ignore-scripts --no-audit --no-fund
 COPY tsconfig.json tsconfig.build.json ./
 COPY src ./src
 RUN revision="$COLLECTOR_REVISION"; \
