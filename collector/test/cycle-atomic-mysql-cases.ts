@@ -296,6 +296,9 @@ export async function runCycleAtomicMysqlCases(
       async () => {
         await cleanup(pool);
         await seedSettling(pool);
+        await pool.query(
+          "UPDATE user SET ignored=0 WHERE jungol_account_id IN (9301,9302)",
+        );
         const before = await state(pool);
         {
           const table =

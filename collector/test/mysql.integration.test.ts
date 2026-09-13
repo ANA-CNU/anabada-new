@@ -629,6 +629,9 @@ test(
         "projection failure rolls back only projection and can retry",
         async () => {
           await pool.query(
+            "UPDATE user SET ignored=0 WHERE jungol_account_id=1",
+          );
+          await pool.query(
             "CREATE TRIGGER reject_rank BEFORE INSERT ON ranked_users FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='test rejection'",
           );
           try {
@@ -741,7 +744,7 @@ test(
           );
           const grants = [
             "GRANT SELECT ON jungol_bada.user TO 'collector_test'@'%'",
-            "GRANT INSERT (jungol_name,jungol_account_id), UPDATE (id,jungol_name,corrects,submissions,solution,rank_wrong_count,ac_rating,tier) ON jungol_bada.user TO 'collector_test'@'%'",
+            "GRANT INSERT (jungol_name,jungol_account_id,ignored), UPDATE (id,jungol_name,corrects,submissions,solution,rank_wrong_count,ac_rating,tier) ON jungol_bada.user TO 'collector_test'@'%'",
             "GRANT SELECT, INSERT (user_id,problem,problem_name,problem_tier,estimated_tier,submitted_at,level,repeatation,verdict,external_submission_id,score), UPDATE (id) ON jungol_bada.problem TO 'collector_test'@'%'",
             "GRANT SELECT ON jungol_bada.event TO 'collector_test'@'%'",
             "GRANT SELECT ON jungol_bada.event_problem TO 'collector_test'@'%'",

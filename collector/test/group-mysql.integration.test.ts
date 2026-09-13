@@ -31,6 +31,7 @@ import { KstCalendar } from "../src/scoring/daily.js";
 import { WeightedRankingPolicy } from "../src/scoring/ranking.js";
 import { runCycleAtomicMysqlCases } from "./cycle-atomic-mysql-cases.js";
 import { runGroupRuntimeCases } from "./group-runtime-mysql-cases.js";
+import { runUserRegistrationCases } from "./user-registration-mysql-cases.js";
 
 interface CountRow extends RowDataPacket {
   readonly count: string;
@@ -514,6 +515,9 @@ test(
           await pool.query(
             "INSERT INTO score_history (user_id,bias,rule_type,created_at) VALUES ((SELECT id FROM user WHERE jungol_account_id=400),999,'manual','2026-09-07')",
           );
+          await pool.query(
+            "UPDATE user SET ignored=0 WHERE jungol_account_id=400",
+          );
           const projection = await new ProjectionService(
             pool,
             calendar,
@@ -538,6 +542,7 @@ test(
       );
       await runGroupRuntimeCases(t, pool);
       await runCycleAtomicMysqlCases(t, pool);
+      await runUserRegistrationCases(t, pool);
     } finally {
       await pool.end();
     }

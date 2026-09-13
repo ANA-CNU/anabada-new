@@ -53,7 +53,7 @@ export class UserRepository {
 
   async upsertAndLock(member: RankMemberSnapshot): Promise<LockedUser> {
     await this.connection.execute(
-      "INSERT INTO user (jungol_name,jungol_account_id) VALUES (?,?) ON DUPLICATE KEY UPDATE id=id",
+      "INSERT INTO user (jungol_name,jungol_account_id,ignored) VALUES (?,?,1) ON DUPLICATE KEY UPDATE id=id",
       [member.jungolName, member.accountId],
     );
     return this.lockExisting(member.accountId);
@@ -109,7 +109,7 @@ export class UserRepository {
       .sort((left, right) => left.accountId.localeCompare(right.accountId))) {
       try {
         await this.connection.execute(
-          "INSERT INTO user (jungol_name,jungol_account_id) VALUES (?,?)",
+          "INSERT INTO user (jungol_name,jungol_account_id,ignored) VALUES (?,?,1)",
           [member.jungolName, member.accountId],
         );
       } catch (error) {

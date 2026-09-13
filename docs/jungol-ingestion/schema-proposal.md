@@ -166,7 +166,7 @@ GRANT SELECT ON jungol_bada.user_bias_total TO 'jungol_collector'@'collector_hos
 GRANT SELECT ON jungol_bada.ranking_boards TO 'jungol_collector'@'collector_host';
 GRANT SELECT ON jungol_bada.ranked_users TO 'jungol_collector'@'collector_host';
 GRANT SELECT ON jungol_bada.hook TO 'jungol_collector'@'collector_host';
-GRANT INSERT (jungol_name,jungol_account_id), UPDATE (id,jungol_name,corrects,submissions,solution,rank_wrong_count,ac_rating,tier) ON jungol_bada.user TO 'jungol_collector'@'collector_host';
+GRANT INSERT (jungol_name,jungol_account_id,ignored), UPDATE (id,jungol_name,corrects,submissions,solution,rank_wrong_count,ac_rating,tier) ON jungol_bada.user TO 'jungol_collector'@'collector_host';
 GRANT INSERT (user_id,problem,problem_name,problem_tier,submitted_at,level,repeatation,verdict,external_submission_id,score), UPDATE (id) ON jungol_bada.problem TO 'jungol_collector'@'collector_host';
 GRANT INSERT (user_id,problem_id,rule_type,award_key,score_day,event_id,bias,`desc`,created_at), UPDATE (id) ON jungol_bada.score_history TO 'jungol_collector'@'collector_host';
 GRANT INSERT (user_id,total_point), UPDATE (total_point) ON jungol_bada.user_bias_total TO 'jungol_collector'@'collector_host';
