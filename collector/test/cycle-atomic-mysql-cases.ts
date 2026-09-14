@@ -11,7 +11,7 @@ import {
 import {
   AccountInitialSnapshot,
   AccountSyncPlan,
-  rankMemberSchema,
+  groupMemberSchema,
 } from "../src/domain/sync.js";
 import { problemIdSchema, submissionIdSchema } from "../src/domain.js";
 import { GroupFeedRepository } from "../src/mysql/group-feed.js";
@@ -26,23 +26,17 @@ const groupId = "1125";
 const accountIds = [9301, 9302] as const;
 const now = () => new Date("2026-09-10T01:00:00.000Z");
 const members = accountIds.map((accountId) =>
-  rankMemberSchema.parse({
+  groupMemberSchema.parse({
     accountId: String(accountId),
     jungolName: `atomic-${accountId}`,
-    solvedCount: 0,
-    wrongCount: 0,
-    acRating: 0,
     tier: 0,
   }),
 );
 const elevenMembers = Array.from({ length: 11 }, (_, index) => {
   const accountId = 9301 + index;
-  return rankMemberSchema.parse({
+  return groupMemberSchema.parse({
     accountId: String(accountId),
     jungolName: `atomic-${accountId}`,
-    solvedCount: 0,
-    wrongCount: 0,
-    acRating: 0,
     tier: 0,
   });
 });
@@ -119,7 +113,7 @@ function runtime(
 async function state(pool: Pool): Promise<State> {
   const statements = {
     users:
-      "SELECT id,jungol_account_id,jungol_name,corrects,submissions,solution,tier,ac_rating,initialized_at,initial_submission_id FROM user WHERE jungol_account_id BETWEEN 9301 AND 9311 ORDER BY jungol_account_id",
+      "SELECT id,jungol_account_id,jungol_name,corrects,submissions,solution,tier,initialized_at,initial_submission_id FROM user WHERE jungol_account_id BETWEEN 9301 AND 9311 ORDER BY jungol_account_id",
     problems:
       "SELECT p.id,p.user_id,p.problem,p.external_submission_id,p.submitted_at,p.problem_tier,p.estimated_tier,p.level,p.repeatation,p.score FROM problem p JOIN user u ON u.id=p.user_id WHERE u.jungol_account_id BETWEEN 9301 AND 9311 ORDER BY p.id",
     scores:
@@ -412,6 +406,70 @@ export async function runCycleAtomicMysqlCases(
       } finally {
         await pool.query("DROP TRIGGER IF EXISTS atomic_cycle_reject");
       }
+      assert.deepEqual(await state(pool), before);
+    },
+  );
+
+  await t.test(
+    "Given initialized members with administrator fields When the group snapshot changes Then only active name and tier metadata refreshes",
+    async () => {
+      await cleanup(pool);
+      await runtime(pool).runAtomic(new AbortController().signal);
+      await pool.query(
+        "UPDATE user SET korean_name='관리자',ignored=1,rank_wrong_count=77,corrects=5,solution=555 WHERE jungol_account_id=9301",
+      );
+      const updated = groupMemberSchema.parse({
+        accountId: "9301",
+        jungolName: "atomic-renamed",
+        tier: 9,
+      });
+      await runtime(pool, {
+        memberList: [updated, members[1] ?? assert.fail("missing member")],
+      }).runAtomic(new AbortController().signal);
+      const [rows] = await pool.query<
+        (RowDataPacket & {
+          readonly jungol_name: string;
+          readonly tier: number;
+          readonly korean_name: string;
+          readonly ignored: number;
+          readonly rank_wrong_count: number;
+          readonly corrects: number;
+          readonly submissions: number;
+          readonly solution: string;
+        })[]
+      >(
+        "SELECT jungol_name,tier,korean_name,ignored,rank_wrong_count,corrects,submissions,solution FROM user WHERE jungol_account_id=9301",
+      );
+      assert.deepEqual(rows[0], {
+        jungol_name: "atomic-renamed",
+        tier: 9,
+        korean_name: "관리자",
+        ignored: 1,
+        rank_wrong_count: 77,
+        corrects: 5,
+        submissions: 0,
+        solution: "555",
+      });
+    },
+  );
+
+  await t.test(
+    "Given projection fails after prepared metadata When runAtomic commits Then all metadata and cycle writes roll back",
+    async () => {
+      await cleanup(pool);
+      await runtime(pool).runAtomic(new AbortController().signal);
+      const before = await state(pool);
+      const changed = groupMemberSchema.parse({
+        accountId: "9301",
+        jungolName: "atomic-projection-rollback",
+        tier: 10,
+      });
+      await assert.rejects(
+        runtime(pool, {
+          failProjection: true,
+          memberList: [changed, members[1] ?? assert.fail("missing member")],
+        }).runAtomic(new AbortController().signal),
+      );
       assert.deepEqual(await state(pool), before);
     },
   );

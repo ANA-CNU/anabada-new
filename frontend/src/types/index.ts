@@ -6,7 +6,6 @@ export interface User {
   submissions: number;
   solution: string;
   tier: number;
-  ac_rating: number;
   ignored: boolean;
   jungol_account_id: string;
   rank_wrong_count: number;

@@ -1,5 +1,6 @@
 export type JungolErrorCode =
-  | "invalid_rank"
+  | "invalid_group_members"
+  | "group_members_timeout"
   | "duplicate_account"
   | "browser_failed"
   | "problem_metadata_timeout"
@@ -36,6 +37,7 @@ export type JungolErrorCode =
 
 /** 원문 응답·URL·예외를 포함하지 않는 collector 전용 진단 단계다. */
 export type SafeJungolStage =
+  | "group_members_readiness"
   | "problem_metadata_readiness"
   | "problem_metadata_navigation"
   | "account_summary"
@@ -102,6 +104,7 @@ export type SafeJungolDiagnostics = {
   readonly hasSubmissionSid?: boolean | undefined;
   readonly rowVisible?: boolean | undefined;
   readonly lastSubmissionId?: string | undefined;
+  readonly observedAccountId?: string | undefined;
   readonly loadingVisible?: boolean | undefined;
   readonly location?: SafeCodeLocation | undefined;
   readonly originalErrorKind?:
@@ -120,6 +123,7 @@ export type SafeJungolDiagnostics = {
 };
 
 const diagnosticStages = new Set<SafeJungolStage>([
+  "group_members_readiness",
   "problem_metadata_readiness",
   "problem_metadata_navigation",
   "account_summary",
@@ -194,6 +198,7 @@ type SafeJungolDiagnosticsDraft = {
   hasSubmissionSid?: boolean | undefined;
   rowVisible?: boolean | undefined;
   lastSubmissionId?: string | undefined;
+  observedAccountId?: string | undefined;
   loadingVisible?: boolean | undefined;
   location?: SafeCodeLocation | undefined;
   originalErrorKind?: SafeJungolDiagnostics["originalErrorKind"];
@@ -249,6 +254,11 @@ const safeDiagnostics = (
     /^[0-9]{1,20}$/.test(value.lastSubmissionId)
   )
     result.lastSubmissionId = value.lastSubmissionId;
+  if (
+    typeof value.observedAccountId === "string" &&
+    /^[1-9][0-9]{0,19}$/.test(value.observedAccountId)
+  )
+    result.observedAccountId = value.observedAccountId;
   const location = safeCodeLocation(value.location);
   if (location) result.location = location;
   if (

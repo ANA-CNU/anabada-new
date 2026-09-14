@@ -19,8 +19,8 @@ import {
   AcceptedAttempt,
   AccountInitialSnapshot,
   AccountSyncPlan,
+  groupMemberSchema,
   InitialSolvedProblem,
-  rankMemberSchema,
 } from "../src/domain/sync.js";
 import { problemIdSchema, submissionIdSchema } from "../src/domain.js";
 import { GroupFeedRepository } from "../src/mysql/group-feed.js";
@@ -32,6 +32,8 @@ import { WeightedRankingPolicy } from "../src/scoring/ranking.js";
 import { runCycleAtomicMysqlCases } from "./cycle-atomic-mysql-cases.js";
 import { runDailyMissedCases } from "./daily-missed-mysql-cases.js";
 import { runGroupRuntimeCases } from "./group-runtime-mysql-cases.js";
+import { runManualProjectionCases } from "./mysql-projection-cases.js";
+import { runSettlementRegressionMysqlCases } from "./settlement-regression-mysql-cases.js";
 import { runUserRegistrationCases } from "./user-registration-mysql-cases.js";
 
 interface CountRow extends RowDataPacket {
@@ -117,19 +119,16 @@ class LoopbackMigrationFactory implements MigrationConnectionFactory {
   }
 }
 
-function member(accountId: number, solvedCount = 0, acRating = 0) {
-  return rankMemberSchema.parse({
+function member(accountId: number, tier = 0) {
+  return groupMemberSchema.parse({
     accountId: String(accountId),
     jungolName: `member-${accountId}`,
-    solvedCount,
-    wrongCount: 0,
-    acRating,
-    tier: acRating === 30 ? 1 : 0,
+    tier,
   });
 }
 
 function baseline(accountId: number, solved: readonly number[], cursor = 100n) {
-  const snapshot = member(accountId, solved.length);
+  const snapshot = member(accountId);
   return new AccountInitialSnapshot(
     new AccountSyncPlan("initial_summary", snapshot, 0n, solved.length, 1),
     solved.map(
@@ -150,7 +149,7 @@ async function count(
 }
 
 test(
-  "Given a disposable MySQL 9.3 database When 002 is seeded and 003 is migrated Then group storage preserves approved state and commits atomically",
+  "Given a disposable MySQL 9.3 database When 002 is seeded and migrations through 005 run Then group storage preserves approved state and commits atomically",
   {
     skip:
       !enabled ||
@@ -214,7 +213,13 @@ test(
       await t.test(
         "migration ledger is idempotent and reset preserves only approved legacy rows",
         async () => {
-          assert.equal(await count(pool, "migrations"), 3);
+          const [migrations] = await pool.query<
+            (RowDataPacket & { readonly version: number })[]
+          >("SELECT version FROM migrations ORDER BY version");
+          assert.deepEqual(
+            migrations.map((migration) => migration.version),
+            [2, 3, 4, 5],
+          );
           assert.equal(await count(pool, "problem"), 0);
           assert.equal(await count(pool, "ranking_boards"), 0);
           const [scores] = await pool.query<ScoreRow[]>(
@@ -291,7 +296,7 @@ test(
             );
             await users.completeSync({
               userId: user.id,
-              member: member(300, 999),
+              member: member(300),
               highestInspectedSubmissionId: 3003n,
             });
           } finally {
@@ -342,7 +347,7 @@ test(
             "UPDATE user SET tier=31 WHERE jungol_account_id=400",
           );
           const prepared = {
-            member: member(400, 0, 30),
+            member: member(400, 1),
             highestSubmissionId: 101n,
             now: new Date("2026-09-10T01:00:00Z"),
             attempts: [
@@ -562,6 +567,8 @@ test(
       await runCycleAtomicMysqlCases(t, pool);
       await runDailyMissedCases(t, pool);
       await runUserRegistrationCases(t, pool);
+      await runManualProjectionCases(t, pool);
+      await runSettlementRegressionMysqlCases(t, pool);
     } finally {
       await pool.end();
     }

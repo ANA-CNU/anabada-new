@@ -15,7 +15,7 @@ const pageHtml = (solved: number): string => {
     solved === 0
       ? ""
       : `<section class="card"><h2>check 해결한 문제</h2><div class="problem-list">${links}</div><button>expand_more</button></section>`;
-  return `<main><div><span>맞은 문제</span>${solved}문제</div>${card}<script>document.querySelector("button")?.addEventListener("click", () => { const list = document.querySelector(".problem-list"); for (let problem = 51; problem <= ${solved}; problem += 1) list?.insertAdjacentHTML("beforeend", \`<a href="/problem/\${problem}">\${problem}</a>\`); });</script></main>`;
+  return `<main><h1>profile</h1><div><span>맞은 문제</span>${solved}문제</div>${card}<script>document.querySelector("button")?.addEventListener("click", () => { const list = document.querySelector(".problem-list"); for (let problem = 51; problem <= ${solved}; problem += 1) list?.insertAdjacentHTML("beforeend", \`<a href="/problem/\${problem}">\${problem}</a>\`); });</script></main>`;
 };
 
 test("Given an account profile with an expandable solved card When collecting Then it returns every advertised problem", async (t) => {
@@ -53,4 +53,43 @@ test("Given an account profile with an expandable solved card When collecting Th
   assert.equal((await collector.collectSolved(page)).length, 73);
   await page.goto(`${settings.baseUrl}/zero`);
   assert.deepEqual(await collector.collectSolved(page), []);
+});
+
+test("Given a loading profile that initially advertises zero When the solved card hydrates Then collection waits for all 73 problems", async (t) => {
+  const links = Array.from(
+    { length: 73 },
+    (_, index) => `<a href="/problem/${index + 1}">${index + 1}</a>`,
+  ).join("");
+  const hydrated = `<h1>profile</h1><div><span>맞은 문제</span>73문제</div><section class="card"><h2>check 해결한 문제</h2><div class="problem-list">${links}</div></section>`;
+  const server = createServer((_request, response) => {
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(
+      `<main><h1>로드 중</h1><div><span>맞은 문제</span>0문제</div><script>setTimeout(() => document.querySelector('main').innerHTML = ${JSON.stringify(hydrated)}, 500)</script></main>`,
+    );
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(
+    () =>
+      new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      ),
+  );
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const settings = {
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    pageTimeoutMs: 3_000,
+  };
+  const browser = await chromium.launch({
+    headless: true,
+    ...(existsSync(chromium.executablePath()) ? {} : { channel: "chrome" }),
+  });
+  t.after(() => browser.close());
+  const page = await browser.newPage();
+  await page.goto(settings.baseUrl);
+  const collector = new AccountProfileCollector(
+    settings,
+    new JungolRequestCoordinator({ delay: async () => {} }),
+  );
+  assert.equal((await collector.collectSolved(page)).length, 73);
 });

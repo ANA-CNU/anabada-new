@@ -9,7 +9,6 @@ type UserRow = Readonly<{
   readonly solution: string;
   readonly korean_name: string | null;
   readonly tier: number;
-  readonly ac_rating: number;
   readonly ignored: number;
   readonly jungol_account_id: string;
   readonly rank_wrong_count: number;
@@ -17,7 +16,6 @@ type UserRow = Readonly<{
 type RawUserRow = RowDataPacket & UserRow;
 
 export const canonicalUserFields = [
-  "ac_rating",
   "corrects",
   "id",
   "ignored",
@@ -50,7 +48,7 @@ export async function userRow(
   id: number,
 ): Promise<UserRow | undefined> {
   const [rows] = await context.rawPool.query<RawUserRow[]>(
-    "SELECT jungol_name, corrects, submissions, CAST(solution AS CHAR) AS solution, korean_name, tier, ac_rating, ignored, CAST(jungol_account_id AS CHAR) AS jungol_account_id, rank_wrong_count FROM user WHERE id = ?",
+    "SELECT jungol_name, corrects, submissions, CAST(solution AS CHAR) AS solution, korean_name, tier, ignored, CAST(jungol_account_id AS CHAR) AS jungol_account_id, rank_wrong_count FROM user WHERE id = ?",
     [id],
   );
   return rows[0];

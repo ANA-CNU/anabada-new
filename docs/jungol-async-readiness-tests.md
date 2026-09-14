@@ -1,5 +1,8 @@
 # Jungol 비동기 페이지 준비 상태 검수
 
+> 역사 준비성 테스트 기록: 이 문서의 AC Rating 수집 검증은 005 이전 계약이다.
+> 현재 직접 보관하는 사용자 실력 값은 tier뿐이며 원시 AC Rating 계약은 금지된다.
+
 ## 검수 범위
 
 `DOMContentLoaded`는 HTML 파싱 완료이지 Jungol 데이터 준비 완료가 아니다.

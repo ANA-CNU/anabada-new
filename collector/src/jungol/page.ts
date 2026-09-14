@@ -16,7 +16,8 @@ export type PageFailureContext = {
     | "group_feed_loadmore_failed"
     | "group_feed_responsewait_failed"
     | "group_feed_header_failed"
-    | "group_feed_rows_failed";
+    | "group_feed_rows_failed"
+    | "group_members_timeout";
   readonly stage:
     | "page_operation"
     | "request_queue_wait"
@@ -24,7 +25,8 @@ export type PageFailureContext = {
     | "loadmore"
     | "responsewait"
     | "header"
-    | "rows";
+    | "rows"
+    | "group_members_readiness";
   readonly pageNumber?: number | undefined;
   readonly timeoutMs?: number | undefined;
   readonly endpointPath?: string | undefined;

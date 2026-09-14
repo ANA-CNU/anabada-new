@@ -31,7 +31,7 @@ test("Given queued operations When each settles Then they run FIFO with a 3000ms
   const first = deferred();
   const events: string[] = [];
 
-  const one = coordinator.schedule("rank_page", undefined, async () => {
+  const one = coordinator.schedule("group_members", undefined, async () => {
     events.push("first:start");
     await first.promise;
     events.push("first:end");
@@ -69,7 +69,7 @@ test("Given an empty queue during cooldown When a later operation arrives Then i
   });
   const events: string[] = [];
 
-  await coordinator.schedule("rank_page", undefined, async () => {
+  await coordinator.schedule("group_members", undefined, async () => {
     events.push("first");
   });
   const later = coordinator.schedule("submission_page", undefined, async () => {
@@ -154,7 +154,7 @@ test("Given rank or metadata receives 403 or 429 When checking the Jungol respon
 
 test("Given a failed operation When a later operation is queued Then the later operation still runs", async () => {
   const coordinator = new JungolRequestCoordinator({ delay: async () => {} });
-  const failure = coordinator.schedule("rank_page", undefined, async () => {
+  const failure = coordinator.schedule("group_members", undefined, async () => {
     throw new Error("expected");
   });
   let succeeded = false;
@@ -175,7 +175,7 @@ test("Given an aborted queued operation When its turn arrives Then its callback 
   const first = deferred();
   const controller = new AbortController();
   const running = coordinator.schedule(
-    "rank_page",
+    "group_members",
     undefined,
     () => first.promise,
   );
@@ -198,7 +198,7 @@ test("Given a closed coordinator When jobs are queued or newly submitted Then th
   const coordinator = new JungolRequestCoordinator({ delay: async () => {} });
   const first = deferred();
   const running = coordinator.schedule(
-    "rank_page",
+    "group_members",
     undefined,
     () => first.promise,
   );

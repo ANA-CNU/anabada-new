@@ -5,8 +5,9 @@ import { join } from "node:path";
 import test from "node:test";
 import { CollectorConfigLoader } from "../../src/config.js";
 import { GroupFeedCollector } from "../../src/jungol/group-feed.js";
+import { GroupMemberCollector } from "../../src/jungol/group-members.js";
 import { ProblemMetadataResolver } from "../../src/jungol/metadata.js";
-import { RankCollector } from "../../src/jungol/rank.js";
+import { AccountProfileCollector } from "../../src/jungol/profile.js";
 import { JungolRequestCoordinator } from "../../src/jungol/request-coordinator.js";
 import { JungolSession } from "../../src/jungol/session.js";
 import { SubmissionTimestampReader } from "../../src/jungol/submission-timestamp.js";
@@ -122,17 +123,68 @@ test(
         sourceDirty: process.env.COLLECTOR_SOURCE_DIRTY ?? "unknown",
       }),
     );
-    const rankPage = await session.newPage();
+    const memberPage = await session.newPage();
     const feedPage = await session.newPage();
     const metadataPage = await session.newPage();
+    const profilePage = await session.newPage();
     t.after(() =>
-      Promise.all([rankPage.close(), feedPage.close(), metadataPage.close()]),
+      Promise.all([
+        memberPage.close(),
+        feedPage.close(),
+        metadataPage.close(),
+        profilePage.close(),
+      ]),
     );
-    const members = await new RankCollector(config, requests).collect(
-      rankPage,
+    const members = await new GroupMemberCollector(config, requests).collect(
+      memberPage,
       config.groupId,
     );
-    assert.ok(members.length > 0, "live rank needs members");
+    assert.ok(members.length > 0, "live group needs members");
+    await requests.schedule("account_summary", undefined, () =>
+      profilePage.goto(new URL("/account/339", config.baseUrl).href, {
+        waitUntil: "domcontentloaded",
+        timeout: config.pageTimeoutMs,
+      }),
+    );
+    const solved339 = await new AccountProfileCollector(
+      config,
+      requests,
+    ).collectSolved(profilePage);
+    assert.ok(solved339.length > 50, "account 339 expansion must exceed 50");
+    assert.equal(new Set(solved339).size, solved339.length);
+    const advertisedSolved339 = await profilePage.evaluate(() => {
+      const label = Array.from(document.querySelectorAll("*")).find(
+        (element) =>
+          element.textContent?.trim() === "맞은 문제" &&
+          !Array.from(element.children).some(
+            (child) => child.textContent?.trim() === "맞은 문제",
+          ),
+      );
+      const matched = /^(0|[1-9]\d*|[1-9]\d{0,2}(?:,\d{3})+)\s*문제$/.exec(
+        label?.parentElement?.innerText.replace("맞은 문제", "").trim() ?? "",
+      );
+      if (!matched) return null;
+      return Number(matched[1]?.replaceAll(",", ""));
+    });
+    assert.notEqual(advertisedSolved339, null);
+    assert.equal(solved339.length, advertisedSolved339);
+    const solvedSection = profilePage
+      .getByText(/^(?:check\s*)?해결한 문제$/, { exact: true })
+      .locator(
+        "xpath=ancestor::section[contains(concat(' ', normalize-space(@class), ' '), ' card ')][1]",
+      );
+    const scopedSolvedCount = await solvedSection
+      .locator('.problem-list a[href^="/problem/"]')
+      .count();
+    assert.equal(scopedSolvedCount, solved339.length);
+    t.diagnostic(
+      JSON.stringify({
+        memberCount: members.length,
+        solvedCount: solved339.length,
+        advertisedSolvedCount: advertisedSolved339,
+        scopedSolvedCount,
+      }),
+    );
     const feed = new GroupFeedCollector(config, requests);
     const first = await feed.readPage(feedPage, members, {
       lastScannedSubmissionId: null,

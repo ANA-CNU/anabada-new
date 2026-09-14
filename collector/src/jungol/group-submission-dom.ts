@@ -1,6 +1,6 @@
 import type { Locator, Page } from "playwright";
 import { sourceLocationFrom } from "../application/safe-source-location.js";
-import { accountIdSchema, type RankMemberSnapshot } from "../domain/sync.js";
+import { accountIdSchema, type GroupMemberSnapshot } from "../domain/sync.js";
 import { problemIdSchema, submissionIdSchema } from "../domain.js";
 import type { GroupAcceptedSubmission } from "../group-domain.js";
 import { JungolError } from "./errors.js";
@@ -16,7 +16,7 @@ export class GroupSubmissionDomParser {
   async parse(
     page: Page,
     rows: readonly Locator[],
-    members: readonly RankMemberSnapshot[],
+    members: readonly GroupMemberSnapshot[],
   ): Promise<readonly GroupAcceptedSubmission[]> {
     const memberIds = new Set(members.map((member) => member.accountId));
     const submissions: GroupAcceptedSubmission[] = [];
@@ -58,6 +58,7 @@ export class GroupSubmissionDomParser {
           stage: "group_feed_actor_resolution",
           reason: "mismatch",
           lastSubmissionId: submissionId,
+          observedAccountId: accountId,
           problemId,
           expectedCount: members.length,
           ...(location === undefined ? {} : { location }),

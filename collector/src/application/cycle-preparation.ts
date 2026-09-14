@@ -2,8 +2,8 @@ import {
   AcceptedAttempt,
   AccountInitialSnapshot,
   AccountSyncPlan,
+  type GroupMemberSnapshot,
   isKnownProblemTier,
-  type RankMemberSnapshot,
 } from "../domain/sync.js";
 import type { ProblemId } from "../domain.js";
 import type { ProblemTierEstimator } from "../group-domain.js";
@@ -27,7 +27,7 @@ export type PreparedInitialization = {
 };
 
 export type PreparedSettlement = {
-  readonly member: RankMemberSnapshot;
+  readonly member: GroupMemberSnapshot;
   readonly attempts: readonly AcceptedAttempt[];
   readonly highestSubmissionId: bigint;
 };
@@ -54,7 +54,7 @@ type PreparedCollectionAdvance = NonNullable<PreparedCollection["next"]> & {
 
 /** Browser/metadata와 DB read snapshot만 담고 write transaction 전에 완결되는 불변 cycle 입력이다. */
 export type PreparedCycle = {
-  readonly members: readonly RankMemberSnapshot[];
+  readonly members: readonly GroupMemberSnapshot[];
   readonly collection: PreparedCollection;
   readonly initializations: readonly PreparedInitialization[];
   readonly settlements: readonly PreparedSettlement[];
@@ -261,7 +261,7 @@ export class CyclePreparationService {
   }
 
   private async prepareInitializations(
-    members: readonly RankMemberSnapshot[],
+    members: readonly GroupMemberSnapshot[],
     states: ReadonlyMap<string, PreparedUserState>,
     signal: AbortSignal,
   ): Promise<readonly PreparedInitialization[]> {
@@ -329,13 +329,13 @@ export class CyclePreparationService {
   }
 
   private async prepareSettlements(
-    members: readonly RankMemberSnapshot[],
+    members: readonly GroupMemberSnapshot[],
     rows: readonly SettlementInboxRow[],
     signal: AbortSignal,
   ): Promise<readonly PreparedSettlement[]> {
     const memberById = new Map<
-      RankMemberSnapshot["accountId"],
-      RankMemberSnapshot
+      GroupMemberSnapshot["accountId"],
+      GroupMemberSnapshot
     >(members.map((member) => [member.accountId, member]));
     const accounts = new Set<string>();
     const selected = [...rows]
@@ -355,7 +355,7 @@ export class CyclePreparationService {
         return true;
       });
     const grouped = new Map<
-      RankMemberSnapshot["accountId"],
+      GroupMemberSnapshot["accountId"],
       SettlementInboxRow[]
     >();
     for (const row of selected)

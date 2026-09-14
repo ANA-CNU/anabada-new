@@ -19,7 +19,6 @@ export async function runUserMutationCases(
     solution: "9007199254740993",
     korean_name: "새이름",
     tier: 31,
-    ac_rating: 2000,
     ignored: true,
     jungol_account_id: "9007199254740994",
     rank_wrong_count: 7,
@@ -56,6 +55,7 @@ export async function runUserMutationCases(
     {},
     { jungol_name: "  " },
     { tier: 32 },
+    { ac_rating: 0 },
     { solution: "not-a-bigint" },
     { jungol_account_id: -1 },
   ]) {

@@ -4,7 +4,7 @@ import { sqlOperations } from "../database-session.js";
 import { type UserDto, type UserPatch, userDtoSchema } from "./contracts.js";
 
 const userColumns =
-  "id, jungol_name, korean_name, corrects, submissions, CAST(solution AS CHAR) AS solution, tier, ac_rating, ignored, CAST(jungol_account_id AS CHAR) AS jungol_account_id, rank_wrong_count";
+  "id, jungol_name, korean_name, corrects, submissions, CAST(solution AS CHAR) AS solution, tier, ignored, CAST(jungol_account_id AS CHAR) AS jungol_account_id, rank_wrong_count";
 const idSchema = z.object({ id: z.number().int().positive() });
 const userOperations = {
   list: sqlOperations.userList,
@@ -21,7 +21,6 @@ const writableColumns = [
   "solution",
   "korean_name",
   "tier",
-  "ac_rating",
   "ignored",
   "jungol_account_id",
   "rank_wrong_count",

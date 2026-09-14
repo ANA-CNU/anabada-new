@@ -2,17 +2,14 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import test from "node:test";
 import { chromium } from "playwright";
-import { rankMemberSchema } from "../src/domain/sync.js";
+import { groupMemberSchema } from "../src/domain/sync.js";
 import { JungolError } from "../src/jungol/errors.js";
 import { GroupSubmissionDomParser } from "../src/jungol/group-submission-dom.js";
 import { SubmissionTimestampReader } from "../src/jungol/submission-timestamp.js";
 
-const member = rankMemberSchema.parse({
+const member = groupMemberSchema.parse({
   accountId: "42",
   jungolName: "known",
-  solvedCount: 0,
-  wrongCount: 0,
-  acRating: 0,
   tier: 0,
 });
 
@@ -39,6 +36,7 @@ test("actor mismatch preserves safe submission and problem diagnostics", async (
           stage: "group_feed_actor_resolution",
           reason: "mismatch",
           lastSubmissionId: "12",
+          observedAccountId: "99",
           problemId: 1000,
           expectedCount: 1,
           location: {

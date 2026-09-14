@@ -91,8 +91,8 @@ test("Given three sanitized summary failures When creating an incident Then it i
   assert.ok(result);
   const message = new EmergencyAlertFormatter().format(result);
 
-  assert.match(message, /그룹 rank 기대 `3` \/ 프로필 표시 `10`/);
-  assert.match(message, /그룹 rank 기대 `2` \/ 프로필 표시 `5`/);
+  assert.match(message, /멤버 수 `3` \/ 프로필 표시 `10`/);
+  assert.match(message, /멤버 수 `2` \/ 프로필 표시 `5`/);
   assert.match(
     message,
     /준비 대기 `30000ms` \/ 프로필 표시 `73` \/ 목록 링크 `50`/,
@@ -144,7 +144,7 @@ test("Given unsafe diagnostic extras When formatting an incident Then only allow
     "private-stack",
   ])
     assert.equal(message.includes(forbidden), false);
-  assert.match(message, /그룹 rank 기대 `3` \/ 프로필 표시 `10`/);
+  assert.match(message, /멤버 수 `3` \/ 프로필 표시 `10`/);
 });
 
 test("Given a rethrown DOM failure When formatting the incident Then it preserves the original typed code and safe source frame", () => {

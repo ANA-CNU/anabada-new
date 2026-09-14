@@ -1,5 +1,10 @@
 # Jungol 전용 DB 스키마 검토안
 
+> 역사 기록: 아래의 `ac_rating` 설계와 AC Rating 수집 서술은 005 이전 제안이다.
+> 현재 `jungol_bada.user`에는 해당 열이 없으며 새 구현은 이를 읽거나 쓰지 않는다.
+> 외부 그룹/랭킹 회원 목록은 불완전하므로 원시 AC Rating을 사용자 사실로 저장하는
+> 계약은 금지된다. 현재 직접 보관하는 실력 값은 0–31 `tier`뿐이다.
+
 [실행 SQL](../../migrations/002_create_jungol_bada.sql)이 이 문서의 산출물이다. 새 MySQL 8.4 논리 DB `jungol_bada`만 생성하며 기존 DB를 수정·복사하지 않는다. 현재 stage/production의 일반 Compose up과 production workflow가 활성 `migrations/*.sql`을 순방향 적용하고, `migrations` 테이블에 버전·파일명·SHA-256 checksum을 기록한다. 개발 Compose는 자동 적용하지 않는다.
 
 ## 원칙

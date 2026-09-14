@@ -1,15 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { rankMemberSchema } from "../src/domain/sync.js";
+import { groupMemberSchema } from "../src/domain/sync.js";
 import { GroupFeedCollector } from "../src/jungol/group-feed.js";
 import { asyncBrowserFixture } from "./async-browser-fixture.js";
 
-const member = rankMemberSchema.parse({
+const member = groupMemberSchema.parse({
   accountId: "42",
   jungolName: "member",
   solvedCount: 1,
   wrongCount: 0,
-  acRating: 20,
   tier: 1,
 });
 

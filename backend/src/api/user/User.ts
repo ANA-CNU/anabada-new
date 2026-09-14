@@ -69,7 +69,6 @@ const requestPatchSchema = z
     solution: bigintInput.optional(),
     korean_name: z.string().trim().min(1).max(25).nullable().optional(),
     tier: numericInput.pipe(z.number().int().min(0).max(31)).optional(),
-    ac_rating: numericInput.pipe(z.number().int().nonnegative()).optional(),
     ignored: z.boolean().optional(),
     jungol_account_id: bigintInput.optional(),
     rank_wrong_count: numericInput

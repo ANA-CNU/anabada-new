@@ -7,7 +7,7 @@ import {
   problemIdSchema,
   submissionIdSchema,
 } from "../../../collector/src/domain.js";
-import { rankMemberSchema } from "../../../collector/src/domain/sync.js";
+import { groupMemberSchema } from "../../../collector/src/domain/sync.js";
 import { CollectorPoolFactory } from "../../../collector/src/mysql/pool.js";
 import { AccountUnitOfWork } from "../../../collector/src/mysql/unit-of-work.js";
 import { ProjectionService } from "../../../collector/src/projection.js";
@@ -54,12 +54,9 @@ export async function createScoreFlowFixture() {
     await context.rawPool.query(
       "INSERT INTO event_problem (event_id,problem,added_at) VALUES (201,3000,'2026-09-01')",
     );
-    const member = rankMemberSchema.parse({
+    const member = groupMemberSchema.parse({
       accountId: "9002",
       jungolName: "beta",
-      solvedCount: 2,
-      wrongCount: 0,
-      acRating: 418,
       tier: 8,
     });
     const calendar = new KstCalendar();

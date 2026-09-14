@@ -177,6 +177,17 @@ export class IncidentFacts {
       value.lastSubmissionId === undefined
         ? undefined
         : `마지막 제출 ${inlineCode(value.lastSubmissionId)}`,
+      value.problemId === undefined
+        ? undefined
+        : `문제 ${inlineCode(value.problemId)}`,
+      value.expectedCount === undefined
+        ? undefined
+        : `멤버 수 ${inlineCode(value.expectedCount)}`,
+      value.observedAccountId === undefined
+        ? undefined
+        : value.stage === "group_feed_actor_resolution"
+          ? `목록에 없는 사용자 발견 ${inlineCode(value.observedAccountId)}`
+          : `계정 ${inlineCode(value.observedAccountId)}`,
       value.timeoutMs === undefined
         ? undefined
         : `제한 ${inlineCode(`${value.timeoutMs}ms`)}`,
@@ -197,7 +208,7 @@ export class IncidentFacts {
     switch (value.reason) {
       case "mismatch":
         return [
-          ["그룹 rank 기대", value.expectedCount],
+          ["멤버 수", value.expectedCount],
           ["프로필 표시", value.profileSolvedCount],
           ["목록 링크", value.observedLinkCount],
           ["고유 링크", value.distinctLinkCount],
@@ -227,7 +238,7 @@ export class IncidentFacts {
   private diagnosticReason(value: SafeJungolDiagnostics): string {
     switch (value.reason) {
       case "mismatch":
-        return "그룹 rank와 개인 해결 목록 수가 일치하지 않습니다";
+        return "멤버 정보와 개인 해결 목록 수가 일치하지 않습니다";
       case "timeout":
         return value.stage === "account_summary_readiness"
           ? "제한 시간 안에 해결 목록의 준비 조건을 충족하지 못했습니다"

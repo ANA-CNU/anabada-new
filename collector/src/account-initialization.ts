@@ -4,14 +4,10 @@ import { PersistenceError } from "./mysql/account-types.js";
 import { AttemptRepository } from "./mysql/attempts.js";
 import type { AccountUnitOfWork } from "./mysql/unit-of-work.js";
 import { UserRepository } from "./mysql/users.js";
-import { AcRatingTierMapper } from "./scoring/tier.js";
 
 /** 요약 기준선은 epoch로 저장해 실제 제출·초기 점수·이벤트와 절대로 혼동하지 않는다. */
 export class AccountInitializationService {
-  constructor(
-    private readonly unitOfWork: AccountUnitOfWork,
-    private readonly ratingTierMapper = new AcRatingTierMapper(),
-  ) {}
+  constructor(private readonly unitOfWork: AccountUnitOfWork) {}
 
   async initialize(snapshot: AccountInitialSnapshot): Promise<void> {
     await this.unitOfWork.executeConnection((connection) =>
@@ -31,8 +27,6 @@ export class AccountInitializationService {
       snapshot.plan.expectedSolvedDelta < 0
     )
       throw new PersistenceError("account_conflict");
-    if (this.ratingTierMapper.toTier(member.acRating) !== member.tier)
-      throw new PersistenceError("rating_tier_mismatch");
     const users = new UserRepository(connection);
     const attempts = new AttemptRepository(connection);
     const user = await users.upsertAndLock(member);

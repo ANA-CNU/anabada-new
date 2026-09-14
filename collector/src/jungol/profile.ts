@@ -25,6 +25,12 @@ export class AccountProfileCollector {
     return this.pages.run(page, signal, async () => {
       const stateHandle = await page.waitForFunction(
         () => {
+          const heading = document.querySelector("h1")?.textContent?.trim();
+          if (
+            !heading ||
+            /^(?:로드 중|로딩 중|loading)(?:\.\.\.|…)?$/i.test(heading)
+          )
+            return false;
           const labels = Array.from(document.querySelectorAll("*")).filter(
             (element) =>
               element.textContent?.trim() === "맞은 문제" &&

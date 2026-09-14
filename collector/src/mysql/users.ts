@@ -1,17 +1,6 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import type { RankMemberSnapshot } from "../domain/sync.js";
+import type { GroupMemberSnapshot } from "../domain/sync.js";
 import { PersistenceError } from "./account-types.js";
-
-export interface StoredUser extends RowDataPacket {
-  readonly id: number;
-  readonly accountId: string;
-  readonly jungolName: string;
-  readonly solvedCount: number;
-  readonly wrongCount: number;
-  readonly acRating: number;
-  readonly tier: number;
-  readonly cursor: string;
-}
 
 export interface LockedUser extends RowDataPacket {
   readonly id: number;
@@ -44,14 +33,7 @@ export interface PreparedUserState extends RowDataPacket {
 export class UserRepository {
   constructor(private readonly connection: PoolConnection) {}
 
-  async readAll(): Promise<readonly StoredUser[]> {
-    const [rows] = await this.connection.execute<StoredUser[]>(
-      "SELECT id, jungol_account_id AS accountId, jungol_name AS jungolName, corrects AS solvedCount, rank_wrong_count AS wrongCount, ac_rating AS acRating, tier, solution AS `cursor` FROM user",
-    );
-    return rows;
-  }
-
-  async upsertAndLock(member: RankMemberSnapshot): Promise<LockedUser> {
+  async upsertAndLock(member: GroupMemberSnapshot): Promise<LockedUser> {
     await this.connection.execute(
       "INSERT INTO user (jungol_name,jungol_account_id,ignored) VALUES (?,?,1) ON DUPLICATE KEY UPDATE id=id",
       [member.jungolName, member.accountId],
@@ -60,7 +42,7 @@ export class UserRepository {
   }
 
   async registerAndReadInitialization(
-    member: RankMemberSnapshot,
+    member: GroupMemberSnapshot,
   ): Promise<UserInitializationState> {
     const user = await this.upsertAndLock(member);
     return {
@@ -91,7 +73,9 @@ export class UserRepository {
     return new Map(rows.map((row) => [row.accountId, row]));
   }
 
-  async lockRegisteredMembers(members: readonly RankMemberSnapshot[]): Promise<{
+  async lockRegisteredMembers(
+    members: readonly GroupMemberSnapshot[],
+  ): Promise<{
     readonly users: readonly LockedUser[];
     readonly insertedAccountIds: ReadonlySet<string>;
   }> {
@@ -133,33 +117,25 @@ export class UserRepository {
     return { users: rows, insertedAccountIds };
   }
 
-  async refreshMetadata(member: RankMemberSnapshot): Promise<void> {
+  async refreshMetadata(member: GroupMemberSnapshot): Promise<void> {
     await this.connection.execute(
-      "UPDATE user SET jungol_name=?, rank_wrong_count=?, ac_rating=?, tier=? WHERE jungol_account_id=?",
-      [
-        member.jungolName,
-        member.wrongCount,
-        member.acRating,
-        member.tier,
-        member.accountId,
-      ],
+      "UPDATE user SET jungol_name=?, tier=? WHERE jungol_account_id=?",
+      [member.jungolName, member.tier, member.accountId],
     );
   }
 
   async completeSync(input: {
     readonly userId: number;
-    readonly member: RankMemberSnapshot;
+    readonly member: GroupMemberSnapshot;
     readonly highestInspectedSubmissionId: bigint;
   }): Promise<void> {
     await this.connection.execute(
-      "UPDATE user SET jungol_name=?, corrects=(SELECT COUNT(DISTINCT problem) FROM problem WHERE user_id=?), submissions=(SELECT COUNT(*) FROM problem WHERE user_id=?), solution=?, rank_wrong_count=?, ac_rating=?, tier=? WHERE id=?",
+      "UPDATE user SET jungol_name=?, corrects=(SELECT COUNT(DISTINCT problem) FROM problem WHERE user_id=?), submissions=(SELECT COUNT(*) FROM problem WHERE user_id=?), solution=?, tier=? WHERE id=?",
       [
         input.member.jungolName,
         input.userId,
         input.userId,
         input.highestInspectedSubmissionId.toString(),
-        input.member.wrongCount,
-        input.member.acRating,
         input.member.tier,
         input.userId,
       ],
@@ -168,13 +144,13 @@ export class UserRepository {
 
   async completeInitialization(input: {
     readonly userId: number;
-    readonly member: RankMemberSnapshot;
+    readonly member: GroupMemberSnapshot;
     readonly solvedCount: number;
     readonly highestInspectedSubmissionId: bigint;
     readonly initializedAt: Date;
   }): Promise<void> {
     await this.connection.execute(
-      "UPDATE user SET jungol_name=?, corrects=?, submissions=?, solution=?, initial_submission_id=?, initialized_at=?, rank_wrong_count=?, ac_rating=?, tier=? WHERE id=?",
+      "UPDATE user SET jungol_name=?, corrects=?, submissions=?, solution=?, initial_submission_id=?, initialized_at=?, tier=? WHERE id=?",
       [
         input.member.jungolName,
         input.solvedCount,
@@ -182,8 +158,6 @@ export class UserRepository {
         "0",
         input.highestInspectedSubmissionId.toString(),
         input.initializedAt,
-        input.member.wrongCount,
-        input.member.acRating,
         input.member.tier,
         input.userId,
       ],

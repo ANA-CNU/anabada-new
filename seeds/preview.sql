@@ -9,14 +9,14 @@ SET @next_month_utc = DATE_SUB(DATE_ADD(@current_score_month, INTERVAL 1 MONTH),
 START TRANSACTION;
 
 -- demo 고정 ID UPSERT는 재실행에서 동일 행을 갱신하고, 다른 데이터를 삭제하지 않는다.
-INSERT INTO user (id, jungol_name, corrects, submissions, solution, korean_name, tier, ac_rating, ignored, jungol_account_id, rank_wrong_count, initialized_at, initial_submission_id)
+INSERT INTO user (id, jungol_name, corrects, submissions, solution, korean_name, tier, ignored, jungol_account_id, rank_wrong_count, initialized_at, initial_submission_id)
 WITH RECURSIVE n AS (SELECT 1 AS value UNION ALL SELECT value + 1 FROM n WHERE value < 30)
 SELECT 80000 + value, CONCAT('demo', LPAD(value, 2, '0')), 0, 0, 990000 + value,
   ELT(value, '김서준', '이민서', '박지호', '최도윤', '정하은', '강준우', '윤수진', '한유나', '김민재', '이서연', '박준혁', '최유진', '정민준', '강지민', '윤도현', '한서윤', '김도현', '이채원', '박시우', '최하린', '정지훈', '강예린', '윤현우', '한지민', '김주원', '이도윤', '박서아', '최민석', '정유나', '강하준'),
-  31 - value, ELT(31 - value, 30, 60, 90, 120, 150, 200, 300, 400, 500, 650, 800, 950, 1100, 1250, 1400, 1600, 1750, 1900, 2000, 2100, 2200, 2300, 2400, 2500, 2600, 2700, 2800, 2850, 2900, 2950), 0, 880000 + value, value % 6,
+  31 - value, 0, 880000 + value, value % 6,
   UTC_TIMESTAMP(), 990000 + value
 FROM n
-ON DUPLICATE KEY UPDATE jungol_name=VALUES(jungol_name), korean_name=VALUES(korean_name), tier=VALUES(tier), ac_rating=VALUES(ac_rating), ignored=0, rank_wrong_count=VALUES(rank_wrong_count), initialized_at=VALUES(initialized_at), initial_submission_id=VALUES(initial_submission_id);
+ON DUPLICATE KEY UPDATE jungol_name=VALUES(jungol_name), korean_name=VALUES(korean_name), tier=VALUES(tier), ignored=0, rank_wrong_count=VALUES(rank_wrong_count), initialized_at=VALUES(initialized_at), initial_submission_id=VALUES(initial_submission_id);
 
 INSERT INTO problem (id, user_id, problem, problem_name, problem_tier, submitted_at, level, repeatation, verdict, external_submission_id, score, estimated_tier)
 WITH RECURSIVE users AS (SELECT 1 AS user_no UNION ALL SELECT user_no + 1 FROM users WHERE user_no < 30), submissions AS (SELECT 1 AS submission_no UNION ALL SELECT submission_no + 1 FROM submissions WHERE submission_no < 6)

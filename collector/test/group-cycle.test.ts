@@ -5,19 +5,16 @@ import {
   GroupCycleExecutor,
   GroupCycleFailure,
 } from "../src/application/group-cycle.js";
-import { rankMemberSchema } from "../src/domain/sync.js";
+import { groupMemberSchema } from "../src/domain/sync.js";
 
 test("Given initialized group members When a complete feed window settles Then cache repair precedes projection in a separate final phase", async () => {
   const events: string[] = [];
   const adapters: GroupCycleAdapters = {
     phase: async () => "collecting",
     members: async () => [
-      rankMemberSchema.parse({
+      groupMemberSchema.parse({
         accountId: "1",
         jungolName: "member",
-        solvedCount: 0,
-        wrongCount: 0,
-        acRating: 0,
         tier: 0,
       }),
     ],
@@ -216,12 +213,9 @@ test("Given a failed baseline and pending inbox When the next cycle is settling 
   const adapters: GroupCycleAdapters = {
     phase: async () => (cycle === 1 ? "collecting" : "settling"),
     members: async () => [
-      rankMemberSchema.parse({
+      groupMemberSchema.parse({
         accountId: "1",
         jungolName: "member",
-        solvedCount: 0,
-        wrongCount: 0,
-        acRating: 0,
         tier: 0,
       }),
     ],

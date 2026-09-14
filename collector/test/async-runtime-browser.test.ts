@@ -2,27 +2,25 @@ import assert from "node:assert/strict";
 import { GroupRuntimeBrowser } from "../src/application/group-runtime-browser.js";
 import { problemIdSchema } from "../src/domain.js";
 import { GroupFeedCollector } from "../src/jungol/group-feed.js";
+import { GroupMemberCollector } from "../src/jungol/group-members.js";
 import { ProblemMetadataResolver } from "../src/jungol/metadata.js";
 import { AccountProfileCollector } from "../src/jungol/profile.js";
-import { RankCollector } from "../src/jungol/rank.js";
 import {
   asyncBrowserFixture,
   FetchGate,
-  rankHtml,
-  rankRow,
   browserTest as test,
   tracked,
 } from "./async-browser-fixture.js";
 
-test("Given all real runtime browser adapters When rank, profile, feed and problem hydrate asynchronously Then initialization carries fetched data end to end", async (t) => {
-  const rank = new FetchGate();
+test("Given all real runtime browser adapters When members, profile, feed and problem hydrate asynchronously Then initialization carries fetched data end to end", async (t) => {
+  const membersGate = new FetchGate();
   const profile = new FetchGate();
   const feed = new FetchGate();
   const metadata = new FetchGate();
   const pages = new Map([
     [
-      "/group/1125/rank",
-      `${rankHtml}<script>fetch('/fixture/rank').then(r=>r.text()).then(html=>document.querySelector('tbody').innerHTML=html)</script>`,
+      "/group/1125",
+      `<article><h2>멤버</h2><section></section></article><script>fetch('/fixture/members').then(r=>r.text()).then(html=>document.querySelector('section').innerHTML=html)</script>`,
     ],
     [
       "/account/42",
@@ -41,7 +39,7 @@ test("Given all real runtime browser adapters When rank, profile, feed and probl
     t,
     pages,
     new Map([
-      ["/fixture/rank", rank],
+      ["/fixture/members", membersGate],
       ["/fixture/profile", profile],
       ["/fixture/feed", feed],
       ["/fixture/metadata", metadata],
@@ -52,7 +50,7 @@ test("Given all real runtime browser adapters When rank, profile, feed and probl
     groupId: 1125,
     requests,
     newPage: () => browser.newPage(),
-    rank: new RankCollector(settings, requests),
+    members: new GroupMemberCollector(settings, requests),
     feed: new GroupFeedCollector(settings, requests),
     profile: new AccountProfileCollector(settings, requests),
     metadata: new ProblemMetadataResolver(settings, requests),
@@ -60,8 +58,10 @@ test("Given all real runtime browser adapters When rank, profile, feed and probl
   t.after(() => runtime.close());
   const signal = new AbortController().signal;
   const membersOperation = tracked(runtime.members(signal));
-  await rank.requested;
-  rank.release(rankRow);
+  await membersGate.requested;
+  membersGate.release(
+    '<a href="/account/42">member<img src="https://s.jungol.co.kr/solved/11.svg"></a>',
+  );
   const members = await membersOperation.result;
   assert.ok(members.ok);
   const member = members.value[0];
@@ -70,7 +70,7 @@ test("Given all real runtime browser adapters When rank, profile, feed and probl
   await profile.requested;
   assert.equal(initialization.settled(), false);
   profile.release(
-    '<div><span>맞은 문제</span>1문제</div><section class="card"><h2>check 해결한 문제</h2><div class="problem-list"><a href="/problem/1000">1000</a></div></section>',
+    '<h1>profile</h1><div><span>맞은 문제</span>1문제</div><section class="card"><h2>check 해결한 문제</h2><div class="problem-list"><a href="/problem/1000">1000</a></div></section>',
   );
   await feed.requested;
   feed.release(
@@ -78,7 +78,6 @@ test("Given all real runtime browser adapters When rank, profile, feed and probl
   );
   const initialized = await initialization.result;
   assert.ok(initialized.ok);
-  assert.equal(initialized.value.member.acRating, 800);
   assert.equal(initialized.value.member.tier, 11);
   assert.deepEqual(
     initialized.value.solved.map((row) => row.problemId),

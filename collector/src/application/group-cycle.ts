@@ -1,4 +1,4 @@
-import type { RankMemberSnapshot } from "../domain/sync.js";
+import type { GroupMemberSnapshot } from "../domain/sync.js";
 import type { SafeJungolDiagnostics } from "../jungol/errors.js";
 import type { SettlementAttemptOutcome } from "../settlement-outcome.js";
 import type { CycleTraceSnapshot } from "./cycle-diagnostics.js";
@@ -40,10 +40,10 @@ export type GroupSettlementFailure = GroupAccountFailure;
 
 export interface GroupCycleAdapters {
   phase(signal: AbortSignal): Promise<"collecting" | "settling">;
-  members(signal: AbortSignal): Promise<readonly RankMemberSnapshot[]>;
+  members(signal: AbortSignal): Promise<readonly GroupMemberSnapshot[]>;
   checkpointInitialHead(signal: AbortSignal): Promise<void>;
   initializeMembers(
-    members: readonly RankMemberSnapshot[],
+    members: readonly GroupMemberSnapshot[],
     signal: AbortSignal,
   ): Promise<readonly GroupInitializationFailure[]>;
   advanceWindow(

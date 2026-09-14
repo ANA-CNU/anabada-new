@@ -7,28 +7,22 @@ import {
   GroupFeedPageLease,
   GroupRuntimeBrowser,
 } from "../src/application/group-runtime-browser.js";
-import { rankMemberSchema } from "../src/domain/sync.js";
+import { groupMemberSchema } from "../src/domain/sync.js";
 import { problemIdSchema, submissionIdSchema } from "../src/domain.js";
 import type { GroupFeedCollector } from "../src/jungol/group-feed.js";
+import type { GroupMemberCollector } from "../src/jungol/group-members.js";
 import type { ProblemMetadataResolver } from "../src/jungol/metadata.js";
 import type { AccountProfileCollector } from "../src/jungol/profile.js";
-import type { RankCollector } from "../src/jungol/rank.js";
 import { JungolRequestCoordinator } from "../src/jungol/request-coordinator.js";
 
-const rankMember = rankMemberSchema.parse({
+const rankMember = groupMemberSchema.parse({
   accountId: "42",
   jungolName: "rank-authority",
-  solvedCount: 1,
-  wrongCount: 0,
-  acRating: 320,
   tier: 7,
 });
-const staleMember = rankMemberSchema.parse({
+const staleMember = groupMemberSchema.parse({
   accountId: "42",
   jungolName: "stale-profile-input",
-  solvedCount: 1,
-  wrongCount: 0,
-  acRating: 30,
   tier: 1,
 });
 
@@ -65,9 +59,9 @@ test("Given a captured rank member When resolving an existing member Then no pro
       baseUrl: "https://group-runtime.test",
       pageTimeoutMs: 2_000,
       requests: new JungolRequestCoordinator({ delay: async () => {} }),
-      rank: {
+      members: {
         collect: async () => [rankMember],
-      } satisfies Pick<RankCollector, "collect">,
+      } satisfies Pick<GroupMemberCollector, "collect">,
       feed: {
         readPage: async () => {
           feedReads += 1;
@@ -98,7 +92,6 @@ test("Given a captured rank member When resolving an existing member Then no pro
       new AbortController().signal,
     );
 
-    assert.equal(member.acRating, 320);
     assert.equal(member.tier, 7);
     assert.equal(profileCalls, 0);
     assert.equal(feedReads, 0);
@@ -127,8 +120,8 @@ test("Given a new member When initializing Then profile supplies only solved pro
       baseUrl: "https://group-runtime.test",
       pageTimeoutMs: 2_000,
       requests: new JungolRequestCoordinator({ delay: async () => {} }),
-      rank: { collect: async () => [rankMember] } satisfies Pick<
-        RankCollector,
+      members: { collect: async () => [rankMember] } satisfies Pick<
+        GroupMemberCollector,
         "collect"
       >,
       feed: {
@@ -175,7 +168,6 @@ test("Given a new member When initializing Then profile supplies only solved pro
       [1000],
     );
     assert.equal(initial.highestInspectedSubmissionId, 9001n);
-    assert.equal(initial.member.acRating, 320);
     assert.equal(initial.member.tier, 7);
     await runtime.close();
     await context.close();

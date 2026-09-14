@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { serialize } from "bson";
-import { rankMemberSchema } from "../src/domain/sync.js";
+import { groupMemberSchema } from "../src/domain/sync.js";
 import { problemIdSchema, submissionIdSchema } from "../src/domain.js";
 import {
   GroupActorResolver,
@@ -82,12 +82,9 @@ test("Given a continuing group page When its cursor is absent Then decoding reje
 });
 
 test("Given an actor handle matching one rank member When resolving Then the verified account ID is returned", () => {
-  const member = rankMemberSchema.parse({
+  const member = groupMemberSchema.parse({
     accountId: "42",
     jungolName: "member",
-    solvedCount: 0,
-    wrongCount: 0,
-    acRating: 0,
     tier: 0,
   });
 

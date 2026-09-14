@@ -107,7 +107,10 @@ jobs:
           mv -f .env.next .env
           export COLLECTOR_REVISION="$(git rev-parse HEAD)"
           docker compose --env-file .env -f docker-compose.prod.yaml config --quiet
-          timeout 1200 docker compose --env-file .env -f docker-compose.prod.yaml up -d --build --remove-orphans --wait --wait-timeout 180
+          timeout 1200 docker compose --env-file .env -f docker-compose.prod.yaml build
+          # 005 적용 뒤 구 backend/collector가 제거된 열을 읽거나 쓰지 않도록 앱만 잠시 중지한다.
+          timeout 60 docker compose --env-file .env -f docker-compose.prod.yaml stop anabada-backend jungol-collector
+          timeout 1200 docker compose --env-file .env -f docker-compose.prod.yaml up -d --no-build --remove-orphans --wait --wait-timeout 180
           # 변경되지 않은 nginx도 이전 backend 컨테이너 IP를 계속 가리킬 수 있어 배포마다 재시작한다.
           timeout 60 docker compose --env-file .env -f docker-compose.prod.yaml restart bada-nginx
           docker compose --env-file .env -f docker-compose.prod.yaml ps

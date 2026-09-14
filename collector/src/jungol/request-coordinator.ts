@@ -4,7 +4,7 @@ import { JungolError } from "./errors.js";
 export const jungolOperationKinds = [
   "auth_probe",
   "auth_submit",
-  "rank_page",
+  "group_members",
   "account_summary",
   "submission_page",
   "submission_next_page",

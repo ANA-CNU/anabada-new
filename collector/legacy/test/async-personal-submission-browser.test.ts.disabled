@@ -1,0 +1,64 @@
+// 레거시 보관: rank plan의 개인 submission cursor 검증이다.
+import assert from "node:assert/strict";
+import { serialize } from "bson";
+import { AccountSyncPlan, rankMemberSchema } from "../src/domain/sync.js";
+import { SubmissionCollector } from "../src/jungol/submission.js";
+import { SubmissionCursorCollector } from "../src/jungol/submission-cursor.js";
+import {
+  asyncBrowserFixture,
+  FetchGate,
+  browserTest as test,
+  tracked,
+} from "./async-browser-fixture.js";
+
+const member = rankMemberSchema.parse({
+  accountId: "42",
+  jungolName: "member",
+  solvedCount: 1,
+  wrongCount: 0,
+  acRating: 800,
+  tier: 11,
+});
+
+const wire = (ids: readonly number[]) =>
+  serialize({
+    data: {
+      list: ids.map((id) => ({
+        id,
+        p: 1000,
+        r: "AC",
+        s: 100,
+        u: "member",
+        t: 1788608362887,
+      })),
+      paging: { cursor: "end", more: false },
+    },
+  }).map((byte) => byte ^ 0xaa);
+
+for (const mode of ["incremental", "initial_summary"] as const) {
+  test(`Given delayed personal submission fetch When ${mode} runs Then the real legacy adapter reads wire data after load`, async (t) => {
+    const api = new FetchGate();
+    const { page, settings, requests } = await asyncBrowserFixture(
+      t,
+      `<main>로딩 중</main><script>fetch('/api/submission',{headers:{'x-fp':'aa'}})</script>`,
+      new Map([["/api/submission", api]]),
+    );
+    const plan = new AccountSyncPlan(mode, member, 0n, 1, 1);
+    const operation = tracked(
+      mode === "incremental"
+        ? new SubmissionCollector(settings, requests)
+            .collect(page, plan)
+            .then((result) => result.highestInspectedId)
+        : new SubmissionCursorCollector(settings, requests)
+            .collect(page, plan)
+            .then((result) => result.highestInspectedSubmissionId),
+    );
+    await api.requested;
+    await page.waitForLoadState("load");
+    assert.equal(operation.settled(), false);
+    api.release(wire([12, 11]));
+    const result = await operation.result;
+    assert.ok(result.ok, result.ok ? "" : String(result.error));
+    assert.equal(result.value, 12n);
+  });
+}

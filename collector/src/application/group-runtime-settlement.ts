@@ -36,7 +36,7 @@ type Transaction = <T>(
   operation: (connection: PoolConnection) => Promise<T>,
 ) => Promise<T>;
 
-/** 그룹 rank snapshot과 문제 metadata를 transaction 전에 읽고 200행·10계정 정산 실패를 계정별로 격리한다. */
+/** 그룹 메인 snapshot과 문제 metadata를 transaction 전에 읽고 200행·10계정 정산 실패를 계정별로 격리한다. */
 export class GroupSettlementRuntime {
   private readonly now: () => Date;
   private readonly tierEstimator: ProblemTierEstimatorPort;

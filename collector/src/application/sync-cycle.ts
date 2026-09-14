@@ -4,9 +4,9 @@ import { AccountInitializationService } from "../account-initialization.js";
 import { AccountSettlementService } from "../account-settlement.js";
 import type { CollectorConfig, Credentials } from "../config.js";
 import { GroupFeedCollector } from "../jungol/group-feed.js";
+import { GroupMemberCollector } from "../jungol/group-members.js";
 import { ProblemMetadataResolver } from "../jungol/metadata.js";
 import { AccountProfileCollector } from "../jungol/profile.js";
-import { RankCollector } from "../jungol/rank.js";
 import { JungolRequestCoordinator } from "../jungol/request-coordinator.js";
 import { JungolSession } from "../jungol/session.js";
 import { HookRepository } from "../mysql/hooks.js";
@@ -15,7 +15,6 @@ import { AccountUnitOfWork } from "../mysql/unit-of-work.js";
 import { ProjectionService } from "../projection.js";
 import { KstCalendar } from "../scoring/daily.js";
 import { WeightedRankingPolicy } from "../scoring/ranking.js";
-import { AcRatingTierMapper } from "../scoring/tier.js";
 import {
   DiscordWebhookClient,
   ProjectionNotificationService,
@@ -92,7 +91,6 @@ export class SyncCycle {
         const calendar = new KstCalendar();
         const cycleTrace = suppliedTrace ?? new CycleTrace(crypto.randomUUID());
         const unitOfWork = new AccountUnitOfWork(pool, calendar);
-        const tiers = new AcRatingTierMapper();
         const projectionService = new ProjectionService(
           pool,
           calendar,
@@ -117,7 +115,7 @@ export class SyncCycle {
           baseUrl: config.baseUrl,
           pageTimeoutMs: config.pageTimeoutMs,
           requests: this.requests,
-          rank: new RankCollector(config, this.requests, tiers),
+          members: new GroupMemberCollector(config, this.requests),
           feed: new GroupFeedCollector(config, this.requests, cycleTrace),
           profile: new AccountProfileCollector(config, this.requests),
           metadata: this.metadata,
@@ -128,12 +126,11 @@ export class SyncCycle {
         const group = new GroupRuntime({
           groupId,
           accountUnitOfWork: unitOfWork,
-          initialization: new AccountInitializationService(unitOfWork, tiers),
+          initialization: new AccountInitializationService(unitOfWork),
           settlement: new AccountSettlementService(
             unitOfWork,
             groupId,
             calendar,
-            tiers,
           ),
           calendar,
           members: (memberSignal) => cycleBrowser.members(memberSignal),

@@ -115,7 +115,7 @@ async function seedPreview(connection: PoolConnection): Promise<void> {
   try {
     await connection.execute("UPDATE ranking_boards SET is_active = 0");
     await connection.execute(
-      `INSERT INTO user (id, jungol_name, corrects, submissions, solution, korean_name, tier, ac_rating, ignored, jungol_account_id, rank_wrong_count) VALUES ${previewUsers.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)").join(", ")}`,
+      `INSERT INTO user (id, jungol_name, corrects, submissions, solution, korean_name, tier, ignored, jungol_account_id, rank_wrong_count) VALUES ${previewUsers.map(() => "(?, ?, ?, ?, ?, ?, ?, 0, ?, ?)").join(", ")}`,
       previewUsers.flatMap((user, index) => [
         user.id,
         user.jungolName,
@@ -124,7 +124,6 @@ async function seedPreview(connection: PoolConnection): Promise<void> {
         20_000 + index,
         user.koreanName,
         user.tier,
-        1_000 + user.tier * 50,
         30_000 + index,
         index,
       ]),

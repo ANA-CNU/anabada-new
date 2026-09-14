@@ -37,6 +37,12 @@ const migrations: readonly Migration[] = [
     checksumSha256: "c".repeat(64),
     sql: "SQL_004",
   },
+  {
+    version: 5,
+    filename: "005_remove_user_ac_rating.sql",
+    checksumSha256: "d".repeat(64),
+    sql: "SQL_005",
+  },
 ];
 
 class HistoryConnection implements MigrationConnection {
@@ -145,7 +151,7 @@ test("Given checksum-only drift, when running, then it reports applied migration
   assert.deepEqual(connection.executedSql, []);
 });
 
-test("Given 002 applied, when running, then it executes 003 and 004 in order", async () => {
+test("Given 002 applied, when running, then it executes every pending migration in order", async () => {
   const connection = new HistoryConnection([
     {
       version: 2,
@@ -156,5 +162,5 @@ test("Given 002 applied, when running, then it executes 003 and 004 in order", a
 
   await runner(connection).run(migrations);
 
-  assert.deepEqual(connection.executedSql, ["SQL_003", "SQL_004"]);
+  assert.deepEqual(connection.executedSql, ["SQL_003", "SQL_004", "SQL_005"]);
 });

@@ -7,7 +7,7 @@ import {
 import type { GroupFeedPage } from "../application/group-feed-scan-policy.js";
 import type { GroupFeedResumePosition } from "../application/group-runtime.js";
 import { sourceLocationFrom } from "../application/safe-source-location.js";
-import type { RankMemberSnapshot } from "../domain/sync.js";
+import type { GroupMemberSnapshot } from "../domain/sync.js";
 import { JungolError } from "./errors.js";
 import { GroupFeedSurface } from "./group-feed-surface.js";
 import { GroupSubmissionDomParser } from "./group-submission-dom.js";
@@ -37,7 +37,7 @@ export class GroupFeedCollector {
   }
   async readPage(
     page: Page,
-    members: readonly RankMemberSnapshot[],
+    members: readonly GroupMemberSnapshot[],
     position: GroupFeedResumePosition,
     signal?: AbortSignal,
   ): Promise<GroupFeedPage> {
@@ -102,7 +102,7 @@ export class GroupFeedCollector {
   }
   private async action(input: {
     readonly page: Page;
-    readonly members: readonly RankMemberSnapshot[];
+    readonly members: readonly GroupMemberSnapshot[];
     readonly position: GroupFeedResumePosition;
     readonly flow: GroupFeedFlowLog;
     readonly action: Action;

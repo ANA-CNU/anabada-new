@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import type { TestContext } from "node:test";
 import type { Pool, RowDataPacket } from "mysql2/promise";
-import { rankMemberSchema } from "../src/domain/sync.js";
+import { groupMemberSchema } from "../src/domain/sync.js";
 import { AccountUnitOfWork } from "../src/mysql/unit-of-work.js";
 import { UserRepository } from "../src/mysql/users.js";
 import { KstCalendar } from "../src/scoring/daily.js";
@@ -15,12 +15,9 @@ export async function runUserRegistrationCases(
     await t.test(
       `new ${mode} registration is ignored and preserves administrator opt-in on replay`,
       async () => {
-        const member = rankMemberSchema.parse({
+        const member = groupMemberSchema.parse({
           accountId: String(990001 + index),
           jungolName: `ignored-test-${index}`,
-          solvedCount: 0,
-          wrongCount: 0,
-          acRating: 0,
           tier: 0,
         });
         const register = () =>

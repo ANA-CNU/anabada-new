@@ -1,5 +1,9 @@
 # Jungol 그룹 AC 수집 구현 상태
 
+> 역사 상태 기록: 이 문서는 005 이전의 AC Rating 기반 구현 상태를 보존한다. 현재
+> 계약은 외부 그룹/랭킹 회원 목록의 불완전성 때문에 원시 AC Rating을 저장하지 않으며,
+> tier만 직접 보관한다.
+
 ## 현재 최종 결과
 
 group AC 수집·정산 durable one-cycle은 `exit=0`, `status=success`로 끝났다.

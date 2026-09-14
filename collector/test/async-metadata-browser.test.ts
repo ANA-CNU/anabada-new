@@ -23,7 +23,7 @@ test("Given an HTML shell When metadata arrives through fetch Then the real reso
   );
   await gate.requested;
   let nextStarted = false;
-  const queued = requests.schedule("rank_page", undefined, async () => {
+  const queued = requests.schedule("group_members", undefined, async () => {
     nextStarted = true;
   });
   await page.waitForLoadState("load");

@@ -1,0 +1,17 @@
+// 레거시 보관: rank metadata refresh는 group snapshot 정산이 직접 갱신한다.
+import type { RankMemberSnapshot } from "../domain/sync.js";
+import type { AccountUnitOfWork } from "../mysql/unit-of-work.js";
+
+/** 제출 cursor와 누적 수치를 건드리지 않고 랭킹 메타데이터 네 칸만 갱신한다. */
+export class MetadataRefreshService {
+  constructor(
+    private readonly unitOfWork: AccountUnitOfWork,
+  ) {}
+
+  refresh(member: RankMemberSnapshot): Promise<void> {
+    return this.unitOfWork.execute(async ({ users }) => {
+      await users.lockExisting(member.accountId);
+      await users.refreshMetadata(member);
+    });
+  }
+}

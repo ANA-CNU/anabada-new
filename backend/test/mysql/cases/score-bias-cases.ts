@@ -13,7 +13,7 @@ export async function runScoreBiasCases(
 ): Promise<void> {
   await context.seed();
   await context.rawPool.execute(
-    "INSERT INTO user (id, jungol_name, corrects, submissions, solution, korean_name, tier, ac_rating, ignored, jungol_account_id, rank_wrong_count) VALUES (4, 'delta', 0, 0, 1004, NULL, 4, 400, 0, 9004, 0)",
+    "INSERT INTO user (id, jungol_name, corrects, submissions, solution, korean_name, tier, ignored, jungol_account_id, rank_wrong_count) VALUES (4, 'delta', 0, 0, 1004, NULL, 4, 0, 9004, 0)",
   );
   const scoreCountBeforeInvalidBulk = await scoreCount(context);
   const invalidBulk = await context.handle(

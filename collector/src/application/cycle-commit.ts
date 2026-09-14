@@ -97,6 +97,13 @@ export class CycleCommitService {
       );
       return current;
     });
+    for (const member of prepared.members)
+      await this.stage(
+        trace,
+        "member_metadata_refresh",
+        () => users.refreshMetadata(member),
+        { accountId: member.accountId },
+      );
     for (const initialization of prepared.initializations)
       await this.stage(
         trace,

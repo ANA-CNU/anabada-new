@@ -43,7 +43,7 @@ end
 check(!validate.match?(/\bWEBHOOK_URL\b/), 'Optional webhook must not become a required GitHub secret')
 check(!deploy.match?(/runtime-secrets|\.secrets|\bsource\b|JUNGOL_DB_PASSWORD/), 'Obsolete secret provisioning')
 %w[StrictHostKeyChecking=accept-new BatchMode=yes].each { |text| check(deploy.include?(text), "Missing SSH safety: #{text}") }
-['repository=/home/ana/Desktop/ana/anabada-new', 'git clone --depth 1 --branch main --single-branch https://github.com/ANA-CNU/anabada-new.git "$repository"', 'git fetch --depth 1 origin main', 'git reset --hard origin/main', 'install -m 0600 "$1/.env" .env.next', 'mv -f .env.next .env', 'docker compose --env-file .env -f docker-compose.prod.yaml config --quiet', 'docker compose --env-file .env -f docker-compose.prod.yaml up -d --build --remove-orphans --wait --wait-timeout 180'].each do |text|
+['repository=/home/ana/Desktop/ana/anabada-new', 'git clone --depth 1 --branch main --single-branch https://github.com/ANA-CNU/anabada-new.git "$repository"', 'git fetch --depth 1 origin main', 'git reset --hard origin/main', 'install -m 0600 "$1/.env" .env.next', 'mv -f .env.next .env', 'docker compose --env-file .env -f docker-compose.prod.yaml config --quiet', 'docker compose --env-file .env -f docker-compose.prod.yaml build', 'docker compose --env-file .env -f docker-compose.prod.yaml stop anabada-backend jungol-collector', 'docker compose --env-file .env -f docker-compose.prod.yaml up -d --no-build --remove-orphans --wait --wait-timeout 180'].each do |text|
   check(deploy.include?(text), "Missing deployment gate: #{text}")
 end
 check(deploy.scan(/docker compose --env-file \.env -f docker-compose\.prod\.yaml up /).length == 1, 'Deployment must have one canonical Compose-up path')
@@ -77,11 +77,13 @@ check(!remote_deploy.nil?, 'Deployment must retain the remote deployment shell')
 check(remote_deploy.include?('export COMPOSE_BAKE=false'), 'Remote deployment shell must disable Compose Bake delegation')
 check(remote_deploy.index('export COMPOSE_BAKE=false') < remote_deploy.index('docker compose --env-file .env -f docker-compose.prod.yaml up '), 'Remote deployment shell must disable Compose Bake before its canonical Compose up')
 compose_config = 'docker compose --env-file .env -f docker-compose.prod.yaml config --quiet'
-compose_up = 'timeout 1200 docker compose --env-file .env -f docker-compose.prod.yaml up -d --build --remove-orphans --wait --wait-timeout 180'
+compose_build = 'timeout 1200 docker compose --env-file .env -f docker-compose.prod.yaml build'
+compose_stop = 'timeout 60 docker compose --env-file .env -f docker-compose.prod.yaml stop anabada-backend jungol-collector'
+compose_up = 'timeout 1200 docker compose --env-file .env -f docker-compose.prod.yaml up -d --no-build --remove-orphans --wait --wait-timeout 180'
 compose_restart = 'timeout 60 docker compose --env-file .env -f docker-compose.prod.yaml restart bada-nginx'
 compose_ps = 'docker compose --env-file .env -f docker-compose.prod.yaml ps'
 check(remote_deploy.scan(Regexp.new(Regexp.escape(compose_restart))).length == 1, 'Deployment must restart nginx exactly once')
-check(remote_deploy.index(compose_config) < remote_deploy.index(compose_up) && remote_deploy.index(compose_up) < remote_deploy.index(compose_restart) && remote_deploy.index(compose_restart) < remote_deploy.index(compose_ps), 'Deployment Compose sequence must be config, up, nginx restart, then ps')
+check(remote_deploy.index(compose_config) < remote_deploy.index(compose_build) && remote_deploy.index(compose_build) < remote_deploy.index(compose_stop) && remote_deploy.index(compose_stop) < remote_deploy.index(compose_up) && remote_deploy.index(compose_up) < remote_deploy.index(compose_restart) && remote_deploy.index(compose_restart) < remote_deploy.index(compose_ps), 'Deployment Compose sequence must build before stopping apps, then migrate/start, restart nginx, and report state')
 check(remote_deploy.include?('git -C "$repository" rev-parse --is-inside-work-tree'), 'Existing deployment path must be a Git working tree')
 check(remote_deploy.include?('Deployment repository path is not a Git working tree'), 'Non-Git deployment path must fail safely')
 
@@ -168,6 +170,7 @@ Dir.mktmpdir('deployment-git-contract-') do |dir|
     set -euo pipefail
     printf '%s\n' "$*" >> "$COMPOSE_LOG"
     case "${MOCK_COMPOSE_FAILURE:-}" in
+      build) if [[ "$*" == *' build' ]]; then exit 70; fi ;;
       up) if [[ "$*" == *' up '* ]]; then exit 71; fi ;;
       restart) if [[ "$*" == *' restart bada-nginx' ]]; then exit 72; fi ;;
     esac
@@ -183,7 +186,9 @@ Dir.mktmpdir('deployment-git-contract-') do |dir|
   command_env = { 'PATH' => "#{dir}:#{ENV.fetch('PATH')}", 'COMPOSE_LOG' => compose_log }
   compose_sequence = [
     'compose --env-file .env -f docker-compose.prod.yaml config --quiet',
-    'compose --env-file .env -f docker-compose.prod.yaml up -d --build --remove-orphans --wait --wait-timeout 180',
+    'compose --env-file .env -f docker-compose.prod.yaml build',
+    'compose --env-file .env -f docker-compose.prod.yaml stop anabada-backend jungol-collector',
+    'compose --env-file .env -f docker-compose.prod.yaml up -d --no-build --remove-orphans --wait --wait-timeout 180',
     'compose --env-file .env -f docker-compose.prod.yaml restart bada-nginx',
     'compose --env-file .env -f docker-compose.prod.yaml ps'
   ]
@@ -212,14 +217,21 @@ Dir.mktmpdir('deployment-git-contract-') do |dir|
   check(history_status.success? && history.strip == '1', 'Existing deployment is not shallow after reset')
   check(File.read(File.join(repository, 'local-untracked')) == "preserve\n", 'Existing checkout lost an untracked file')
   check(File.read(File.join(repository, 'database', 'mysql_data', 'sentinel')) == "preserve\n", 'Existing checkout lost untracked database data')
-  check(File.readlines(compose_log).last(4).map(&:strip) == compose_sequence, 'Existing checkout Compose sequence must restart nginx after up')
+  check(File.readlines(compose_log).last(6).map(&:strip) == compose_sequence, 'Existing checkout Compose sequence must build before app downtime')
+
+  write_transit.call
+  calls_before_build_failure = File.readlines(compose_log).length
+  _, _, status = Open3.capture3(command_env.merge('MOCK_COMPOSE_FAILURE' => 'build'), 'bash', '-se', '--', transit, stdin_data: fixture)
+  check(!status.success?, 'Compose build failure must stop deployment')
+  failed_build_calls = File.readlines(compose_log).drop(calls_before_build_failure).map(&:strip)
+  check(failed_build_calls.any? { |call| call.end_with?(' build') } && failed_build_calls.none? { |call| call.include?(' stop anabada-backend jungol-collector') || call.include?(' up ') || call.include?(' restart bada-nginx') }, 'Build failure must occur before app downtime')
 
   write_transit.call
   calls_before_up_failure = File.readlines(compose_log).length
   _, _, status = Open3.capture3(command_env.merge('MOCK_COMPOSE_FAILURE' => 'up'), 'bash', '-se', '--', transit, stdin_data: fixture)
   check(!status.success?, 'Compose up failure must stop deployment')
   failed_up_calls = File.readlines(compose_log).drop(calls_before_up_failure).map(&:strip)
-  check(failed_up_calls.any? { |call| call.include?(' up ') } && failed_up_calls.none? { |call| call.include?(' restart bada-nginx') || call.end_with?(' ps') }, 'Compose up failure must prevent nginx restart and ps')
+  check(failed_up_calls.any? { |call| call.include?(' stop anabada-backend jungol-collector') } && failed_up_calls.any? { |call| call.include?(' up ') } && failed_up_calls.none? { |call| call.include?(' restart bada-nginx') || call.end_with?(' ps') }, 'Compose up failure must prevent nginx restart and ps')
 
   write_transit.call
   calls_before_restart_failure = File.readlines(compose_log).length

@@ -1,5 +1,9 @@
 # Jungol 그룹 AC 흐름 검토 기록
 
+> 역사 검토 기록: 이 문서의 AC Rating 흐름은 005 이전 관찰이다. 현재 원시 AC Rating은
+> 저장·표시·관리자 수정 대상이 아니며, 불완전한 외부 회원 목록 대신 0–31 tier만
+> 직접 보관한다.
+
 ## 현재 최종 결과
 
 durable one-cycle은 `exit=0`, `status=success`로 완료됐다. rank/initialization/cutoff는

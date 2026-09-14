@@ -1,7 +1,7 @@
 import type { AccountInitializationService } from "../account-initialization.js";
 import type {
+  GroupMemberSnapshot,
   InitialSolvedProblem,
-  RankMemberSnapshot,
 } from "../domain/sync.js";
 import { AccountInitialSnapshot, AccountSyncPlan } from "../domain/sync.js";
 import { ProblemTierEstimator } from "../group-domain.js";
@@ -31,7 +31,7 @@ import { GroupWindowScanner } from "./group-window-scanner.js";
 export { GroupFeedCursorError } from "../group-feed-error.js";
 
 export type GroupInitializationProfile = {
-  readonly member: RankMemberSnapshot;
+  readonly member: GroupMemberSnapshot;
   readonly solved: readonly InitialSolvedProblem[];
   readonly highestInspectedSubmissionId: bigint;
 };
@@ -51,14 +51,14 @@ export type GroupFeedResumePosition = {
 export interface GroupRuntimeProfilePort {
   /** profile은 신규 계정의 historical solved-list 기준선에만 사용한다. */
   initialize(
-    member: RankMemberSnapshot,
+    member: GroupMemberSnapshot,
     signal: AbortSignal,
   ): Promise<GroupInitializationProfile>;
-  /** 정산 시점 member는 profile 요청이 아니라 cycle의 그룹 rank snapshot에서 찾는다. */
+  /** 정산 시점 member는 profile 요청이 아니라 cycle의 그룹 메인 snapshot에서 찾는다. */
   currentMember(
-    accountId: RankMemberSnapshot["accountId"],
+    accountId: GroupMemberSnapshot["accountId"],
     signal: AbortSignal,
-  ): Promise<RankMemberSnapshot>;
+  ): Promise<GroupMemberSnapshot>;
 }
 
 export type GroupRuntimeDependencies = GroupSettlementRuntimeDependencies & {
@@ -69,7 +69,7 @@ export type GroupRuntimeDependencies = GroupSettlementRuntimeDependencies & {
   readonly feed: GroupRuntimeFeedPort;
   readonly members: (
     signal: AbortSignal,
-  ) => Promise<readonly RankMemberSnapshot[]>;
+  ) => Promise<readonly GroupMemberSnapshot[]>;
   readonly profiles: GroupRuntimeProfilePort;
   readonly project: (signal: AbortSignal) => Promise<void>;
   readonly projectOnConnection?: (
@@ -192,7 +192,7 @@ export class GroupRuntime implements GroupCycleAdapters {
     };
   }
 
-  async members(signal: AbortSignal): Promise<readonly RankMemberSnapshot[]> {
+  async members(signal: AbortSignal): Promise<readonly GroupMemberSnapshot[]> {
     return this.dependencies.members(signal);
   }
 
@@ -219,7 +219,7 @@ export class GroupRuntime implements GroupCycleAdapters {
   }
 
   async initializeMembers(
-    members: readonly RankMemberSnapshot[],
+    members: readonly GroupMemberSnapshot[],
     signal: AbortSignal,
   ): Promise<readonly GroupInitializationFailure[]> {
     const failures: GroupInitializationFailure[] = [];

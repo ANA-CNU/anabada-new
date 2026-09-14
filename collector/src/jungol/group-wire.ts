@@ -1,6 +1,6 @@
 import { BSONError, deserialize } from "bson";
 import { z } from "zod";
-import type { AccountId, RankMemberSnapshot } from "../domain/sync.js";
+import type { AccountId, GroupMemberSnapshot } from "../domain/sync.js";
 import {
   type ProblemId,
   problemIdSchema,
@@ -108,7 +108,7 @@ export class GroupActorResolver {
   private readonly accountsByHandle = new Map<string, AccountId>();
   private matchedCount = 0;
 
-  constructor(members: readonly RankMemberSnapshot[]) {
+  constructor(members: readonly GroupMemberSnapshot[]) {
     for (const member of members) {
       if (this.accountsByHandle.has(member.jungolName))
         throw new GroupWireContractError("duplicate_group_actor");

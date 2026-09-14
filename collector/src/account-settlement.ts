@@ -1,6 +1,6 @@
 import type { PoolConnection } from "mysql2/promise";
 import type { CycleTrace } from "./application/cycle-diagnostics.js";
-import type { AcceptedAttempt, RankMemberSnapshot } from "./domain/sync.js";
+import type { AcceptedAttempt, GroupMemberSnapshot } from "./domain/sync.js";
 import { PersistenceError } from "./mysql/account-types.js";
 import { AttemptRepository } from "./mysql/attempts.js";
 import {
@@ -13,7 +13,6 @@ import type { AccountUnitOfWork } from "./mysql/unit-of-work.js";
 import { UserRepository } from "./mysql/users.js";
 import { DailyScorePolicy, type KstCalendar } from "./scoring/daily.js";
 import { EventManager } from "./scoring/events.js";
-import { AcRatingTierMapper } from "./scoring/tier.js";
 import {
   dailyOutcomeFromDecision,
   orderAcceptedAttempts,
@@ -28,7 +27,7 @@ export type {
 export { orderAcceptedAttempts } from "./settlement-outcome.js";
 
 export type PreparedAccountBatch = {
-  readonly member: RankMemberSnapshot;
+  readonly member: GroupMemberSnapshot;
   readonly attempts: readonly AcceptedAttempt[];
   readonly highestSubmissionId: bigint;
   readonly now: Date;
@@ -48,7 +47,6 @@ export class AccountSettlementService {
     private readonly unitOfWork: AccountUnitOfWork,
     private readonly groupId: string,
     private readonly calendar: KstCalendar,
-    private readonly ratingTierMapper = new AcRatingTierMapper(),
     private readonly dailyPolicy = new DailyScorePolicy(calendar),
   ) {}
 
@@ -67,10 +65,6 @@ export class AccountSettlementService {
     const user = await users.lockExisting(batch.member.accountId);
     if (user.initializedAt === null || user.initialSubmissionId === null)
       throw new PersistenceError("account_conflict");
-    if (
-      this.ratingTierMapper.toTier(batch.member.acRating) !== batch.member.tier
-    )
-      throw new PersistenceError("rating_tier_mismatch");
     if (
       batch.attempts.some(
         (attempt) => BigInt(attempt.submissionId) > batch.highestSubmissionId,

@@ -5,7 +5,7 @@ import { GroupRuntime } from "../src/application/group-runtime.js";
 import {
   AccountInitialSnapshot,
   AccountSyncPlan,
-  rankMemberSchema,
+  groupMemberSchema,
 } from "../src/domain/sync.js";
 import { problemIdSchema, submissionIdSchema } from "../src/domain.js";
 import { JungolError } from "../src/jungol/errors.js";
@@ -35,12 +35,9 @@ export interface CheckpointRow extends RowDataPacket {
   readonly phase: string;
 }
 export function member(accountId: number) {
-  return rankMemberSchema.parse({
+  return groupMemberSchema.parse({
     accountId: String(accountId),
     jungolName: `daily-missed-${accountId}`,
-    solvedCount: 0,
-    wrongCount: 0,
-    acRating: 418,
     tier: 8,
   });
 }

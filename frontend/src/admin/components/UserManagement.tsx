@@ -55,7 +55,6 @@ export default function UserManagement() {
       solution: user.solution,
       korean_name: user.korean_name,
       tier: user.tier,
-      ac_rating: user.ac_rating,
       ignored: user.ignored,
       jungol_account_id: user.jungol_account_id,
       rank_wrong_count: user.rank_wrong_count
@@ -76,7 +75,6 @@ export default function UserManagement() {
       if (typeof editForm.solution !== "undefined") payload.solution = editForm.solution;
       if (typeof editForm.korean_name !== "undefined") payload.korean_name = editForm.korean_name;
       if (typeof editForm.tier !== "undefined") payload.tier = Number(editForm.tier) || 0;
-      if (typeof editForm.ac_rating !== "undefined") payload.ac_rating = Number(editForm.ac_rating) || 0;
       if (typeof editForm.ignored !== "undefined") payload.ignored = editForm.ignored;
       if (typeof editForm.jungol_account_id !== "undefined") payload.jungol_account_id = editForm.jungol_account_id;
       if (typeof editForm.rank_wrong_count !== "undefined") payload.rank_wrong_count = Number(editForm.rank_wrong_count) || 0;
@@ -148,7 +146,6 @@ export default function UserManagement() {
               <th className="text-left px-4 py-2">Submissions</th>
               <th className="text-left px-4 py-2">Solution</th>
               <th className="text-left px-4 py-2">Tier</th>
-              <th className="text-left px-4 py-2">AC Rating</th>
               <th className="text-left px-4 py-2">정올 계정 ID</th>
               <th className="text-left px-4 py-2">오답 수</th>
               <th className="text-left px-4 py-2">Ignored</th>
@@ -235,18 +232,6 @@ export default function UserManagement() {
                       />
                     ) : (
                       user.tier
-                    )}
-                  </td>
-                  <td className="px-4 py-2">
-                    {isEditing ? (
-                      <Input
-                        type="number"
-                        value={String(editForm.ac_rating ?? 0)}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, ac_rating: Number(e.target.value) }))}
-                        className="w-24"
-                      />
-                    ) : (
-                      user.ac_rating
                     )}
                   </td>
                   <td className="px-4 py-2">

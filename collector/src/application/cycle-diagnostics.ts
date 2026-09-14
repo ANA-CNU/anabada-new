@@ -311,6 +311,9 @@ export class CycleTrace {
       ...(diagnostics?.problemId === undefined
         ? {}
         : { problemId: diagnostics.problemId }),
+      ...(diagnostics?.observedAccountId === undefined
+        ? {}
+        : { accountId: diagnostics.observedAccountId }),
       ...(diagnostics?.timeoutMs === undefined
         ? {}
         : { timeoutMs: diagnostics.timeoutMs }),

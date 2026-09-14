@@ -14,7 +14,7 @@ const UserSearchGuide: React.FC = () => {
             <li>최근 점수 기록(변동 사유·점수·일자)</li>
             <li>최근 해결한 문제(레벨·티어·해결 일자)</li>
             <li>기본 통계(정답 수, 정답률, 평균 점수 등)</li>
-            <li>Jungol 계정명, AC Rating과 티어</li>
+            <li>Jungol 계정명과 티어</li>
           </ul>
         </div>
         <div className="pt-2">

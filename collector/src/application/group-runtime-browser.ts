@@ -1,14 +1,14 @@
 import type { Page } from "playwright";
 import {
+  type GroupMemberSnapshot,
   InitialSolvedProblem,
-  type RankMemberSnapshot,
 } from "../domain/sync.js";
 import { JungolError, rejectJungolHttpStatus } from "../jungol/errors.js";
 import type { GroupFeedCollector } from "../jungol/group-feed.js";
+import type { GroupMemberCollector } from "../jungol/group-members.js";
 import type { ProblemMetadataResolver } from "../jungol/metadata.js";
 import { PageOperation } from "../jungol/page.js";
 import type { AccountProfileCollector } from "../jungol/profile.js";
-import type { RankCollector } from "../jungol/rank.js";
 import type { JungolRequestCoordinator } from "../jungol/request-coordinator.js";
 import type {
   GroupFeedResumePosition,
@@ -18,7 +18,7 @@ import type {
 } from "./group-runtime.js";
 
 type NewPage = () => Promise<Page>;
-type RankPort = Pick<RankCollector, "collect">;
+type GroupMemberPort = Pick<GroupMemberCollector, "collect">;
 type GroupFeedPort = Pick<GroupFeedCollector, "readPage">;
 type ProfilePort = Pick<AccountProfileCollector, "collectSolved">;
 type MetadataPort = Pick<ProblemMetadataResolver, "resolve">;
@@ -28,7 +28,7 @@ type GroupRuntimeBrowserDependencies = {
   readonly baseUrl: string;
   readonly pageTimeoutMs: number;
   readonly requests: JungolRequestCoordinator;
-  readonly rank: RankPort;
+  readonly members: GroupMemberPort;
   readonly feed: GroupFeedPort;
   readonly profile: ProfilePort;
   readonly metadata: MetadataPort;
@@ -60,7 +60,7 @@ export class GroupFeedPageLease<
 export class GroupRuntimeBrowser
   implements GroupRuntimeFeedPort, GroupRuntimeProfilePort
 {
-  private readonly membersByAccountId = new Map<string, RankMemberSnapshot>();
+  private readonly membersByAccountId = new Map<string, GroupMemberSnapshot>();
   private readonly feedPage: GroupFeedPageLease;
   private readonly ownsFeedPage: boolean;
   private readonly pages = new PageOperation();
@@ -71,12 +71,12 @@ export class GroupRuntimeBrowser
     this.ownsFeedPage = dependencies.feedPage === undefined;
   }
 
-  async members(signal: AbortSignal): Promise<readonly RankMemberSnapshot[]> {
+  async members(signal: AbortSignal): Promise<readonly GroupMemberSnapshot[]> {
     if (this.membersByAccountId.size > 0)
       return [...this.membersByAccountId.values()];
     const page = await this.dependencies.newPage();
     try {
-      const members = await this.dependencies.rank.collect(
+      const members = await this.dependencies.members.collect(
         page,
         this.dependencies.groupId,
         signal,
@@ -117,7 +117,7 @@ export class GroupRuntimeBrowser
   }
 
   async initialize(
-    member: RankMemberSnapshot,
+    member: GroupMemberSnapshot,
     signal: AbortSignal,
   ): Promise<GroupInitializationProfile> {
     const page = await this.dependencies.newPage();
@@ -152,12 +152,12 @@ export class GroupRuntimeBrowser
   }
 
   async currentMember(
-    accountId: RankMemberSnapshot["accountId"],
+    accountId: GroupMemberSnapshot["accountId"],
     signal: AbortSignal,
-  ): Promise<RankMemberSnapshot> {
+  ): Promise<GroupMemberSnapshot> {
     signal.throwIfAborted();
     const member = this.membersByAccountId.get(accountId);
-    if (!member) throw new JungolError("invalid_rank");
+    if (!member) throw new JungolError("invalid_group_members");
     return member;
   }
 
@@ -178,9 +178,9 @@ export class GroupRuntimeBrowser
     this.membersByAccountId.clear();
   }
 
-  private memberList(): readonly RankMemberSnapshot[] {
+  private memberList(): readonly GroupMemberSnapshot[] {
     if (this.membersByAccountId.size === 0)
-      throw new JungolError("invalid_rank");
+      throw new JungolError("invalid_group_members");
     return [...this.membersByAccountId.values()];
   }
 }

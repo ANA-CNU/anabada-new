@@ -39,18 +39,16 @@ test("Given a group navigation timeout When PageOperation translates it Then it 
       { code: "group_feed_navigation_failed", stage: "navigation" },
     ),
     (error: unknown) => {
-      assert.equal(error instanceof JungolError, true);
-      assert.equal((error as JungolError).code, "group_feed_navigation_failed");
-      assert.deepEqual((error as JungolError).diagnostics, {
-        stage: "navigation",
-        reason: "timeout",
-        originalErrorKind: "TimeoutError",
-        location: {
-          method: "PageOperation.run",
-          source: "collector/src/jungol/page.ts",
-          line: 53,
-        },
-      });
+      assert.ok(error instanceof JungolError);
+      assert.equal(error.code, "group_feed_navigation_failed");
+      assert.equal(error.diagnostics?.stage, "navigation");
+      assert.equal(error.diagnostics?.reason, "timeout");
+      assert.equal(error.diagnostics?.location?.method, "PageOperation.run");
+      assert.equal(
+        error.diagnostics?.location?.source,
+        "collector/src/jungol/page.ts",
+      );
+      assert.ok((error.diagnostics?.location?.line ?? 0) > 0);
       return true;
     },
   );

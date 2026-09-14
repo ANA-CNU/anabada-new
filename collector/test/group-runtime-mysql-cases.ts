@@ -7,7 +7,7 @@ import { GroupRuntime } from "../src/application/group-runtime.js";
 import {
   AccountInitialSnapshot,
   AccountSyncPlan,
-  rankMemberSchema,
+  groupMemberSchema,
 } from "../src/domain/sync.js";
 import { problemIdSchema, submissionIdSchema } from "../src/domain.js";
 import { ProblemTierEstimator } from "../src/group-domain.js";
@@ -29,22 +29,16 @@ interface DailyCountRow extends RowDataPacket {
   readonly count: string;
 }
 
-const member = rankMemberSchema.parse({
+const member = groupMemberSchema.parse({
   accountId: "5000",
   jungolName: "runtime-case",
-  solvedCount: 0,
-  wrongCount: 0,
-  acRating: 0,
   tier: 0,
 });
 
 const runtimeMember = (accountId: number) =>
-  rankMemberSchema.parse({
+  groupMemberSchema.parse({
     accountId: String(accountId),
     jungolName: `runtime-${accountId}`,
-    solvedCount: 0,
-    wrongCount: 0,
-    acRating: 0,
     tier: 0,
   });
 
@@ -311,12 +305,9 @@ export async function runGroupRuntimeCases(
       const unitOfWork = new AccountUnitOfWork(pool, calendar);
       const initialization = new AccountInitializationService(unitOfWork);
       const members = [8100, 8101].map((accountId) =>
-        rankMemberSchema.parse({
+        groupMemberSchema.parse({
           accountId: String(accountId),
           jungolName: `tier-${accountId}`,
-          solvedCount: 0,
-          wrongCount: 0,
-          acRating: 3000,
           tier: 31,
         }),
       );

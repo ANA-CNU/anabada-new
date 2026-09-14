@@ -3,16 +3,13 @@ import { existsSync } from "node:fs";
 import { createServer } from "node:http";
 import test from "node:test";
 import { type Browser, chromium } from "playwright";
-import { rankMemberSchema } from "../src/domain/sync.js";
+import { groupMemberSchema } from "../src/domain/sync.js";
 import { GroupFeedCollector } from "../src/jungol/group-feed.js";
 import { JungolRequestCoordinator } from "../src/jungol/request-coordinator.js";
 
-const member = rankMemberSchema.parse({
+const member = groupMemberSchema.parse({
   accountId: "42",
   jungolName: "member",
-  solvedCount: 1,
-  wrongCount: 0,
-  acRating: 30,
   tier: 1,
 });
 const row = (id: number, problem: number, timestamp: string) =>
