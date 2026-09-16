@@ -162,7 +162,7 @@ export class RankingRepository {
   recentlyScore(limit: number, offset: number) {
     return this.database.select(
       operation("ranking.recent_score"),
-      "SELECT sh.id, u.jungol_name AS display_name, sh.desc, sh.bias, sh.event_id, CAST(sh.problem_id AS CHAR) AS problem_id, sh.created_at FROM score_history sh JOIN user u ON u.id = sh.user_id WHERE u.ignored = 0 ORDER BY sh.created_at DESC LIMIT ? OFFSET ?",
+      "SELECT sh.id, u.jungol_name AS display_name, sh.desc, sh.bias, sh.event_id, CAST(sh.problem_id AS CHAR) AS problem_id, sh.created_at FROM score_history sh JOIN user u ON u.id = sh.user_id ORDER BY sh.created_at DESC LIMIT ? OFFSET ?",
       [limit, offset],
       scoreRow,
     );

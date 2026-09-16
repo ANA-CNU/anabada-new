@@ -18,6 +18,15 @@ export async function runRankingScoreCases(
       success: true,
       data: [
         {
+          id: 405,
+          display_name: "ignored",
+          desc: "제외 대상",
+          bias: 9,
+          event_id: null,
+          problem_id: "101",
+          created_at: "2026-09-03T00:00:00.000Z",
+        },
+        {
           id: 403,
           display_name: "alpha",
           desc: "수동 차감",
@@ -25,15 +34,6 @@ export async function runRankingScoreCases(
           event_id: null,
           problem_id: null,
           created_at: "2026-09-02T00:00:00.000Z",
-        },
-        {
-          id: 402,
-          display_name: "alpha",
-          desc: "이벤트",
-          bias: 1,
-          event_id: 201,
-          problem_id: "101",
-          created_at: "2026-09-01T00:00:01.000Z",
         },
       ],
       message: "최근 점수 기록 페이지 1 조회 성공",
@@ -47,6 +47,15 @@ export async function runRankingScoreCases(
       success: true,
       data: [
         {
+          id: 402,
+          display_name: "alpha",
+          desc: "이벤트",
+          bias: 1,
+          event_id: 201,
+          problem_id: "101",
+          created_at: "2026-09-01T00:00:01.000Z",
+        },
+        {
           id: 401,
           display_name: "alpha",
           desc: "일일",
@@ -55,6 +64,17 @@ export async function runRankingScoreCases(
           problem_id: "101",
           created_at: "2026-09-01T00:00:00.000Z",
         },
+      ],
+      message: "최근 점수 기록 페이지 2 조회 성공",
+      summary: { count: 2, limit: 2, page: 2 },
+    },
+  );
+  await expectRankingJson(
+    context,
+    "/api/statistics/recently-score?page=3&limit=2",
+    {
+      success: true,
+      data: [
         {
           id: 404,
           display_name: "beta",
@@ -65,8 +85,8 @@ export async function runRankingScoreCases(
           created_at: "2026-08-15T00:00:00.000Z",
         },
       ],
-      message: "최근 점수 기록 페이지 2 조회 성공",
-      summary: { count: 2, limit: 2, page: 2 },
+      message: "최근 점수 기록 페이지 3 조회 성공",
+      summary: { count: 1, limit: 2, page: 3 },
     },
   );
   await expectRankingJson(

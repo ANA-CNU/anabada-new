@@ -99,6 +99,12 @@ export async function runUserActivityCases(
     },
   });
 
+  // Given 무시 사용자의 정답 풀이
+  // When 공개 최근 풀이 목록을 요청하면
+  // Then 해당 활동도 노출된다.
+  await context.rawPool.execute(
+    "INSERT INTO problem (id, user_id, problem, problem_name, problem_tier, submitted_at, level, repeatation, verdict, external_submission_id, score) VALUES (107, 3, 3000, '무시 사용자 최근 해결', 1, '2026-09-03 00:00:00.000', 1, 0, 'accepted', 5007, NULL)",
+  );
   const recent = await userRequest(
     context,
     "/api/statistics/recently-solved?limit=10",
@@ -107,6 +113,14 @@ export async function runUserActivityCases(
   expect(await recent.json()).toEqual({
     success: true,
     data: [
+      {
+        display_name: "ignored",
+        jungol_name: "ignored",
+        korean_name: "무시",
+        problem: 3000,
+        problem_name: "무시 사용자 최근 해결",
+        submitted_at: "2026-09-03T00:00:00.000Z",
+      },
       {
         display_name: "alpha",
         jungol_name: "alpha",
@@ -134,7 +148,7 @@ export async function runUserActivityCases(
     ],
     message: "최근 해결된 문제 페이지 1 조회 성공",
     summary: {
-      count: 3,
+      count: 4,
       description: "중복 제거된 최근 해결된 문제 목록",
       order: "해결 시간 기준 내림차순",
     },
@@ -162,17 +176,17 @@ export async function runUserActivityCases(
       { date: "2026-06", solved_problem: 0 },
       { date: "2026-07", solved_problem: 0 },
       { date: "2026-08", solved_problem: 2 },
-      { date: "2026-09", solved_problem: 2 },
+      { date: "2026-09", solved_problem: 3 },
     ],
     message: "월별 문제 해결 통계 조회 성공",
-    summary: { total_months: 12, total_problems: 4, period: "최근 1년" },
+    summary: { total_months: 12, total_problems: 5, period: "최근 1년" },
   });
 
   const total = await userRequest(context, "/api/statistics/total-problems");
   expect(total.status).toBe(200);
   expect(await total.json()).toEqual({
     success: true,
-    data: { total_problems: 5 },
+    data: { total_problems: 6 },
     message: "전체 문제 수 조회 성공",
   });
 

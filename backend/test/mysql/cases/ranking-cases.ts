@@ -9,6 +9,13 @@ export async function runRankingCases(
 ): Promise<void> {
   await context.seed();
 
+  // Given 무시 사용자의 이번 달 정답 풀이
+  // When 월간 풀이 순위를 요청하면
+  // Then 해당 풀이도 노출된다.
+  await context.rawPool.execute(
+    "INSERT INTO problem (id, user_id, problem, problem_name, problem_tier, submitted_at, level, repeatation, verdict, external_submission_id, score) VALUES (107, 3, 3000, '무시 사용자 월간 해결', 1, '2026-09-03 00:00:00.000', 1, 0, 'accepted', 5007, NULL)",
+  );
+
   // Given current-month solves with a repeated acceptance
   // When the solved ranking feeds are requested
   // Then only unique accepted solves and canonical user fields are exposed.
@@ -20,6 +27,13 @@ export async function runRankingCases(
         jungol_name: "alpha",
         korean_name: "가나다",
         tier: 12,
+        solved: 1,
+      },
+      {
+        display_name: "ignored",
+        jungol_name: "ignored",
+        korean_name: "무시",
+        tier: 1,
         solved: 1,
       },
     ],
@@ -35,6 +49,14 @@ export async function runRankingCases(
         tier: 12,
         solved: 1,
         total_solved: 3,
+      },
+      {
+        display_name: "ignored",
+        jungol_name: "ignored",
+        korean_name: "무시",
+        tier: 1,
+        solved: 1,
+        total_solved: 1,
       },
     ],
     message: "해결한 문제 랭킹 조회 성공",
