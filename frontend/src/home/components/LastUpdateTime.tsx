@@ -116,7 +116,7 @@ export default function LastUpdateTime() {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-300">업데이트 주기:</span>
-                <span className="text-white font-medium">5분마다 자동 갱신</span>
+                <span className="text-white font-medium">매시 10분 마다</span>
               </div>
             </div>
           </div>
