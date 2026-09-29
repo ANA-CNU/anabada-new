@@ -47,7 +47,7 @@ export async function runGroupRuntimeCases(
   pool: Pool,
 ): Promise<void> {
   await t.test(
-    "runtime caps one frozen window at ten pages and resumes it",
+    "runtime scans one frozen window past ten pages until its saved cursor overlap is complete",
     async () => {
       await pool.query("DELETE FROM collector_ac_inbox");
       await pool.query("DELETE FROM collector_checkpoint");
@@ -63,7 +63,6 @@ export async function runGroupRuntimeCases(
           100n,
         ),
       );
-      const pages = Array.from({ length: 11 }, (_, index) => 111 - index);
       let reads = 0;
       const runtime = () =>
         new GroupRuntime({
@@ -78,25 +77,27 @@ export async function runGroupRuntimeCases(
           calendar,
           members: async () => [member],
           feed: {
-            head: async () => 100n,
+            head: async () => 9300111n,
             readPage: async (position) => {
-              const id = pages[reads++];
-              if (id === undefined) throw new RangeError("unexpected_page");
+              const index = reads;
+              reads += 1;
+              if (index >= 12)
+                assert.fail("collection read past cursor overlap");
               assert.equal(
                 position.lastScannedSubmissionId,
-                reads === 1 ? null : String(113 - reads),
+                index === 0 ? null : String(9300137 - index * 3),
               );
               return {
-                submissions: [
-                  {
-                    accountId: member.accountId,
-                    submissionId: submissionIdSchema.parse(id),
-                    problemId: problemIdSchema.parse(9000),
-                    submittedAt: new Date("2026-09-10T00:00:00Z"),
-                    score: null,
-                  },
-                ],
-                more: reads < 11,
+                submissions: Array.from({ length: 3 }, (_, offset) => ({
+                  accountId: member.accountId,
+                  submissionId: submissionIdSchema.parse(
+                    9300136 - index * 3 - offset,
+                  ),
+                  problemId: problemIdSchema.parse(9000 + index * 3 + offset),
+                  submittedAt: new Date("2026-09-10T00:00:00Z"),
+                  score: null,
+                })),
+                more: true,
               };
             },
           },
@@ -116,25 +117,16 @@ export async function runGroupRuntimeCases(
           now: () => new Date("2026-09-10T00:00:00Z"),
         });
       await runtime().checkpointInitialHead(new AbortController().signal);
-      const first = await runtime().advanceWindow(
-        new AbortController().signal,
-        10,
-      );
-      assert.equal(first.scannedPageCount, 10);
-      assert.equal(first.status, "pending");
+      const first = await runtime().advanceWindow(new AbortController().signal);
+      assert.equal(first.scannedPageCount, 12);
+      assert.equal(first.status, "complete");
       const [checkpoint] = await pool.query<CheckpointRow[]>(
         "SELECT window_upper_submission_id,phase FROM collector_checkpoint WHERE group_id=1125",
       );
       assert.deepEqual(checkpoint[0], {
-        window_upper_submission_id: "111",
-        phase: "collecting",
+        window_upper_submission_id: "9300136",
+        phase: "settling",
       });
-      const resumed = await runtime().advanceWindow(
-        new AbortController().signal,
-        10,
-      );
-      assert.equal(resumed.scannedPageCount, 1);
-      assert.equal(resumed.status, "complete");
       const settlement = await runtime().settle(new AbortController().signal);
       assert.equal(settlement.failedUserCount, 0);
       assert.equal(
@@ -145,7 +137,7 @@ export async function runGroupRuntimeCases(
         "SELECT committed_cursor AS window_upper_submission_id,phase FROM collector_checkpoint WHERE group_id=1125",
       );
       assert.deepEqual(finished[0], {
-        window_upper_submission_id: "111",
+        window_upper_submission_id: "9300136",
         phase: "idle",
       });
     },

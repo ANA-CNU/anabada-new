@@ -173,10 +173,10 @@ export class CyclePreparationService {
         next: null,
       };
     let state = checkpoint;
-    let lastNext: PreparedCollectionAdvance | null = null;
     const accepted: import("../group-domain.js").GroupAcceptedSubmission[] = [];
     let scannedAttemptCount = 0;
-    for (let count = 0; count < 10; count += 1) {
+    // 저장 cursor와 그 아래 10개 overlap을 확인해야 하므로 page 수로 중단하지 않는다.
+    for (let count = 0; ; count += 1) {
       signal.throwIfAborted();
       const page: GroupFeedPage = await this.dependencies.feed.readPage(
         { lastScannedSubmissionId: state.lastScannedSubmissionId },
@@ -188,7 +188,6 @@ export class CyclePreparationService {
         scannedAttemptCount,
       });
       const next = this.nextCollection(state, page);
-      lastNext = next;
       accepted.push(...next.accepted);
       this.trace?.progressUpdate({ acceptedCount: accepted.length });
       if (next.cursorReached)
@@ -210,17 +209,6 @@ export class CyclePreparationService {
         cursorReached: false,
       };
     }
-    if (!lastNext)
-      throw new RangeError("group_feed_no_page_after_cursor_reset");
-    return {
-      checkpoint,
-      head: null,
-      accepted,
-      scannedPageCount: 10,
-      phase: "collecting",
-      complete: false,
-      next: lastNext,
-    };
   }
 
   private nextCollection(

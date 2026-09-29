@@ -25,8 +25,8 @@ test("Given initialized group members When a complete feed window settles Then c
       events.push("initialize");
       return [];
     },
-    advanceWindow: async (_signal, maxPages) => {
-      events.push(`scan:${maxPages}`);
+    advanceWindow: async () => {
+      events.push("scan");
       return {
         phase: "collecting",
         status: "complete",
@@ -64,7 +64,7 @@ test("Given initialized group members When a complete feed window settles Then c
   assert.deepEqual(events, [
     "checkpoint",
     "initialize",
-    "scan:10",
+    "scan",
     "settle",
     "finalize",
     "cache",
@@ -75,7 +75,7 @@ test("Given initialized group members When a complete feed window settles Then c
   assert.equal(result.status, "success");
 });
 
-test("Given a pending ten-page window When the cycle ends Then settlement and checkpoint finalization wait for completion", async () => {
+test("Given a pending feed window When the cycle ends Then settlement and checkpoint finalization wait for completion", async () => {
   const events: string[] = [];
   const adapters: GroupCycleAdapters = {
     phase: async () => "collecting",

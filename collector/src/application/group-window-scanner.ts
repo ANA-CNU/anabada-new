@@ -19,15 +19,11 @@ export class GroupWindowScanner {
 
   constructor(private readonly dependencies: GroupWindowScannerDependencies) {}
 
-  async advance(
-    signal: AbortSignal,
-    maxPages: number,
-  ): Promise<GroupScanResult> {
-    if (!Number.isSafeInteger(maxPages) || maxPages < 1 || maxPages > 10)
-      throw new RangeError("invalid_group_page_limit");
+  async advance(signal: AbortSignal): Promise<GroupScanResult> {
     let acceptedCount = 0;
     let scannedPageCount = 0;
-    for (let requestCount = 0; requestCount < maxPages; requestCount += 1) {
+    // 저장 cursor와 그 아래 10개 overlap을 확인해야 하므로 page 수로 중단하지 않는다.
+    for (;;) {
       signal.throwIfAborted();
       const checkpoint = await this.transaction((repository) =>
         repository.lockCheckpoint(this.dependencies.groupId),
@@ -91,12 +87,6 @@ export class GroupWindowScanner {
           scannedPageCount,
         );
     }
-    return this.result(
-      "collecting",
-      "pending",
-      acceptedCount,
-      scannedPageCount,
-    );
   }
 
   private result(

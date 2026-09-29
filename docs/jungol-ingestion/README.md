@@ -15,7 +15,7 @@ backend와 collector는 새 `jungol_bada`를 사용합니다. 기존 `anabada`�
 | 책임 | 구현 |
 |---|---|
 | 조립·CLI·생명주기 | `SyncCycle`, `CollectorRuntime`, `CollectorService` |
-| 브라우저·그룹 feed | `JungolSession`, `RankCollector`, `GroupFeedCollector`, `GroupSubmissionDomParser`, `SubmissionTimestampReader` |
+| 브라우저·그룹 메인·feed | `JungolSession`, `GroupMemberCollector`, `GroupFeedCollector`, `GroupSubmissionDomParser`, `SubmissionTimestampReader` |
 | cycle 준비·window | `CyclePreparationService`, `GroupFeedScanPolicy`, `GroupFeedPageLease` |
 | 단일 commit·정산 | `CycleCommitService`, `AccountUnitOfWork`, `AccountSettlementService` |
 | 점수·projection·알림 | `KstCalendar`, `ProjectionService`, `ProjectionNotificationService`, `WebhookBroadcaster` |
@@ -24,18 +24,18 @@ backend와 collector는 새 `jungol_bada`를 사용합니다. 기존 `anabada`�
 
 1. `CollectorService`는 다음 10분 경계에 맞춰 cycle을 실행합니다. 단일 프로세스 cycle은 겹치지 않으며, 실행 중인 cycle이 20분 이상이면 unhealthy입니다.
 2. DB advisory lease `jungol_bada:collector`를 얻습니다. 충돌하면 외부 요청 없이 이번 cycle을 끝냅니다. profile도 한 프로세스만 사용해야 합니다.
-3. persistent Chromium에서 로그인과 그룹 rank를 읽고, AC filter가 적용된 group submission DOM을 읽습니다. 행은 sid·account·problem identity와 실제 hover 절대시각이 모두 hydrate된 뒤에만 수집합니다. 모든 Jungol request는 concurrency 1, 완료 뒤 3초 간격입니다.
-4. 수집 window는 persisted `lastScannedSubmissionId`부터 엄격히 더 오래된 submission ID만 읽고, upper bound는 window 시작 때 동결합니다. marker를 찾지 못하면 head로 reset하지 않고 실패합니다. `더 불러오기`는 클릭 뒤 새 행 성장을 기다린 별도 request이며, 10 page 상한은 pending으로 저장해 다음 cycle에서 이어 읽고 기존 cursor 아래 10개 overlap으로 window를 끝냅니다.
+3. persistent Chromium에서 로그인과 그룹 메인 member 목록을 읽고, AC filter가 적용된 group submission DOM을 읽습니다. 행은 sid·account·problem identity와 실제 hover 절대시각이 모두 hydrate된 뒤에만 수집합니다. 모든 Jungol request는 concurrency 1, 완료 뒤 3초 간격입니다.
+4. 수집 window는 persisted `lastScannedSubmissionId`부터 엄격히 더 오래된 submission ID만 읽고, upper bound는 window 시작 때 동결합니다. marker를 찾지 못하면 head로 reset하지 않고 실패합니다. `더 불러오기`는 클릭 뒤 새 행 성장을 기다린 별도 request이며, page 수 상한 없이 persisted committed cursor와 그 아래 10개 overlap을 확인할 때까지 같은 cycle에서 읽습니다.
 5. DOM에서 읽은 AC는 문제 metadata와 함께 transaction 밖에서 준비한다. 실제 tier 1–31은 우선 사용하고, tier 0만 bounded fallback estimator를 사용한다. tooltip 상대시각·원문 HTML·cookie·API payload는 저장하거나 추정하지 않는다.
-6. 준비된 rank, inbox, AC, 점수, checkpoint, 월 cache, projection은 하나의 cycle commit transaction에서 확정한다. 네트워크·prepare 실패는 durable write를 남기지 않으며 page lease도 무효화한다. commit 응답 연결 실패는 `commit_unknown`으로 분류해 DB 반영 여부를 단정하지 않는다.
+6. 준비된 group member, inbox, AC, 점수, checkpoint, 월 cache, projection은 하나의 cycle commit transaction에서 확정한다. 네트워크·prepare 실패는 durable write를 남기지 않으며 page lease도 무효화한다. commit 응답 연결 실패는 `commit_unknown`으로 분류해 DB 반영 여부를 단정하지 않는다.
 7. 제출 원래 KST 날짜로 daily/event를 계산한다. daily는 first solve이고 그날 daily가 없으며 effective tier가 11 이상 또는 user tier−5 이상일 때 원래 제출일당 한 번이고 event는 `[begin,end)`, event 생성·문제 추가 시각을 함께 확인한다.
 8. 초기 기준선은 각 해결 문제를 `1970-01-01T00:00:01Z`, `external_submission_id=NULL`, `accepted`, `problem_name=NULL`, tier 0, `repeatation=0`의 synthetic 행으로만 저장하며 일일·이벤트 점수와 `score_history`를 전혀 만들지 않습니다. 이 값은 실제 제출 시각이 아니라 과거 이력을 재생하지 않는 기준선 표식입니다. 증분에서만 `EventManager`가 문제 번호, `[begin,end)` 기간, 제출 시각 ≥ `event.created_at`, 제출 시각 ≥ `event_problem.added_at`을 모두 확인합니다. 반복 AC도 이벤트 조건을 만족할 수 있지만 사용자·이벤트·문제별 한 번만 지급합니다. unique `award_key`는 daily 및 event 재지급을 막습니다.
-9. settlement는 inbox를 시간순으로 최대 200 row, 최대 10 user 단위로 처리한다. 성공 commit에는 projection 변경과 무관하게 `WEBHOOK_URL` receipt를 보내고, DB `hook` 알림은 projection 변경 때만 별도로 전송한다.
+9. settlement는 inbox를 시간순으로 최대 200 row, 최대 10 user 단위로 처리한다. 이 정산 상한은 feed collection page 수를 제한하지 않는다. 성공 commit에는 projection 변경과 무관하게 `WEBHOOK_URL` receipt를 보내고, DB `hook` 알림은 projection 변경 때만 별도로 전송한다.
 10. webhook 전송 실패는 이미 commit한 cycle을 rollback하지 않으며, URL·cookie·원문 응답은 기록하지 않는다.
 
 ### 지연 이벤트와 window 한계
 
-group AC feed는 rank solved-count trigger에 의존하지 않는다. 다만 DOM marker·order·hover 시각을 확인할 수 없거나 10-page window가 끝나면 해당 cycle은 실패하거나 pending으로 남고, 추정 cursor 전진을 하지 않는다. 지연 수집된 AC도 점수는 수집일이 아니라 원래 제출 시각을 사용하며 retroactive event award는 하지 않는다.
+group AC feed는 rank solved-count trigger에 의존하지 않는다. DOM marker·order·hover 시각을 확인할 수 없으면 해당 cycle은 실패하고 추정 cursor 전진을 하지 않는다. cursor와 10개 overlap을 확인하기 전에는 page 수만으로 pending 처리하지 않는다. 지연 수집된 AC도 점수는 수집일이 아니라 원래 제출 시각을 사용하며 retroactive event award는 하지 않는다.
 
 ## 자동 마이그레이션과 DB 권한
 
@@ -104,7 +104,7 @@ docker run --rm --init \
 
 명령을 실행하기 전에는 **이 명령만을 위한 shell 환경에** `JUNGOL_USERNAME`과 `JUNGOL_PASSWORD` 두 값만 이미 export되어 있어야 한다. 루트 `.env`는 Compose dotenv 형식이므로 shell에서 source하지 않으며, `--env-file`로 전체 secret을 컨테이너에 전달하지도 않는다.
 
-테스트는 production `JungolSession`, `RankCollector`, `GroupFeedCollector`, `SubmissionTimestampReader`, `ProblemMetadataResolver`를 직접 사용한다. 즉, selector나 tooltip parser를 테스트에서 복제하지 않는다. tooltip은 상대 날짜를 추정하지 않고 `YYYY. M. D. 오전/오후 H:MM:SS` 한국 절대시각만 UTC로 정규화한다. `더 불러오기` 대상이 실제로 없으면 명시적인 목록 종료는 검증하되 pagination 성공으로 기록하지 않는다. 실제 빈 목록 상태는 아직 관찰하지 못했으므로 성공으로 기록하지 않는다. 출력에는 source revision/dirty 여부와 Chromium 버전·플랫폼만 남기며, cookie, credential, 원문 HTML, 행의 개인정보는 기록하지 않는다.
+테스트는 production `JungolSession`, `GroupMemberCollector`, `GroupFeedCollector`, `SubmissionTimestampReader`, `ProblemMetadataResolver`를 직접 사용한다. 즉, selector나 tooltip parser를 테스트에서 복제하지 않는다. tooltip은 상대 날짜를 추정하지 않고 `YYYY. M. D. 오전/오후 H:MM:SS` 한국 절대시각만 UTC로 정규화한다. `더 불러오기` 대상이 실제로 없으면 명시적인 목록 종료는 검증하되 pagination 성공으로 기록하지 않는다. 실제 빈 목록 상태는 아직 관찰하지 못했으므로 성공으로 기록하지 않는다. 출력에는 source revision/dirty 여부와 Chromium 버전·플랫폼만 남기며, cookie, credential, 원문 HTML, 행의 개인정보는 기록하지 않는다.
 
 2026-09-14 local evidence는 `bfe416dc393201a32074313e37c9a42505c866fe` 기준의 dirty worktree에서 Chromium `153.0.8010.12` (`linux/arm64`)로 위 opt-in test가 1/1 통과한 결과다. 이 결과는 같은 production reader를 통한 rank, AC 행 두 개의 hover 시각↔UTC normalized instant 일치, 더 불러오기 후의 older/disjoint page, problem tier 범위를 확인한다. 동일 image tag의 별도 서버 검증은 private source bundle을 `ana-coss`로 전송하는 단계가 별도 명시 승인을 필요로 해 아직 실행하지 않았다. 사용자 최신 요청은 **local 검증 후 main 출시 승인**으로 기준을 변경했으므로 local release는 진행할 수 있지만, **local pass는 server parity pass가 아니며** server 결과는 계속 미검증으로 기록한다.
 

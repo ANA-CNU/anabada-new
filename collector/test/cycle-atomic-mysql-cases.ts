@@ -3,6 +3,7 @@ import type { TestContext } from "node:test";
 import type { Pool, RowDataPacket } from "mysql2/promise";
 import { AccountInitializationService } from "../src/account-initialization.js";
 import { AccountSettlementService } from "../src/account-settlement.js";
+import { AtomicCycleFailure } from "../src/application/cycle-atomic-error.js";
 import type { GroupFeedPage } from "../src/application/group-feed-scan-policy.js";
 import {
   type GroupFeedResumePosition,
@@ -245,6 +246,59 @@ export async function runCycleAtomicMysqlCases(
       assert.deepEqual(await state(pool), before);
     },
   );
+
+  for (const failure of ["repeated", "aborted"] as const)
+    await t.test(
+      `Given ${failure} feed progress after ten pages When runAtomic continues collection Then no partial cycle writes commit`,
+      async () => {
+        await cleanup(pool);
+        await seedSettling(pool);
+        await pool.query("DELETE FROM collector_ac_inbox WHERE group_id=1125");
+        await pool.query(
+          "UPDATE collector_checkpoint SET committed_cursor=9400111,window_upper_submission_id=NULL,window_lower_cursor=NULL,pagination_cursor=NULL,last_scanned_submission_id=NULL,phase='collecting',overlap_observed_count=0,cursor_reached=0 WHERE group_id=1125",
+        );
+        const before = await state(pool);
+        const controller = new AbortController();
+        let reads = 0;
+        await assert.rejects(
+          runtime(pool, {
+            readPage: async (): Promise<GroupFeedPage> => {
+              const index = reads;
+              reads += 1;
+              if (failure === "aborted" && index === 10) controller.abort();
+              const pageIndex =
+                failure === "repeated" && index === 10 ? 9 : index;
+              return {
+                submissions: Array.from({ length: 3 }, (_, offset) => ({
+                  accountId:
+                    members[(pageIndex * 3 + offset) % 2]?.accountId ??
+                    members[0]?.accountId ??
+                    assert.fail("missing atomic member"),
+                  submissionId: submissionIdSchema.parse(
+                    9400136 - pageIndex * 3 - offset,
+                  ),
+                  problemId: problemIdSchema.parse(
+                    9950 + pageIndex * 3 + offset,
+                  ),
+                  submittedAt: now(),
+                  score: 100,
+                })),
+                more: true,
+              };
+            },
+          }).runAtomic(controller.signal),
+          (error: unknown) =>
+            error instanceof AtomicCycleFailure &&
+            (failure === "repeated"
+              ? error.cause instanceof RangeError &&
+                error.cause.message === "group_feed_non_descending_across_pages"
+              : error.cause instanceof DOMException &&
+                error.cause.name === "AbortError"),
+        );
+        assert.equal(reads, 11);
+        assert.deepEqual(await state(pool), before);
+      },
+    );
 
   await t.test(
     "Given two brand-new members When runAtomic bootstraps its initial head Then both initialization markers commit together",
@@ -506,76 +560,59 @@ export async function runCycleAtomicMysqlCases(
   );
 
   await t.test(
-    "Given eleven feed pages When runAtomic reaches ten pages Then it commits pending collection before the next cycle settles the tail",
+    "Given a twelve-page feed window When runAtomic reaches the committed cursor and its ten older rows Then it settles the complete collection in one cycle",
     async () => {
       await cleanup(pool);
       await seedSettling(pool);
       await pool.query("DELETE FROM collector_ac_inbox WHERE group_id=1125");
       await pool.query(
-        "UPDATE collector_checkpoint SET window_upper_submission_id=930210,window_lower_cursor=100,pagination_cursor=NULL,last_scanned_submission_id=NULL,phase='collecting',overlap_observed_count=0,cursor_reached=0 WHERE group_id=1125",
+        "UPDATE collector_checkpoint SET committed_cursor=9300111,window_upper_submission_id=NULL,window_lower_cursor=NULL,pagination_cursor=NULL,last_scanned_submission_id=NULL,phase='collecting',overlap_observed_count=0,cursor_reached=0 WHERE group_id=1125",
       );
-      const beforePending = await state(pool);
       let reads = 0;
       const readPage = async (
         position: GroupFeedResumePosition,
       ): Promise<GroupFeedPage> => {
         const index = reads;
         reads += 1;
+        if (index >= 12) assert.fail("collection read past cursor overlap");
         assert.equal(
           position.lastScannedSubmissionId,
-          index === 0 ? null : String(930211 - index),
+          index === 0 ? null : String(9300137 - index * 3),
         );
-        const submissionId = 930210 - index;
+        const submissionIds = Array.from(
+          { length: 3 },
+          (_, offset) => 9300136 - index * 3 - offset,
+        );
         return {
-          submissions: [
-            {
-              accountId:
-                members[index % 2]?.accountId ??
-                members[0]?.accountId ??
-                assert.fail("missing atomic member"),
-              submissionId: submissionIdSchema.parse(submissionId),
-              problemId: problemIdSchema.parse(9910 + index),
-              submittedAt: now(),
-              score: 100,
-            },
-          ],
-          more: index < 10,
+          submissions: submissionIds.map((submissionId, offset) => ({
+            accountId:
+              members[(index * 3 + offset) % 2]?.accountId ??
+              members[0]?.accountId ??
+              assert.fail("missing atomic member"),
+            submissionId: submissionIdSchema.parse(submissionId),
+            problemId: problemIdSchema.parse(9910 + index * 3 + offset),
+            submittedAt: now(),
+            score: 100,
+          })),
+          more: true,
         };
       };
       const first = await runtime(pool, { readPage }).runAtomic(
         new AbortController().signal,
       );
-      assert.equal(first.status, "success_pending");
-      assert.equal(first.scan.scannedPageCount, 10);
-      const pending = await state(pool);
-      const {
-        inbox: pendingInbox,
-        problems: pendingProblems,
-        users: pendingUsers,
-      } = pending;
-      const { users: beforePendingUsers } = beforePending;
-      assert.equal(reads, 10);
-      assert.equal(pendingInbox?.length, 10);
-      assert.equal(pendingProblems?.length, 0);
-      assert.deepEqual(
-        pendingUsers?.map(({ solution }) => solution),
-        beforePendingUsers?.map(({ solution }) => solution),
-      );
-      const resumed = await runtime(pool, { readPage }).runAtomic(
-        new AbortController().signal,
-      );
-      assert.equal(resumed.status, "success");
-      assert.equal(reads, 11);
+      assert.equal(first.status, "success");
+      assert.equal(first.scan.scannedPageCount, 12);
+      assert.equal(reads, 12);
       const settled = await state(pool);
       const { inbox, problems, checkpoint } = settled;
       assert.equal(inbox?.length, 0);
-      assert.equal(problems?.length, 11);
+      assert.equal(problems?.length, 36);
       const [collectionCheckpoint] = checkpoint ?? [];
       assert.equal(
         collectionCheckpoint
           ? Reflect.get(collectionCheckpoint, "committed_cursor")
           : undefined,
-        "930210",
+        "9300136",
       );
       const replay = await runtime(pool, {
         readPage: async () => ({
@@ -585,7 +622,7 @@ export async function runCycleAtomicMysqlCases(
       }).runAtomic(new AbortController().signal);
       assert.equal(replay.settlement.insertedAttemptCount, 0);
       const { problems: replayProblems } = await state(pool);
-      assert.equal(replayProblems?.length, 11);
+      assert.equal(replayProblems?.length, 36);
     },
   );
 

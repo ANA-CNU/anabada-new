@@ -46,10 +46,7 @@ export interface GroupCycleAdapters {
     members: readonly GroupMemberSnapshot[],
     signal: AbortSignal,
   ): Promise<readonly GroupInitializationFailure[]>;
-  advanceWindow(
-    signal: AbortSignal,
-    maxPages: number,
-  ): Promise<GroupScanResult>;
+  advanceWindow(signal: AbortSignal): Promise<GroupScanResult>;
   settle(signal: AbortSignal): Promise<GroupSettlementResult>;
   finalize(signal: AbortSignal): Promise<"finalized" | "pending">;
   rebuildMonthlyCache(signal: AbortSignal): Promise<void>;
@@ -117,7 +114,7 @@ export class GroupCycleExecutor {
       const scan: GroupScanResult =
         phase === "collecting"
           ? await trace.runStep("group_scan", () =>
-              this.adapters.advanceWindow(signal, 10),
+              this.adapters.advanceWindow(signal),
             )
           : {
               phase: "settling",

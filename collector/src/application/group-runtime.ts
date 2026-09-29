@@ -266,8 +266,8 @@ export class GroupRuntime implements GroupCycleAdapters {
     return failures;
   }
 
-  advanceWindow(signal: AbortSignal, maxPages: number) {
-    return this.scanner.advance(signal, maxPages);
+  advanceWindow(signal: AbortSignal) {
+    return this.scanner.advance(signal);
   }
 
   async settle(signal: AbortSignal): Promise<GroupSettlementResult> {
