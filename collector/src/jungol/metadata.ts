@@ -84,11 +84,19 @@ export class ProblemMetadataResolver {
             try {
               const handle = await page.waitForFunction(
                 () => {
-                  const title = document.querySelector(
-                    "[data-problem-title], h1",
+                  const heading = document.querySelector("h1");
+                  const title = document.querySelector("[data-problem-title]");
+                  const liveTitle = heading?.querySelector(
+                    ":scope > .head > .name",
                   );
                   const tier = document.querySelector("[data-tier]");
-                  const icon = title?.querySelector('img[src*="/solved/"]');
+                  const icon = heading?.querySelector('img[src*="/solved/"]');
+                  const titleText =
+                    title?.textContent ??
+                    liveTitle?.textContent ??
+                    heading?.querySelector(":scope > span:not(.limit)")
+                      ?.textContent ??
+                    heading?.textContent;
                   const statementReady = Array.from(
                     document.querySelectorAll("article h2"),
                   ).some(
@@ -98,10 +106,7 @@ export class ProblemMetadataResolver {
                         ?.querySelector("p,pre,ul,ol,table")
                         ?.textContent?.trim(),
                   );
-                  if (
-                    !title?.textContent?.trim() ||
-                    (!tier && !icon && !statementReady)
-                  )
+                  if (!titleText?.trim() || (!tier && !icon && !statementReady))
                     return false;
                   const imageTier = icon
                     ?.getAttribute("src")
@@ -112,11 +117,7 @@ export class ProblemMetadataResolver {
                   )
                     return false;
                   return {
-                    title: (title.matches("[data-problem-title]")
-                      ? title.textContent
-                      : (title.querySelector(":scope > span:not(.limit)")
-                          ?.textContent ?? title.textContent)
-                    )?.trim(),
+                    title: titleText.trim(),
                     tier: imageTier ?? tier?.getAttribute("data-tier") ?? 0,
                   };
                 },
@@ -132,12 +133,16 @@ export class ProblemMetadataResolver {
               if (!(error instanceof errors.TimeoutError)) throw error;
               await this.requireAccessible(page, rejectedStatus);
               const observed = await page.evaluate(() => {
-                const title = document.querySelector(
-                  "[data-problem-title], h1",
-                );
+                const heading = document.querySelector("h1");
+                const title =
+                  document.querySelector("[data-problem-title]") ??
+                  heading?.querySelector(":scope > .head > .name") ??
+                  heading;
                 return {
                   titleObserved: !!title?.textContent?.trim(),
-                  imageObserved: !!title?.querySelector('img[src*="/solved/"]'),
+                  imageObserved: !!heading?.querySelector(
+                    'img[src*="/solved/"]',
+                  ),
                 };
               });
               throw new JungolError("problem_metadata_timeout", {

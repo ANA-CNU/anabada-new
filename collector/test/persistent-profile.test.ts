@@ -29,7 +29,7 @@ test(
       response.setHeader("content-type", "text/html; charset=utf-8");
       if (url.pathname === "/auth/signin") {
         response.end(
-          '<form method="post"><label>아이디<input name="username"></label><label>암호<input name="password" type="password"></label><label>로그인 유지<input type="checkbox"></label><button>로그인</button></form>',
+          '<form method="post"><label>아이디<input name="username"></label><label>비밀번호<input name="password" type="password"></label><label>로그인 유지<input type="checkbox"></label><button>로그인</button></form>',
         );
         return;
       }

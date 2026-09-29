@@ -20,7 +20,7 @@ test("Given all real runtime browser adapters When members, profile, feed and pr
   const pages = new Map([
     [
       "/group/1125",
-      `<article><h2>멤버</h2><section></section></article><script>fetch('/fixture/members').then(r=>r.text()).then(html=>document.querySelector('section').innerHTML=html)</script>`,
+      `<section class="group-card group-people"><div class="people-section"><h2>소유자</h2><div class="people"><a href="/account/42">member<img src="https://s.jungol.co.kr/solved/11.svg"></a></div></div><div class="people-section"><h2>멤버 1명</h2><div class="people" id="members"></div></div></section><script>fetch('/fixture/members').then(r=>r.text()).then(html=>document.querySelector('#members').innerHTML=html)</script>`,
     ],
     [
       "/account/42",
@@ -28,7 +28,7 @@ test("Given all real runtime browser adapters When members, profile, feed and pr
     ],
     [
       "/group/1125/submission",
-      `<style>.timestamp { display: none; } [role="button"]:hover + .timestamp { display: inline; }</style><table><thead><tr><th>번호</th><th>제출자</th><th>문제</th><th>결과</th><th>시간</th><th>메모리</th><th>길이</th><th>언어</th><th>시각</th></tr></thead><tbody></tbody></table><script>fetch('/fixture/feed').then(r=>r.text()).then(html=>document.querySelector('tbody').innerHTML=html)</script>`,
+      `<style>.timestamp { display: none; } [role="button"]:hover + .timestamp { display: inline; }</style><button id="result" type="button">결과</button><div id="options" hidden><button role="option" data-value="0\u001fAC">정답</button></div><table><thead><tr><th>번호</th><th>제출자</th><th>문제</th><th>결과</th><th>시간</th><th>메모리</th><th>코드 길이</th><th>언어</th><th>시각</th></tr></thead><tbody></tbody></table><script>document.querySelector('#result').addEventListener('click',()=>document.querySelector('#options').hidden=false);document.querySelector('[role=option]').addEventListener('click',()=>{history.pushState({},'', '?result=AC');fetch('/fixture/feed').then(r=>r.text()).then(html=>document.querySelector('tbody').innerHTML=html)})</script>`,
     ],
     [
       "/problem/1000",
@@ -70,7 +70,7 @@ test("Given all real runtime browser adapters When members, profile, feed and pr
   await profile.requested;
   assert.equal(initialization.settled(), false);
   profile.release(
-    '<h1>profile</h1><div><span>맞은 문제</span>1문제</div><section class="card"><h2>check 해결한 문제</h2><div class="problem-list"><a href="/problem/1000">1000</a></div></section>',
+    '<h1>profile</h1><div class="jgacc-row">해결한 문제1문제</div><div class="jgacc-sections"><section class="jgacc-sec"><div class="jgacc-sec-head"><h2 class="jgacc-sec-title">해결한 문제</h2><span class="jgacc-sec-count">1</span></div><div class="problem-list"><a href="/problem/1000">1000</a></div></section></div>',
   );
   await feed.requested;
   feed.release(

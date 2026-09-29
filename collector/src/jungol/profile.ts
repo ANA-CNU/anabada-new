@@ -1,4 +1,4 @@
-import type { Page } from "playwright";
+import { errors, type Page } from "playwright";
 import { z } from "zod";
 import { type ProblemId, problemIdSchema } from "../domain.js";
 import { JungolError } from "./errors.js";
@@ -23,94 +23,111 @@ export class AccountProfileCollector {
     signal?: AbortSignal,
   ): Promise<readonly ProblemId[]> {
     return this.pages.run(page, signal, async () => {
-      const stateHandle = await page.waitForFunction(
-        () => {
-          const heading = document.querySelector("h1")?.textContent?.trim();
-          if (
-            !heading ||
-            /^(?:로드 중|로딩 중|loading)(?:\.\.\.|…)?$/i.test(heading)
-          )
-            return false;
-          const labels = Array.from(document.querySelectorAll("*")).filter(
-            (element) =>
-              element.textContent?.trim() === "맞은 문제" &&
-              !Array.from(element.children).some(
-                (child) => child.textContent?.trim() === "맞은 문제",
+      if (
+        await page
+          .getByText("비공개 프로필이에요", { exact: true })
+          .first()
+          .isVisible()
+      )
+        throw new JungolError("account_summary_invalid");
+      let stateHandle: Awaited<ReturnType<typeof page.waitForFunction>>;
+      try {
+        stateHandle = await page.waitForFunction(
+          () => {
+            const rows = Array.from(document.querySelectorAll(".jgacc-row"));
+            const solvedRows = rows.filter((row) =>
+              /^해결한 문제\s*(0|[1-9]\d*|[1-9]\d{0,2}(?:,\d{3})+)\s*문제$/.test(
+                row.textContent?.trim() ?? "",
               ),
-          );
-          const label = labels[0];
-          const count =
-            /^\s*(0|[1-9]\d*|[1-9]\d{0,2}(?:,\d{3})+)\s*문제\s*$/.exec(
-              label?.parentElement?.innerText.replace("맞은 문제", "") ?? "",
             );
-          const title = Array.from(document.querySelectorAll("*")).find(
-            (element) =>
-              /^(?:check\s*)?해결한 문제$/.test(
-                element.textContent?.trim() ?? "",
-              ),
-          );
-          const section = title?.closest("section.card");
-          const list = section?.querySelector(".problem-list");
-          if (labels.length !== 1 || !count) return false;
-          const advertised = Number(count[1]?.replaceAll(",", ""));
-          if (advertised === 0 && !section) return { advertised, observed: 0 };
-          if (!section || !list) return false;
-          const observed = list.querySelectorAll('a[href^="/problem/"]').length;
-          if (advertised > 0 && observed === 0) return false;
-          return {
-            advertised,
-            observed,
-          };
-        },
-        undefined,
-        { timeout: this.settings.pageTimeoutMs },
-      );
+            const count =
+              /^해결한 문제\s*(0|[1-9]\d*|[1-9]\d{0,2}(?:,\d{3})+)\s*문제$/.exec(
+                solvedRows[0]?.textContent?.trim() ?? "",
+              );
+            const sections = Array.from(
+              document.querySelectorAll("section.jgacc-sec"),
+            );
+            const section = sections.find(
+              (candidate) =>
+                candidate
+                  .querySelector("h2.jgacc-sec-title")
+                  ?.textContent?.trim() === "해결한 문제",
+            );
+            if (solvedRows.length !== 1 || !count) return false;
+            const advertised = Number(count[1]?.replaceAll(",", ""));
+            if (advertised === 0 && !section)
+              return { advertised, observed: 0 };
+            if (!section) return false;
+            const observed = section.querySelectorAll(
+              'a[href*="/problem/"]',
+            ).length;
+            return {
+              advertised,
+              observed,
+            };
+          },
+          undefined,
+          { timeout: this.settings.pageTimeoutMs },
+        );
+      } catch (error) {
+        if (
+          error instanceof errors.TimeoutError &&
+          (await page
+            .getByText("비공개 프로필이에요", { exact: true })
+            .first()
+            .isVisible())
+        )
+          throw new JungolError("account_summary_invalid");
+        throw error;
+      }
       const initial = profileStateSchema.parse(await stateHandle.jsonValue());
       await stateHandle.dispose();
       if (initial.advertised === 0) return [];
-      const section = page
-        .getByText(/^(?:check\s*)?해결한 문제$/, { exact: true })
-        .locator(
-          "xpath=ancestor::section[contains(concat(' ', normalize-space(@class), ' '), ' card ')][1]",
-        );
+      const section = page.locator("section.jgacc-sec").filter({
+        has: page.locator("h2.jgacc-sec-title", {
+          hasText: "해결한 문제",
+        }),
+      });
       for (let clicks = 0; clicks < 100; clicks += 1) {
-        const observed = await section
-          .locator('.problem-list a[href^="/problem/"]')
-          .count();
+        const observed = await section.locator('a[href*="/problem/"]').count();
         if (observed === initial.advertised) break;
         const expand = section
-          .locator("button")
-          .filter({ hasText: /^expand_more$/ });
-        if ((await expand.count()) !== 1)
-          throw new JungolError("account_summary_invalid");
-        await this.requests.schedule(
-          "submission_next_page",
-          signal,
-          async () => {
-            await expand.click({ timeout: this.settings.pageTimeoutMs });
-            await page.waitForFunction(
-              ({ previous, advertised }) => {
-                const title = Array.from(document.querySelectorAll("*")).find(
-                  (element) =>
-                    /^(?:check\s*)?해결한 문제$/.test(
-                      element.textContent?.trim() ?? "",
-                    ),
-                );
-                const next =
-                  title
-                    ?.closest("section.card")
-                    ?.querySelectorAll('.problem-list a[href^="/problem/"]')
-                    .length ?? 0;
-                return next > previous || next === advertised;
-              },
-              { previous: observed, advertised: initial.advertised },
-              { timeout: this.settings.pageTimeoutMs },
-            );
-          },
-        );
+          .locator('button.jgacc-tiergroup-head[aria-expanded="false"]')
+          .first();
+        const collapsed = await section
+          .locator('button.jgacc-tiergroup-head[aria-expanded="false"]')
+          .count();
+        if (collapsed === 0) throw new JungolError("account_summary_invalid");
+        await this.requests.schedule("account_summary", signal, async () => {
+          await expand.click({ timeout: this.settings.pageTimeoutMs });
+          await page.waitForFunction(
+            ({ previous, advertised }) => {
+              const solved = Array.from(
+                document.querySelectorAll("section.jgacc-sec"),
+              ).find(
+                (candidate) =>
+                  candidate
+                    .querySelector("h2.jgacc-sec-title")
+                    ?.textContent?.trim() === "해결한 문제",
+              );
+              const expanded = solved?.querySelector(
+                'button.jgacc-tiergroup-head[aria-expanded="true"]',
+              );
+              const next =
+                solved?.querySelectorAll('a[href*="/problem/"]').length ?? 0;
+              return (
+                expanded !== null &&
+                expanded !== undefined &&
+                (next > previous || next === advertised)
+              );
+            },
+            { previous: observed, advertised: initial.advertised },
+            { timeout: this.settings.pageTimeoutMs },
+          );
+        });
       }
       const links = await section
-        .locator('.problem-list a[href^="/problem/"]')
+        .locator('a[href*="/problem/"]')
         .evaluateAll((items) =>
           items.map((item) => ({
             href: item.getAttribute("href") ?? "",

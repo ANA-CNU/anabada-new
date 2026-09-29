@@ -15,9 +15,10 @@ import { type BrowserSettings, PageOperation } from "./page.js";
 import type { JungolRequestCoordinator } from "./request-coordinator.js";
 import { SubmissionTimestampReader } from "./submission-timestamp.js";
 
-type Action = "navigate" | "read" | "load_more";
+type Action = "navigate" | "filter" | "read" | "load_more";
 type Outcome =
   | { readonly kind: "replay" }
+  | { readonly kind: "next"; readonly action: Action }
   | { readonly kind: "page"; readonly page: GroupFeedPage };
 
 /** Jungol 그룹 AC 제출 표를 DOM 계약으로 읽고 마지막 제출 ID부터 이어서 탐색한다. */
@@ -47,14 +48,15 @@ export class GroupFeedCollector {
         page,
         signal,
         async () => {
-          let action: Action =
+          const initialAction: Action =
             position.lastScannedSubmissionId === null ||
             !(await this.surface.isFeedPage(page))
               ? "navigate"
               : "read";
+          let action: Action = initialAction;
           let replayIndex = 0;
           while (true) {
-            const currentAction = action;
+            const currentAction: Action = action;
             const pageNumber = replayIndex + 1;
             const queueWait = this.trace?.begin("queue_wait", {
               pageNumber,
@@ -63,11 +65,9 @@ export class GroupFeedCollector {
             let result: Outcome;
             try {
               result = await this.requests.schedule(
-                currentAction === "load_more"
-                  ? "submission_next_page"
-                  : "submission_page",
+                this.requestKind(currentAction),
                 signal,
-                () => {
+                (): Promise<Outcome> => {
                   actionStarted = true;
                   if (queueWait) this.trace?.finish(queueWait, "completed");
                   return this.action({
@@ -86,6 +86,10 @@ export class GroupFeedCollector {
               throw error;
             }
             if (result.kind === "page") return result.page;
+            if (result.kind === "next") {
+              action = result.action;
+              continue;
+            }
             action = "load_more";
             replayIndex += 1;
           }
@@ -108,10 +112,18 @@ export class GroupFeedCollector {
     readonly action: Action;
     readonly pageNumber: number;
   }): Promise<Outcome> {
-    if (input.action === "navigate")
+    if (input.action === "navigate") {
       await this.stage(input.flow, "navigation", input.pageNumber, () =>
         this.surface.navigate(input.page),
       );
+      return { kind: "next", action: "filter" };
+    }
+    if (input.action === "filter") {
+      await this.stage(input.flow, "filter_check", input.pageNumber, () =>
+        this.surface.applyAcceptedFilter(input.page),
+      );
+      return { kind: "next", action: "read" };
+    }
     if (input.action === "load_more")
       await this.loadMore(input.page, input.flow, input.pageNumber);
     await this.stage(input.flow, "table_ready", input.pageNumber, () =>
@@ -132,6 +144,11 @@ export class GroupFeedCollector {
       kind: "page",
       page: { submissions, more: await this.surface.settledMore(input.page) },
     };
+  }
+  private requestKind(
+    action: Action,
+  ): "submission_page" | "submission_next_page" {
+    return action === "load_more" ? "submission_next_page" : "submission_page";
   }
   private async needsReplay(page: Page, marker: string): Promise<boolean> {
     const ids = await this.surface.ids(page);

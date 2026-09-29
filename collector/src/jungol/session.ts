@@ -110,7 +110,7 @@ export class JungolSession {
           .getByLabel("아이디", { exact: true })
           .fill(credentials.username);
         await page
-          .getByLabel("암호", { exact: true })
+          .getByLabel("비밀번호", { exact: true })
           .fill(credentials.password);
         const remember = page.getByRole("checkbox", { name: "로그인 유지" });
         if (await remember.isVisible()) await remember.check();
@@ -137,7 +137,7 @@ export class JungolSession {
             error instanceof errors.TimeoutError &&
             !transportFailed &&
             page.url().includes("/auth/signin") &&
-            (await page.getByLabel("암호", { exact: true }).isVisible())
+            (await page.getByLabel("비밀번호", { exact: true }).isVisible())
           )
             throw new JungolError("auth_required");
           throw error;

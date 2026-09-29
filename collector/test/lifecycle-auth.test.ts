@@ -10,7 +10,7 @@ import { JungolRequestCoordinator } from "../src/jungol/request-coordinator.js";
 import { JungolSession } from "../src/jungol/session.js";
 
 const login =
-  '<label>아이디<input></label><label>암호<input type="password"></label><button onclick="window.login()">로그인</button>';
+  '<label>아이디<input></label><label>비밀번호<input type="password"></label><button onclick="window.login()">로그인</button>';
 
 for (const scenario of [
   {

@@ -25,6 +25,7 @@ const structuralRows = '<tr><td colspan="9"></td></tr>'.repeat(3);
 test("Given a delayed DOM feed When a new collector resumes on its existing page Then it pages after the marker without navigating again", async (t) => {
   // Given
   let navigations = 0;
+  let directAcceptedNavigations = 0;
   const server = createServer((request, response) => {
     const url = new URL(
       request.url ?? "/",
@@ -35,10 +36,18 @@ test("Given a delayed DOM feed When a new collector resumes on its existing page
       response.end();
       return;
     }
+    if (url.searchParams.get("result") === "AC") {
+      directAcceptedNavigations += 1;
+      response.setHeader("content-type", "text/html; charset=utf-8");
+      response.end(
+        "<main><h1>문제가 발생했어요</h1><p>알 수 없는 오류</p></main>",
+      );
+      return;
+    }
     navigations += 1;
     response.setHeader("content-type", "text/html; charset=utf-8");
     response.end(
-      `<!doctype html><style>.timestamp { display: none; position: absolute; } [role="button"]:hover + .timestamp { display: inline; }</style><table><thead><tr><th>번호</th><th>제출자</th><th>문제</th><th>결과</th><th>시간</th><th>메모리</th><th>길이</th><th>언어</th><th>시각</th></tr></thead><tbody></tbody></table><button type="button" id="more">더 불러오기</button><script>setTimeout(() => { document.querySelector('tbody').insertAdjacentHTML('beforeend', ${JSON.stringify(pendingFirstRow + structuralRows)}); setTimeout(() => document.querySelector('.account-placeholder').replaceWith(Object.assign(document.createElement('a'), { href: '/account/42', textContent: 'member' })), 25); }, 25); document.querySelector('#more').addEventListener('click', () => setTimeout(() => { document.querySelector('tbody').insertAdjacentHTML('beforeend', ${JSON.stringify(nextRow)}); document.querySelector('#more').remove(); }, 25));</script>`,
+      `<!doctype html><style>.timestamp { display: none; position: absolute; } [role="button"]:hover + .timestamp { display: inline; }</style><button type="button" id="result">결과</button><div id="options" hidden><button role="option" data-value="0\u001fAC">정답</button></div><table><thead><tr><th>번호</th><th>제출자</th><th>문제</th><th>결과</th><th>시간</th><th>메모리</th><th>코드 길이</th><th>언어</th><th>시각</th></tr></thead><tbody></tbody></table><button type="button" id="more">더 불러오기</button><script>document.querySelector('#result').addEventListener('click', () => document.querySelector('#options').hidden = false); document.querySelector('[role=option]').addEventListener('click', () => { history.pushState({}, '', '?result=AC'); setTimeout(() => { document.querySelector('tbody').insertAdjacentHTML('beforeend', ${JSON.stringify(pendingFirstRow + structuralRows)}); setTimeout(() => document.querySelector('.account-placeholder').replaceWith(Object.assign(document.createElement('a'), { href: '/account/42', textContent: 'member' })), 25); }, 25); }); document.querySelector('#more').addEventListener('click', () => setTimeout(() => { document.querySelector('tbody').insertAdjacentHTML('beforeend', ${JSON.stringify(nextRow)}); document.querySelector('#more').remove(); }, 25));</script>`,
     );
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -79,6 +88,8 @@ test("Given a delayed DOM feed When a new collector resumes on its existing page
 
   // Then
   assert.equal(navigations, 1);
+  assert.equal(directAcceptedNavigations, 0);
+  assert.equal(new URL(page.url()).searchParams.get("result"), "AC");
   assert.deepEqual(
     first.submissions.map((submission) => submission.submissionId),
     ["9"],

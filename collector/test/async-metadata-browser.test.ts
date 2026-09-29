@@ -95,6 +95,23 @@ test("Given the actual Jungol tier-image structure When metadata loads Then titl
   assert.equal(result.title, "두 정수 더하기 (A+B)");
 });
 
+test("Given the live problem heading shape When metadata loads Then the direct name excludes its resource limits", async (t) => {
+  const { page, settings, requests } = await asyncBrowserFixture(
+    t,
+    '<h1><span class="head"><span class="tier"><img src="https://s.jungol.co.kr/solved/1.svg?dm=jungol.co.kr"></span><span class="name">두 정수 더하기 (A+B)</span><span class="limit">1s 4MB</span></span></h1>',
+    new Map(),
+  );
+  const result = await new ProblemMetadataResolver(settings, requests).resolve(
+    page,
+    problemIdSchema.parse(1000),
+  );
+  assert.deepEqual(result, {
+    problemId: 1000,
+    title: "두 정수 더하기 (A+B)",
+    tier: 1,
+  });
+});
+
 for (const fixture of [
   { html: "<main>로그인이 필요해요</main>", code: "auth_required" },
   {

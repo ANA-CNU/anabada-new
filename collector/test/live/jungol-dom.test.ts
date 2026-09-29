@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { CollectorConfigLoader } from "../../src/config.js";
+import { problemIdSchema } from "../../src/domain.js";
 import { GroupFeedCollector } from "../../src/jungol/group-feed.js";
 import { GroupMemberCollector } from "../../src/jungol/group-members.js";
 import { ProblemMetadataResolver } from "../../src/jungol/metadata.js";
@@ -68,7 +69,12 @@ function kstParts(date: Date): KstTimestampParts {
     year: required("year"),
     month: required("month"),
     day: required("day"),
-    dayPeriod: required("dayPeriod"),
+    dayPeriod:
+      required("dayPeriod") === "AM"
+        ? "오전"
+        : required("dayPeriod") === "PM"
+          ? "오후"
+          : required("dayPeriod"),
     hour: required("hour"),
     minute: required("minute"),
     second: required("second"),
@@ -141,47 +147,51 @@ test(
     );
     assert.ok(members.length > 0, "live group needs members");
     await requests.schedule("account_summary", undefined, () =>
-      profilePage.goto(new URL("/account/339", config.baseUrl).href, {
+      profilePage.goto(new URL("/account/133924", config.baseUrl).href, {
         waitUntil: "domcontentloaded",
         timeout: config.pageTimeoutMs,
       }),
     );
-    const solved339 = await new AccountProfileCollector(
+    const solved133924 = await new AccountProfileCollector(
       config,
       requests,
     ).collectSolved(profilePage);
-    assert.ok(solved339.length > 50, "account 339 expansion must exceed 50");
-    assert.equal(new Set(solved339).size, solved339.length);
-    const advertisedSolved339 = await profilePage.evaluate(() => {
-      const label = Array.from(document.querySelectorAll("*")).find(
-        (element) =>
-          element.textContent?.trim() === "맞은 문제" &&
-          !Array.from(element.children).some(
-            (child) => child.textContent?.trim() === "맞은 문제",
-          ),
+    assert.ok(
+      solved133924.length > 50,
+      "public account expansion must exceed 50",
+    );
+    assert.equal(new Set(solved133924).size, solved133924.length);
+    const advertisedSolved133924 = await profilePage.evaluate(() => {
+      const rows = Array.from(document.querySelectorAll(".jgacc-row"));
+      const solved = rows.find((row) =>
+        /^해결한 문제\s*(0|[1-9]\d*|[1-9]\d{0,2}(?:,\d{3})+)\s*문제$/.test(
+          row.textContent?.trim() ?? "",
+        ),
       );
-      const matched = /^(0|[1-9]\d*|[1-9]\d{0,2}(?:,\d{3})+)\s*문제$/.exec(
-        label?.parentElement?.innerText.replace("맞은 문제", "").trim() ?? "",
-      );
+      const matched =
+        /^해결한 문제\s*(0|[1-9]\d*|[1-9]\d{0,2}(?:,\d{3})+)\s*문제$/.exec(
+          solved?.textContent?.trim() ?? "",
+        );
       if (!matched) return null;
       return Number(matched[1]?.replaceAll(",", ""));
     });
-    assert.notEqual(advertisedSolved339, null);
-    assert.equal(solved339.length, advertisedSolved339);
-    const solvedSection = profilePage
-      .getByText(/^(?:check\s*)?해결한 문제$/, { exact: true })
-      .locator(
-        "xpath=ancestor::section[contains(concat(' ', normalize-space(@class), ' '), ' card ')][1]",
-      );
+    assert.notEqual(advertisedSolved133924, null);
+    assert.equal(solved133924.length, advertisedSolved133924);
+    const solvedSection = profilePage.locator("section.jgacc-sec").filter({
+      has: profilePage.locator("h2.jgacc-sec-title", {
+        hasText: "해결한 문제",
+      }),
+    });
     const scopedSolvedCount = await solvedSection
-      .locator('.problem-list a[href^="/problem/"]')
+      .locator('a[href*="/problem/"]')
       .count();
-    assert.equal(scopedSolvedCount, solved339.length);
+    assert.equal(scopedSolvedCount, solved133924.length);
     t.diagnostic(
       JSON.stringify({
         memberCount: members.length,
-        solvedCount: solved339.length,
-        advertisedSolvedCount: advertisedSolved339,
+        accountId: 133924,
+        solvedCount: solved133924.length,
+        advertisedSolvedCount: advertisedSolved133924,
         scopedSolvedCount,
       }),
     );
@@ -235,14 +245,36 @@ test(
         "pagination unverified: Jungol reported an explicit end of list",
       );
     }
-    const metadata = await new ProblemMetadataResolver(
-      config,
-      requests,
-    ).resolve(
+    const resolver = new ProblemMetadataResolver(config, requests);
+    const metadata = await resolver.resolve(
       metadataPage,
       first.submissions[0]?.problemId ?? assert.fail("missing first problem"),
     );
     assert.equal(metadata.problemId, first.submissions[0]?.problemId);
     assert.ok(metadata.tier >= 0 && metadata.tier <= 31);
+    const metadata1000 = await resolver.resolve(
+      metadataPage,
+      problemIdSchema.parse(1000),
+    );
+    const metadataSurface = await metadataPage.evaluate(() => {
+      const heading = document.querySelector("h1");
+      return {
+        title: heading
+          ?.querySelector(":scope > .head > .name")
+          ?.textContent?.trim(),
+        image: heading
+          ?.querySelector('img[src*="/solved/"]')
+          ?.getAttribute("src"),
+      };
+    });
+    assert.equal(metadata1000.title, metadataSurface.title);
+    assert.match(metadataSurface.image ?? "", /\/solved\/(\d+)\.svg(?:\?|$)/);
+    const imageTier = /\/solved\/(\d+)\.svg(?:\?|$)/.exec(
+      metadataSurface.image ?? "",
+    );
+    if (imageTier === null)
+      assert.fail("problem heading lacks solved tier image");
+    assert.equal(metadata1000.tier, Number(imageTier[1]));
+    t.diagnostic(JSON.stringify({ metadataSurface }));
   },
 );

@@ -3,6 +3,7 @@ import { JungolError, rejectJungolHttpStatus } from "./errors.js";
 import type { BrowserSettings } from "./page.js";
 
 const path = "/group/1125/submission";
+const acceptedResult = /^정답(?:\s+\d+\s*점)?$/;
 const headers = [
   "번호",
   "제출자",
@@ -10,7 +11,7 @@ const headers = [
   "결과",
   "시간",
   "메모리",
-  "길이",
+  "코드 길이",
   "언어",
   "시각",
 ] as const;
@@ -19,18 +20,41 @@ const headers = [
 export class GroupFeedSurface {
   constructor(private readonly settings: BrowserSettings) {}
   async isFeedPage(page: Page): Promise<boolean> {
-    return (await this.isAcUrl(page)) && (await this.hasHeaders(page));
+    return (
+      (await this.isAcUrl(page)) &&
+      (await this.hasHeaders(page)) &&
+      (await this.hasAcceptedRows(page))
+    );
   }
   async navigate(page: Page): Promise<void> {
     const response = await page.goto(
-      new URL(`${path}?result=AC`, this.settings.baseUrl).href,
+      new URL(path, this.settings.baseUrl).href,
       { waitUntil: "domcontentloaded", timeout: this.settings.pageTimeoutMs },
     );
     rejectJungolHttpStatus(response?.status());
     if (!response?.ok()) throw new JungolError("submission_http_failed");
     await this.requireAccessible(page);
-    if (!(await this.isAcUrl(page)))
-      throw new JungolError("group_feed_filter_invalid");
+  }
+  async applyAcceptedFilter(page: Page): Promise<void> {
+    await this.requireAccessible(page);
+    await page
+      .getByRole("button", { name: "결과", exact: true })
+      .click({ timeout: this.settings.pageTimeoutMs });
+    await page
+      .getByRole("option", { name: "정답", exact: true })
+      .click({ timeout: this.settings.pageTimeoutMs });
+    await page.waitForFunction(
+      (target) => {
+        const url = new URL(location.href);
+        return (
+          url.pathname === target.path &&
+          url.searchParams.get("result") === "AC"
+        );
+      },
+      { path },
+      { timeout: this.settings.pageTimeoutMs },
+    );
+    await this.requireAccessible(page);
   }
   async waitForRows(page: Page): Promise<void> {
     await page.waitForFunction(
@@ -40,47 +64,57 @@ export class GroupFeedSurface {
           .map((cell) => cell.textContent?.trim())
           .join("|");
         const rows = Array.from(table?.querySelectorAll("tbody tr") ?? []);
+        const boundary = Array.from(document.querySelectorAll("body *")).some(
+          (item) =>
+            /^문제가 발생했어요(?:\s|:|$)/.test(item.textContent?.trim() ?? ""),
+        );
         return (
-          actual === expected.join("|") &&
-          rows.some((row) =>
-            /[?&]sid=\d+(?:&|$)/.test(
-              row.querySelector("td:last-child a")?.getAttribute("href") ?? "",
-            ),
-          ) &&
-          rows.every((row) => {
-            const cells = row.querySelectorAll(":scope > td");
-            const hrefs = Array.from(
-              row.querySelectorAll("a"),
-              (anchor) => anchor.getAttribute("href") ?? "",
-            );
-            const hasSid = /[?&]sid=\d+(?:&|$)/.test(
-              cells[cells.length - 1]
-                ?.querySelector("a")
-                ?.getAttribute("href") ?? "",
-            );
-            if (
-              cells.length === 1 &&
-              !hrefs.some((href) =>
-                /[?&]sid=\d+(?:&|$)|\/account\/\d+|\/problem\/\d+/.test(href),
+          boundary ||
+          (actual === expected.join("|") &&
+            rows.some((row) =>
+              /[?&]sid=\d+(?:&|$)/.test(
+                row.querySelector("td:last-child a")?.getAttribute("href") ??
+                  "",
+              ),
+            ) &&
+            rows.every((row) => {
+              const cells = row.querySelectorAll(":scope > td");
+              const hrefs = Array.from(
+                row.querySelectorAll("a"),
+                (anchor) => anchor.getAttribute("href") ?? "",
+              );
+              const hasSid = /[?&]sid=\d+(?:&|$)/.test(
+                cells[cells.length - 1]
+                  ?.querySelector("a")
+                  ?.getAttribute("href") ?? "",
+              );
+              if (
+                cells.length === 1 &&
+                !hrefs.some((href) =>
+                  /[?&]sid=\d+(?:&|$)|\/account\/\d+|\/problem\/\d+/.test(href),
+                )
               )
-            )
-              return true;
-            return (
-              cells.length === 9 &&
-              hasSid &&
-              /\/account\/\d+(?:$|[?#])/.test(
-                cells[1]?.querySelector("a")?.getAttribute("href") ?? "",
-              ) &&
-              /\/problem\/\d+(?:$|[?#])/.test(
-                cells[2]?.querySelector("a")?.getAttribute("href") ?? "",
-              )
-            );
-          })
+                return true;
+              return (
+                cells.length === 9 &&
+                hasSid &&
+                /^정답(?:\s+\d+\s*점)?$/.test(
+                  cells[3]?.textContent?.trim() ?? "",
+                ) &&
+                /\/account\/\d+(?:$|[?#])/.test(
+                  cells[1]?.querySelector("a")?.getAttribute("href") ?? "",
+                ) &&
+                /\/problem\/\d+(?:$|[?#])/.test(
+                  cells[2]?.querySelector("a")?.getAttribute("href") ?? "",
+                )
+              );
+            }))
         );
       },
       [...headers],
       { timeout: this.settings.pageTimeoutMs },
     );
+    await this.requireAccessible(page);
   }
   async requireAccessible(page: Page): Promise<void> {
     if (page.url().includes("/auth/signin"))
@@ -107,6 +141,16 @@ export class GroupFeedSurface {
       .first()
       .isVisible();
     if (challenge || text) throw new JungolError("manual_recovery_required");
+    if (
+      await page
+        .getByText(/^문제가 발생했어요(?:\s|:|$)/)
+        .first()
+        .isVisible()
+    )
+      throw new JungolError("group_feed_navigation_failed", {
+        stage: "group_feed_navigation",
+        reason: "mismatch",
+      });
   }
   async rowsBelow(
     page: Page,
@@ -191,6 +235,19 @@ export class GroupFeedSurface {
         .map((value) => value.trim())
         .join("|") === headers.join("|")
     );
+  }
+  private async hasAcceptedRows(page: Page): Promise<boolean> {
+    const rows = await this.dataRows(page);
+    if (rows.length === 0) return false;
+    for (const row of rows) {
+      if (
+        !acceptedResult.test(
+          (await row.locator("td").nth(3).textContent())?.trim() ?? "",
+        )
+      )
+        return false;
+    }
+    return true;
   }
   private async id(row: Locator): Promise<string | null> {
     const href = await row

@@ -12,16 +12,18 @@ const member = groupMemberSchema.parse({
   tier: 1,
 });
 
-const row = (id: number, timestamp: string) =>
-  `<tr><td>${id}</td><td><a href="/account/42">member</a></td><td><a href="/problem/1000">1000</a></td><td>정답 100점</td><td>1ms</td><td>1KB</td><td>1</td><td>C++</td><td><a href="?result=AC&sid=${id}"><div role="button" tabindex="0" onmouseenter="const t=document.createElement('span');t.id='tooltip';t.textContent='${timestamp}';document.body.append(t)" onmouseleave="document.querySelector('#tooltip')?.remove()">오전 1:00</div></a></td></tr>`;
+const row = (id: number, timestamp: string, result: string) =>
+  `<tr><td>${id}</td><td><a href="/account/42">member</a></td><td><a href="/problem/1000">1000</a></td><td>${result}</td><td>1ms</td><td>1KB</td><td>1</td><td>C++</td><td><a href="?result=AC&sid=${id}"><div role="button" tabindex="0" onmouseenter="const t=document.createElement('span');t.id='tooltip';t.textContent='${timestamp}';document.body.append(t)" onmouseleave="document.querySelector('#tooltip')?.remove()">오전 1:00</div></a></td></tr>`;
 
 const table = (rows: string) =>
-  `<table><thead><tr><th>번호</th><th>제출자</th><th>문제</th><th>결과</th><th>시간</th><th>메모리</th><th>길이</th><th>언어</th><th>시각</th></tr></thead><tbody>${rows}</tbody></table>`;
+  `<table><thead><tr><th>번호</th><th>제출자</th><th>문제</th><th>결과</th><th>시간</th><th>메모리</th><th>코드 길이</th><th>언어</th><th>시각</th></tr></thead><tbody>${rows}</tbody></table>`;
 
 const delayedPage = (delay: number) => {
-  const first = row(9, "2026. 9. 13. 오전 1:00:01");
-  const second = row(8, "2026. 9. 12. 오후 1:00:02");
-  return `<main></main><script>setTimeout(()=>{document.querySelector('main').innerHTML=${JSON.stringify(`${table(first)}<button id="more">더 불러오기</button>`)};document.querySelector('#more').addEventListener('click',()=>{document.querySelector('tbody').insertAdjacentHTML('beforeend',${JSON.stringify(second)});document.querySelector('#more').remove()})},${delay})</script>`;
+  const first = row(9, "2026. 9. 13. 오전 1:00:01", "정답");
+  const second = row(8, "2026. 9. 12. 오후 1:00:02", "정답\n50점");
+  const unfiltered = row(10, "2026. 9. 13. 오전 1:00:02", "오답 0점");
+  const accepted = `${table(first)}<button id="more">더 불러오기</button>`;
+  return `<button id="result" type="button">결과</button><div id="options" hidden><button role="option" data-value="0\u001fAC">정답</button></div><main>${table(unfiltered)}</main><script>document.querySelector('#result').addEventListener('click',()=>document.querySelector('#options').hidden=false);document.querySelector('[role=option]').addEventListener('click',()=>{history.pushState({},'', '?result=AC');setTimeout(()=>{document.querySelector('main').innerHTML=${JSON.stringify(accepted)};document.querySelector('#more').addEventListener('click',()=>{document.querySelector('tbody').insertAdjacentHTML('beforeend',${JSON.stringify(second)});document.querySelector('#more').remove()})},${delay})})</script>`;
 };
 
 test("Given delayed DOM rows and load-more When the production feed reads pages Then it waits and returns only new older rows", async (t) => {
@@ -40,6 +42,7 @@ test("Given delayed DOM rows and load-more When the production feed reads pages 
     first.submissions.map((submission) => submission.submissionId),
     ["9"],
   );
+  assert.equal(first.submissions[0]?.score, null);
   const second = await collector.readPage(page, [member], {
     lastScannedSubmissionId: "9",
   });
@@ -47,6 +50,7 @@ test("Given delayed DOM rows and load-more When the production feed reads pages 
     second.submissions.map((submission) => submission.submissionId),
     ["8"],
   );
+  assert.equal(second.submissions[0]?.score, 50);
   assert.equal(second.more, false);
 });
 

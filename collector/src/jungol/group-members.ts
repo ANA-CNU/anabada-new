@@ -1,4 +1,5 @@
-import type { Page } from "playwright";
+import { errors, type Page } from "playwright";
+import { z } from "zod";
 import {
   type AccountId,
   type GroupMemberSnapshot,
@@ -8,11 +9,17 @@ import { JungolError, rejectJungolHttpStatus } from "./errors.js";
 import { type BrowserSettings, PageOperation } from "./page.js";
 import type { JungolRequestCoordinator } from "./request-coordinator.js";
 
-type MemberDom = {
-  readonly accountId: string;
-  readonly jungolName: string;
-  readonly imagePaths: readonly string[];
-};
+const groupPeopleDomSchema = z.object({
+  members: z.array(
+    z.object({
+      accountId: z.string(),
+      jungolName: z.string(),
+      imagePaths: z.array(z.string()),
+    }),
+  ),
+  advertisedMemberCount: z.number().int().nonnegative(),
+  observedMemberCount: z.number().int().nonnegative(),
+});
 
 const tierPath = /^\/solved\/([0-9]|[12][0-9]|3[01])\.svg$/;
 const solvedPath = /^\/solved\//;
@@ -59,125 +66,150 @@ export class GroupMemberCollector {
           if (page.url().includes("/auth/signin"))
             throw new JungolError("auth_required");
           if (
+            await page
+              .getByText(/로그인이 필요해요|그룹에 가입해야 해요/)
+              .first()
+              .isVisible()
+          )
+            throw new JungolError("auth_required");
+          if (
             /\/(?:cdn-cgi\/challenge|captcha(?:\/|$)|challenge(?:\/|$))/i.test(
               new URL(page.url()).pathname,
             )
           )
             throw new JungolError("manual_recovery_required");
-          const ready = await page.waitForFunction(
-            () => {
-              const article = Array.from(
-                document.querySelectorAll("article"),
-              ).find((candidate) =>
-                Array.from(
-                  candidate.querySelectorAll("h1,h2,h3,h4,h5,h6"),
-                ).some((heading) =>
-                  /^멤버\s*$/.test(heading.textContent?.trim() ?? ""),
-                ),
-              );
-              if (!article) return false;
-              const headings = Array.from(
-                article.querySelectorAll("h1,h2,h3,h4,h5,h6"),
-              ).filter((heading) =>
-                /^(?:소유자|멤버)\s*$/.test(heading.textContent?.trim() ?? ""),
-              );
-              const links: HTMLAnchorElement[] = [];
-              const buttons: HTMLButtonElement[] = [];
-              for (const heading of headings)
-                for (
-                  let sibling = heading.nextElementSibling;
-                  sibling && !sibling.matches("h1,h2,h3,h4,h5,h6");
-                  sibling = sibling.nextElementSibling
-                ) {
+          let ready: Awaited<ReturnType<typeof page.waitForFunction>>;
+          try {
+            ready = await page.waitForFunction(
+              () => {
+                const peopleCard = document.querySelector(
+                  "section.group-card.group-people",
+                );
+                if (!peopleCard) return false;
+                const sections = Array.from(
+                  peopleCard.querySelectorAll(":scope > .people-section"),
+                );
+                const owner = sections.find(
+                  (section) =>
+                    section
+                      .querySelector(
+                        ":scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > h5,:scope > h6",
+                      )
+                      ?.textContent?.trim() === "소유자",
+                );
+                const members = sections.find((section) =>
+                  /^멤버\s+(0|[1-9]\d*)명$/.test(
+                    section
+                      .querySelector(
+                        ":scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > h5,:scope > h6",
+                      )
+                      ?.textContent?.trim() ?? "",
+                  ),
+                );
+                if (!owner || !members) return false;
+                const ownerLinks = Array.from(
+                  owner.querySelectorAll(
+                    ':scope > .people a[href*="/account/"]',
+                  ),
+                );
+                const memberLinks = Array.from(
+                  members.querySelectorAll(
+                    ':scope > .people a[href*="/account/"]',
+                  ),
+                );
+                const links: HTMLAnchorElement[] = [];
+                const buttons: HTMLButtonElement[] = [];
+                for (const section of [owner, members]) {
+                  const people = section.querySelector(":scope > .people");
+                  if (!people) return false;
                   links.push(
                     ...Array.from(
-                      sibling.querySelectorAll<HTMLAnchorElement>(
+                      people.querySelectorAll<HTMLAnchorElement>(
                         'a[href*="/account/"]',
                       ),
                     ),
                   );
                   buttons.push(
                     ...Array.from(
-                      sibling.querySelectorAll<HTMLButtonElement>("button"),
+                      people.querySelectorAll<HTMLButtonElement>("button"),
                     ),
                   );
                 }
-              const loading = /^(?:로드 중|로딩 중|loading)(?:\.\.\.|…)?$/i;
-              if (
-                buttons.some((button) =>
-                  loading.test(button.textContent?.trim() ?? ""),
-                )
-              )
-                return false;
-              return (
-                links.length > 0 &&
-                links.every((link) =>
-                  /^\/account\/[1-9][0-9]*\/?$/.test(
-                    new URL(link.href).pathname,
-                  ),
-                )
-              );
-            },
-            undefined,
-            { timeout: this.settings.pageTimeoutMs },
-          );
-          await ready.dispose();
-          const dom = await page.evaluate<MemberDom[]>(() => {
-            const article = Array.from(
-              document.querySelectorAll("article"),
-            ).find((candidate) =>
-              Array.from(candidate.querySelectorAll("h1,h2,h3,h4,h5,h6")).some(
-                (heading) =>
-                  /^멤버\s*$/.test(heading.textContent?.trim() ?? ""),
-              ),
-            );
-            if (!article) return [];
-            const headings = Array.from(
-              article.querySelectorAll("h1,h2,h3,h4,h5,h6"),
-            ).filter((heading) =>
-              /^(?:소유자|멤버)\s*$/.test(heading.textContent?.trim() ?? ""),
-            );
-            const links: HTMLAnchorElement[] = [];
-            for (const heading of headings)
-              for (
-                let sibling = heading.nextElementSibling;
-                sibling && !sibling.matches("h1,h2,h3,h4,h5,h6");
-                sibling = sibling.nextElementSibling
-              )
-                links.push(
-                  ...Array.from(
-                    sibling.querySelectorAll<HTMLAnchorElement>(
-                      'a[href*="/account/"]',
-                    ),
-                  ),
+                const memberCount = Number(
+                  /^멤버\s+(0|[1-9]\d*)명$/.exec(
+                    members
+                      .querySelector(
+                        ":scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > h5,:scope > h6",
+                      )
+                      ?.textContent?.trim() ?? "",
+                  )?.[1],
                 );
-            return links.map((link) => ({
-              accountId:
-                new URL(link.href).pathname.match(
-                  /^\/account\/([1-9][0-9]*)\/?$/,
-                )?.[1] ?? "",
-              jungolName:
-                Array.from(link.childNodes)
-                  .filter((node) => node.nodeType === Node.TEXT_NODE)
-                  .map((node) => node.textContent ?? "")
-                  .join(" ")
-                  .trim() ||
-                Array.from(link.querySelectorAll("button"))
-                  .flatMap((button) =>
-                    Array.from(button.childNodes)
-                      .filter((node) => node.nodeType === Node.TEXT_NODE)
-                      .map((node) => node.textContent ?? ""),
+                const loading = /^(?:로드 중|로딩 중|loading)(?:\.\.\.|…)?$/i;
+                if (
+                  buttons.some((button) =>
+                    loading.test(button.textContent?.trim() ?? ""),
                   )
-                  .join(" ")
-                  .trim(),
-              imagePaths: Array.from(link.querySelectorAll("img")).map(
-                (image) => image.getAttribute("src")?.trim() ?? "",
-              ),
-            }));
-          });
+                )
+                  return false;
+                if (
+                  ownerLinks.length === 0 ||
+                  memberLinks.length !== memberCount ||
+                  !links.every((link) =>
+                    /^\/account\/[1-9][0-9]*\/?$/.test(
+                      new URL(link.href).pathname,
+                    ),
+                  )
+                )
+                  return false;
+                return {
+                  advertisedMemberCount: memberCount,
+                  observedMemberCount: memberLinks.length,
+                  members: links.map((link) => ({
+                    accountId:
+                      new URL(link.href).pathname.match(
+                        /^\/account\/([1-9][0-9]*)\/?$/,
+                      )?.[1] ?? "",
+                    jungolName:
+                      Array.from(link.childNodes)
+                        .filter((node) => node.nodeType === Node.TEXT_NODE)
+                        .map((node) => node.textContent ?? "")
+                        .join(" ")
+                        .trim() ||
+                      Array.from(link.querySelectorAll("button"))
+                        .flatMap((button) =>
+                          Array.from(button.childNodes)
+                            .filter((node) => node.nodeType === Node.TEXT_NODE)
+                            .map((node) => node.textContent ?? ""),
+                        )
+                        .join(" ")
+                        .trim(),
+                    imagePaths: Array.from(link.querySelectorAll("img")).map(
+                      (image) => image.getAttribute("src")?.trim() ?? "",
+                    ),
+                  })),
+                };
+              },
+              undefined,
+              { timeout: this.settings.pageTimeoutMs },
+            );
+          } catch (error) {
+            if (
+              error instanceof errors.TimeoutError &&
+              (await page
+                .getByText(/로그인이 필요해요|그룹에 가입해야 해요/)
+                .first()
+                .isVisible())
+            )
+              throw new JungolError("auth_required");
+            throw error;
+          }
+          const dom = groupPeopleDomSchema.parse(await ready.jsonValue());
+          await ready.dispose();
+          if (dom.observedMemberCount !== dom.advertisedMemberCount)
+            throw new JungolError("invalid_group_members");
           const membersByAccountId = new Map<AccountId, GroupMemberSnapshot>();
           const members: GroupMemberSnapshot[] = [];
-          for (const entry of dom) {
+          for (const entry of dom.members) {
             if (entry.imagePaths.some((source) => source.length === 0))
               throw this.invalidMember(entry.accountId, true);
             const solvedImages = entry.imagePaths
