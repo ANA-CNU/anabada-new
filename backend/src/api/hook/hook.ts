@@ -1,18 +1,14 @@
 import { Elysia } from "elysia";
 import { z } from "zod";
 import type { DatabaseExecutor } from "../../infrastructure/mysql/database-session.js";
-import { HookRepository } from "../../infrastructure/mysql/repositories/hook-repository.js";
+import type {
+  HookCreate,
+  HookPagination,
+  HookPatch,
+} from "../../infrastructure/mysql/repositories/hook-repository.js";
+import { WebhookManagementService } from "./webhook-management-service.js";
 
 type HookId = Readonly<{ readonly id: number }>;
-type HookPagination = Readonly<{
-  readonly page: number;
-  readonly limit: number;
-}>;
-type HookCreate = Readonly<{ readonly url: string; readonly ignored: boolean }>;
-type HookUpdate = Readonly<{
-  readonly url?: string;
-  readonly ignored?: boolean;
-}>;
 const hookIdSchema: z.ZodType<HookId, z.ZodTypeDef, unknown> = z
   .object({ id: z.coerce.number().int().positive() })
   .strict();
@@ -32,7 +28,7 @@ const hookUrlSchema = z
 const createHookSchema: z.ZodType<HookCreate, z.ZodTypeDef, unknown> = z
   .object({ url: hookUrlSchema, ignored: z.boolean().default(false) })
   .strict();
-const updateHookSchema: z.ZodType<HookUpdate, z.ZodTypeDef, unknown> = z
+const updateHookSchema: z.ZodType<HookPatch, z.ZodTypeDef, unknown> = z
   .object({ url: hookUrlSchema.optional(), ignored: z.boolean().optional() })
   .strict()
   .refine(
@@ -70,6 +66,9 @@ function parse<T>(
 }
 
 export function createHookRoutes(dependencies: HookRoutesDependencies) {
+  const service = new WebhookManagementService({
+    withSession: dependencies.withSession,
+  });
   const authorize = async (request: Request): Promise<boolean> =>
     dependencies.authorizer(request);
   return new Elysia()
@@ -83,20 +82,18 @@ export function createHookRoutes(dependencies: HookRoutesDependencies) {
         set.status = 400;
         return invalidInput;
       }
-      return dependencies.withSession(async (session) => {
-        const result = await new HookRepository(session).list(pagination);
-        return {
-          success: true,
-          data: result.items,
-          pagination: {
-            page: pagination.page,
-            limit: pagination.limit,
-            total: result.total,
-            total_pages: Math.ceil(result.total / pagination.limit),
-          },
-          message: "Webhook 목록 조회 성공",
-        };
-      });
+      const result = await service.list(pagination);
+      return {
+        success: true,
+        data: result.items,
+        pagination: {
+          page: pagination.page,
+          limit: pagination.limit,
+          total: result.total,
+          total_pages: Math.ceil(result.total / pagination.limit),
+        },
+        message: "Webhook 목록 조회 성공",
+      };
     })
     .get("/api/hooks/:id", async ({ params, request, set }) => {
       if (!(await authorize(request))) {
@@ -108,14 +105,12 @@ export function createHookRoutes(dependencies: HookRoutesDependencies) {
         set.status = 400;
         return invalidInput;
       }
-      return dependencies.withSession(async (session) => {
-        const hook = await new HookRepository(session).find(parsed.id);
-        if (!hook) {
-          set.status = 404;
-          return notFound;
-        }
-        return { success: true, data: hook, message: "Webhook 상세 조회 성공" };
-      });
+      const hook = await service.find(parsed.id);
+      if (!hook) {
+        set.status = 404;
+        return notFound;
+      }
+      return { success: true, data: hook, message: "Webhook 상세 조회 성공" };
     })
     .post("/api/hooks", async ({ body, request, set }) => {
       if (!(await authorize(request))) {
@@ -127,11 +122,11 @@ export function createHookRoutes(dependencies: HookRoutesDependencies) {
         set.status = 400;
         return invalidInput;
       }
-      return dependencies.withSession(async (session) => ({
+      return {
         success: true,
-        hook_id: await new HookRepository(session).create(input),
+        hook_id: await service.create(input),
         message: "Webhook 생성 성공",
-      }));
+      };
     })
     .put("/api/hooks/:id", async ({ params, body, request, set }) => {
       if (!(await authorize(request))) {
@@ -139,21 +134,16 @@ export function createHookRoutes(dependencies: HookRoutesDependencies) {
         return unauthorized;
       }
       const parsed = parse<HookId>(hookIdSchema, params);
-      const input = parse<HookUpdate>(updateHookSchema, body);
+      const input = parse<HookPatch>(updateHookSchema, body);
       if (!parsed || !input) {
         set.status = 400;
         return invalidInput;
       }
-      return dependencies.withSession(async (session) => {
-        if (!(await new HookRepository(session).update(parsed.id, input))) {
-          set.status = 404;
-          return notFound;
-        }
-        return {
-          success: true,
-          message: "Webhook이 성공적으로 수정되었습니다.",
-        };
-      });
+      if (!(await service.update(parsed.id, input))) {
+        set.status = 404;
+        return notFound;
+      }
+      return { success: true, message: "Webhook이 성공적으로 수정되었습니다." };
     })
     .delete("/api/hooks/:id", async ({ params, request, set }) => {
       if (!(await authorize(request))) {
@@ -165,16 +155,11 @@ export function createHookRoutes(dependencies: HookRoutesDependencies) {
         set.status = 400;
         return invalidInput;
       }
-      return dependencies.withSession(async (session) => {
-        if (!(await new HookRepository(session).remove(parsed.id))) {
-          set.status = 404;
-          return notFound;
-        }
-        return {
-          success: true,
-          message: "Webhook이 성공적으로 삭제되었습니다.",
-        };
-      });
+      if (!(await service.remove(parsed.id))) {
+        set.status = 404;
+        return notFound;
+      }
+      return { success: true, message: "Webhook이 성공적으로 삭제되었습니다." };
     })
     .patch("/api/hooks/:id/toggle", async ({ params, request, set }) => {
       if (!(await authorize(request))) {
@@ -186,12 +171,10 @@ export function createHookRoutes(dependencies: HookRoutesDependencies) {
         set.status = 400;
         return invalidInput;
       }
-      return dependencies.withSession(async (session) => {
-        if (!(await new HookRepository(session).toggle(parsed.id))) {
-          set.status = 404;
-          return notFound;
-        }
-        return { success: true, message: "Webhook 상태가 변경되었습니다." };
-      });
+      if (!(await service.toggle(parsed.id))) {
+        set.status = 404;
+        return notFound;
+      }
+      return { success: true, message: "Webhook 상태가 변경되었습니다." };
     });
 }
