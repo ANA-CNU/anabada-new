@@ -48,6 +48,12 @@ DB 반영과 webhook 전송은 분리된 책임이다. DB의 `hook`은 추첨 �
 실패해도 이미 반영된 수집 결과를 되돌리지 않으며, 운영 webhook의 선택적 비활성화도 DB
 수집 결과에 영향을 주지 않는다.
 
+추첨 보드가 commit 뒤 새로 만들어진 경우에만 `hook.ignored=0` endpoint로 최신 저장 보드의
+상위 10명을 전송한다. 보드의 `rank` 순서와 보드 생성 시각의 KST 월 `user_bias_total` BIA를
+사용하며, 비활성 보드도 최신 보드이면 대상이다. 본문과 `text`는 같고 mention은 허용하지
+않는다. 각 10개 hook 배치가 끝난 뒤 다음 배치를 전송하며, 전송 거부된 hook은 기존 정책대로
+`ignored=1`로 남긴다. 이 알림은 `WEBHOOK_URL` 정상 lifecycle 알림 중단 정책과 별개다.
+
 ## 원자 cycle과 복구 판단
 
 - cycle은 브라우저·Jungol API·metadata 조회와 필요한 DB 읽기 snapshot을 먼저 끝낸 뒤, 실제

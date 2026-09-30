@@ -11,8 +11,10 @@ import { JungolRequestCoordinator } from "../jungol/request-coordinator.js";
 import { JungolSession } from "../jungol/session.js";
 import { HookRepository } from "../mysql/hooks.js";
 import { CycleLeaseManager } from "../mysql/lease.js";
+import { RankingBoardWebhookRepository } from "../mysql/ranking-board-webhook.js";
 import { AccountUnitOfWork } from "../mysql/unit-of-work.js";
 import { ProjectionService } from "../projection.js";
+import { RankingBoardWebhookService } from "../ranking-board-webhook-service.js";
 import { KstCalendar } from "../scoring/daily.js";
 import { WeightedRankingPolicy } from "../scoring/ranking.js";
 import {
@@ -99,11 +101,14 @@ export class SyncCycle {
         );
         const projection = new ProjectionNotificationService(
           projectionService,
-          new WebhookBroadcaster(
-            new HookRepository(pool),
-            new DiscordWebhookClient(),
-            new WebhookMessageFormatter(),
-            logger,
+          new RankingBoardWebhookService(
+            new RankingBoardWebhookRepository(pool),
+            new WebhookBroadcaster(
+              new HookRepository(pool),
+              new DiscordWebhookClient(10_000, 65_536, "content_and_text"),
+              new WebhookMessageFormatter(),
+              logger,
+            ),
           ),
         );
         this.feedPage ??= new GroupFeedPageLease(async () =>

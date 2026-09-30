@@ -2,8 +2,10 @@ import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 import type { Logger } from "pino";
 import { z } from "zod";
+import { inlineCode } from "./alert-markdown.js";
 import type { HookEndpoint } from "./mysql/hooks.js";
-import type { ProjectedRankingEntry, ProjectionResult } from "./projection.js";
+import type { RankingBoardWebhookEntry } from "./mysql/ranking-board-webhook.js";
+import type { ProjectionResult } from "./projection.js";
 
 export type { HookEndpoint } from "./mysql/hooks.js";
 
@@ -27,19 +29,19 @@ export interface WebhookTransport {
   ): Promise<WebhookDeliveryResult>;
 }
 
-/** 기존 Discord 알림 문구와 최대 열 명의 내부 순위를 결정한다. */
 export class WebhookMessageFormatter {
-  format(entries: readonly ProjectedRankingEntry[]): string {
+  format(entries: readonly RankingBoardWebhookEntry[]): string {
     return [
       "추첨 결과가 바뀌었습니다.",
       "https://bada.anacnu.kr 에서 자세히 확인하세요!",
       "",
-      ...entries
-        .slice(0, 10)
-        .map(
-          (entry, index) =>
-            `${index + 1}. \`${entry.jungolName}\`: ${entry.score} 문제`,
-        ),
+      ...entries.slice(0, 10).map((entry) => {
+        const name = entry.koreanName?.trim();
+        const displayName = name
+          ? `${entry.jungolName}(${name})`
+          : entry.jungolName;
+        return `${entry.rank}. ${inlineCode(displayName)}: ${entry.bia} BIA`;
+      }),
     ].join("\n");
   }
 }
@@ -49,6 +51,9 @@ export class DiscordWebhookClient implements WebhookTransport {
   constructor(
     private readonly timeoutMs = 10_000,
     private readonly maxResponseBytes = 65_536,
+    private readonly payloadFormat:
+      | "content_only"
+      | "content_and_text" = "content_only",
   ) {}
 
   async send(
@@ -66,7 +71,11 @@ export class DiscordWebhookClient implements WebhookTransport {
           ? httpRequest
           : undefined;
     if (!requester) return { kind: "rejected", code: "unsupported_protocol" };
-    const body = JSON.stringify({ content, allowed_mentions: { parse: [] } });
+    const body = JSON.stringify({
+      content,
+      ...(this.payloadFormat === "content_and_text" ? { text: content } : {}),
+      allowed_mentions: { parse: [] },
+    });
     return new Promise<WebhookDeliveryResult>((resolve, reject) => {
       let settled = false;
       const finish = (result: WebhookDeliveryResult) => {
@@ -163,7 +172,7 @@ export class WebhookBroadcaster {
   ) {}
 
   async broadcast(
-    entries: readonly ProjectedRankingEntry[],
+    entries: readonly RankingBoardWebhookEntry[],
     signal: AbortSignal,
   ): Promise<{ readonly delivered: number; readonly rejected: number }> {
     let endpoints: readonly HookEndpoint[];
@@ -179,22 +188,30 @@ export class WebhookBroadcaster {
     const content = this.formatter.format(entries);
     const rejected: number[] = [];
     let delivered = 0;
-    for (const endpoint of endpoints) {
-      signal.throwIfAborted();
-      let outcome: WebhookDeliveryResult;
-      try {
-        outcome = await this.transport.send(endpoint.url, content, signal);
-      } catch (error) {
-        if (signal.aborted) throw error;
-        outcome = { kind: "rejected", code: "request_error" };
-      }
-      if (outcome.kind === "delivered") delivered += 1;
-      else {
-        rejected.push(endpoint.id);
-        this.logger.warn(
-          { hookId: endpoint.id, code: outcome.code },
-          "webhook.delivery_rejected",
-        );
+    for (let offset = 0; offset < endpoints.length; offset += 10) {
+      const batch = endpoints.slice(offset, offset + 10);
+      const outcomes = await Promise.all(
+        batch.map(async (endpoint) => {
+          signal.throwIfAborted();
+          let outcome: WebhookDeliveryResult;
+          try {
+            outcome = await this.transport.send(endpoint.url, content, signal);
+          } catch (error) {
+            if (signal.aborted) throw error;
+            outcome = { kind: "rejected", code: "request_error" };
+          }
+          return { endpoint, outcome };
+        }),
+      );
+      for (const { endpoint, outcome } of outcomes) {
+        if (outcome.kind === "delivered") delivered += 1;
+        else {
+          rejected.push(endpoint.id);
+          this.logger.warn(
+            { hookId: endpoint.id, code: outcome.code },
+            "webhook.delivery_rejected",
+          );
+        }
       }
     }
     if (rejected.length > 0)
@@ -222,18 +239,15 @@ type ProjectionPort = {
   rebuild(): Promise<ProjectionResult>;
 };
 
-type BroadcastPort = {
-  broadcast(
-    entries: readonly ProjectedRankingEntry[],
-    signal: AbortSignal,
-  ): Promise<{ readonly delivered: number; readonly rejected: number }>;
+type LatestBoardNotificationPort = {
+  notifyLatest(signal: AbortSignal): Promise<void>;
 };
 
 /** projection commit 이후 순위가 실제로 바뀐 경우에만 webhook을 호출한다. */
 export class ProjectionNotificationService {
   constructor(
     private readonly projection: ProjectionPort,
-    private readonly webhooks: BroadcastPort,
+    private readonly webhooks: LatestBoardNotificationPort,
   ) {}
 
   async run(signal: AbortSignal): Promise<ProjectionResult> {
@@ -243,7 +257,6 @@ export class ProjectionNotificationService {
   }
 
   async notify(result: ProjectionResult, signal: AbortSignal): Promise<void> {
-    if (result.kind === "changed")
-      await this.webhooks.broadcast(result.entries, signal);
+    if (result.kind === "changed") await this.webhooks.notifyLatest(signal);
   }
 }

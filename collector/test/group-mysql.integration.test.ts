@@ -33,6 +33,7 @@ import { runCycleAtomicMysqlCases } from "./cycle-atomic-mysql-cases.js";
 import { runDailyMissedCases } from "./daily-missed-mysql-cases.js";
 import { runGroupRuntimeCases } from "./group-runtime-mysql-cases.js";
 import { runManualProjectionCases } from "./mysql-projection-cases.js";
+import { runRankingWebhookMysqlCases } from "./ranking-board-webhook-mysql-cases.js";
 import { runSettlementRegressionMysqlCases } from "./settlement-regression-mysql-cases.js";
 import { runUserRegistrationCases } from "./user-registration-mysql-cases.js";
 
@@ -568,6 +569,7 @@ test(
       await runDailyMissedCases(t, pool);
       await runUserRegistrationCases(t, pool);
       await runManualProjectionCases(t, pool);
+      await runRankingWebhookMysqlCases(t, pool);
       await runSettlementRegressionMysqlCases(t, pool);
     } finally {
       await pool.end();
