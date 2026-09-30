@@ -30,7 +30,7 @@ backend와 collector는 새 `jungol_bada`를 사용합니다. 기존 `anabada`�
 6. 준비된 group member, inbox, AC, 점수, checkpoint, 월 cache, projection은 하나의 cycle commit transaction에서 확정한다. 네트워크·prepare 실패는 durable write를 남기지 않으며 page lease도 무효화한다. commit 응답 연결 실패는 `commit_unknown`으로 분류해 DB 반영 여부를 단정하지 않는다.
 7. 제출 원래 KST 날짜로 daily/event를 계산한다. daily는 first solve이고 그날 daily가 없으며 effective tier가 11 이상 또는 user tier−5 이상일 때 원래 제출일당 한 번이고 event는 `[begin,end)`, event 생성·문제 추가 시각을 함께 확인한다.
 8. 초기 기준선은 각 해결 문제를 `1970-01-01T00:00:01Z`, `external_submission_id=NULL`, `accepted`, `problem_name=NULL`, tier 0, `repeatation=0`의 synthetic 행으로만 저장하며 일일·이벤트 점수와 `score_history`를 전혀 만들지 않습니다. 이 값은 실제 제출 시각이 아니라 과거 이력을 재생하지 않는 기준선 표식입니다. 증분에서만 `EventManager`가 문제 번호, `[begin,end)` 기간, 제출 시각 ≥ `event.created_at`, 제출 시각 ≥ `event_problem.added_at`을 모두 확인합니다. 반복 AC도 이벤트 조건을 만족할 수 있지만 사용자·이벤트·문제별 한 번만 지급합니다. unique `award_key`는 daily 및 event 재지급을 막습니다.
-9. settlement는 inbox를 시간순으로 최대 200 row, 최대 10 user 단위로 처리한다. 이 정산 상한은 feed collection page 수를 제한하지 않는다. 성공 commit에는 projection 변경과 무관하게 `WEBHOOK_URL` receipt를 보내고, DB `hook` 알림은 projection 변경 때만 별도로 전송한다.
+9. settlement는 inbox를 시간순으로 최대 200 row, 최대 10 user 단위로 처리한다. 이 정산 상한은 feed collection page 수를 제한하지 않는다. 정상 완료·지연 `WEBHOOK_URL` receipt는 현재 임시 중단했으며 [collector 운영 동작](../collector-operations.md)을 따른다. DB `hook` 알림은 projection 변경 때만 별도로 전송한다.
 10. webhook 전송 실패는 이미 commit한 cycle을 rollback하지 않으며, URL·cookie·원문 응답은 기록하지 않는다.
 
 ### 지연 이벤트와 window 한계

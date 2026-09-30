@@ -55,7 +55,10 @@ export class CollectorRuntime {
       randomSeed: config.randomSeed,
     });
     const lifecycle = new CycleLifecycleReporter({
-      url: config.emergencyWebhookUrl,
+      // 정상 완료·지연 알림이 불편해서 임시로 발송을 중단한다.
+      // 아래 URL 연결을 복원하면 정상 알림도 다시 발송한다. 실행 오류는 EmergencyWebhookNotifier에서 계속 보낸다.
+      // url: config.emergencyWebhookUrl,
+      url: undefined,
       transport: new DiscordWebhookClient(),
       logger,
       stage: () => cycle.currentStage?.(),

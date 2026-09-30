@@ -224,6 +224,23 @@ test("Given a stopped cycle or disabled URL When a slow timer would fire Then it
   assert.equal(timer.pendingCount, 0);
 });
 
+test("Given a disabled URL and an active cycle When twenty minutes elapse Then the slow alert timer completes without delivery", async () => {
+  const timer = new FakeTimer();
+  const messages: string[] = [];
+  const reporter = new CycleLifecycleReporter({
+    url: undefined,
+    transport: new RecordingTransport(messages),
+    logger: pino({ enabled: false }),
+    timer,
+  });
+
+  reporter.start(new Date("2026-09-10T00:00:00Z"));
+  await timer.advance(1_200_000);
+
+  assert.equal(messages.length, 0);
+  assert.equal(timer.pendingCount, 0);
+});
+
 test("Given two successful cycles When each completes Then neither receipt is suppressed", async () => {
   const timer = new FakeTimer();
   const messages: string[] = [];
