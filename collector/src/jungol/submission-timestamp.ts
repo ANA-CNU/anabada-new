@@ -84,15 +84,13 @@ export class SubmissionTimestampReader {
 
   /** 이전 tooltip이 숨은 뒤 현재 행의 time wrapper가 연 정확한 tooltip만 반환한다. */
   async read(page: Page, row: Locator): Promise<SubmissionTimestamp> {
-    const trigger = row
-      .locator("td")
-      .last()
-      .locator('[role="button"][tabindex="0"]')
-      .first();
+    const timeCell = row.locator(":scope > td").last();
+    const trigger = timeCell.locator('[role="button"][tabindex="0"]').first();
     try {
       await page.mouse.move(0, 0);
       await this.waitForVisibleTimestampCount(page, 0);
-      await trigger.hover({ timeout: this.timeoutMs });
+      const hoverTarget = (await trigger.count()) > 0 ? trigger : timeCell;
+      await hoverTarget.hover({ timeout: this.timeoutMs });
       const timestamp = await this.waitForVisibleTimestamp(page);
       return { raw: timestamp, submittedAt: this.parser.parse(timestamp) };
     } catch (error) {

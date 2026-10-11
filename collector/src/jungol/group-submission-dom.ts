@@ -1,9 +1,13 @@
 import type { Locator, Page } from "playwright";
 import { sourceLocationFrom } from "../application/safe-source-location.js";
 import { accountIdSchema, type GroupMemberSnapshot } from "../domain/sync.js";
-import { problemIdSchema, submissionIdSchema } from "../domain.js";
+import { problemIdSchema, type SubmissionId } from "../domain.js";
 import type { GroupAcceptedSubmission } from "../group-domain.js";
 import { JungolError } from "./errors.js";
+import {
+  SubmissionIdExtractionError,
+  submissionIdFromHrefs,
+} from "./submission-id.js";
 import type {
   SubmissionTimestamp,
   SubmissionTimestampReader,
@@ -46,9 +50,7 @@ export class GroupSubmissionDomParser {
       const problemId = problemIdSchema.parse(
         Number(await this.idFrom(cells.nth(2), "problem")),
       );
-      const submissionId = submissionIdSchema.parse(
-        await this.idFrom(cells.last(), "sid"),
-      );
+      const submissionId = await this.submissionId(page, row, rowIndex);
       if (!memberIds.has(accountId)) {
         const location = sourceLocationFrom(
           new Error("group_feed_actor_unmatched"),
@@ -89,16 +91,43 @@ export class GroupSubmissionDomParser {
     return submissions;
   }
 
-  private async idFrom(cell: Locator, key: string): Promise<string> {
+  private async idFrom(
+    cell: Locator,
+    key: "account" | "problem",
+  ): Promise<string> {
     const href = await cell.locator("a").first().getAttribute("href");
     if (!href) throw new JungolError("group_feed_row_invalid");
     const url = new URL(href, "https://jungol.co.kr");
-    const fromPath = new RegExp(`/${key === "sid" ? "" : key}/(\\d+)$`).exec(
-      url.pathname,
-    )?.[1];
-    const value = key === "sid" ? url.searchParams.get("sid") : fromPath;
+    const value = new RegExp(`/${key}/(\\d+)$`).exec(url.pathname)?.[1];
     if (!value) throw new JungolError("group_feed_row_invalid");
     return value;
+  }
+
+  private async submissionId(
+    page: Page,
+    row: Locator,
+    rowIndex: number,
+  ): Promise<SubmissionId> {
+    const hrefs = await row
+      .locator("a")
+      .evaluateAll((anchors) =>
+        anchors.map((anchor) => anchor.getAttribute("href") ?? ""),
+      );
+    try {
+      return submissionIdFromHrefs(
+        hrefs,
+        await page.evaluate(() => document.baseURI),
+      );
+    } catch (error) {
+      if (!(error instanceof SubmissionIdExtractionError)) throw error;
+      throw new JungolError("group_feed_row_invalid", {
+        stage: "group_feed_rows_parse",
+        reason: "mismatch",
+        rowIndex,
+        hasSubmissionSid: error.code !== "submission_id_missing",
+        rowVisible: await row.isVisible(),
+      });
+    }
   }
 
   private score(text: string): number | null {

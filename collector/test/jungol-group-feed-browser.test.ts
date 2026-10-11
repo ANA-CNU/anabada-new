@@ -12,9 +12,16 @@ const member = groupMemberSchema.parse({
   jungolName: "member",
   tier: 1,
 });
-const row = (id: number, problem: number, timestamp: string) =>
-  `<tr><td>${10 - id}</td><td><a href="/account/42">member</a></td><td><a href="/problem/${problem}">${problem}</a></td><td>정답 100점</td><td>1ms</td><td>1MB</td><td>10</td><td>C++</td><td><a href="/submission?sid=${id}">${id}</a><div role="button" tabindex="0">시각</div><span class="timestamp">${timestamp}</span></td></tr>`;
-const firstRow = row(9, 1339, "2026.9.13.오후7:37:16");
+const row = (
+  id: number,
+  problem: number,
+  timestamp: string,
+  submissionLinkInLanguageCell: boolean = false,
+) => {
+  const submissionLink = `<a href="?result=AC&sid=${id}">${id}</a>`;
+  return `<tr><td>${10 - id}</td><td><a href="/account/42">member</a></td><td><a href="/problem/${problem}">${problem}</a></td><td>정답 100점</td><td>1ms</td><td>1MB</td><td>10</td><td>C++${submissionLinkInLanguageCell ? submissionLink : ""}</td><td>${submissionLinkInLanguageCell ? "" : submissionLink}<div role="button" tabindex="0">시각</div><span class="timestamp">${timestamp}</span></td></tr>`;
+};
+const firstRow = row(9, 1339, "2026.9.13.오후7:37:16", true);
 const pendingFirstRow = firstRow.replace(
   '<a href="/account/42">member</a>',
   '<span class="account-placeholder">member</span>',

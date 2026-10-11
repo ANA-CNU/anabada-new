@@ -1,6 +1,10 @@
 import type { Locator, Page } from "playwright";
 import { JungolError, rejectJungolHttpStatus } from "./errors.js";
 import type { BrowserSettings } from "./page.js";
+import {
+  SubmissionIdExtractionError,
+  submissionIdFromHrefs,
+} from "./submission-id.js";
 
 const path = "/group/1125/submission";
 const acceptedResult = /^정답(?:\s+\d+\s*점)?$/;
@@ -71,23 +75,14 @@ export class GroupFeedSurface {
         return (
           boundary ||
           (actual === expected.join("|") &&
-            rows.some((row) =>
-              /[?&]sid=\d+(?:&|$)/.test(
-                row.querySelector("td:last-child a")?.getAttribute("href") ??
-                  "",
-              ),
-            ) &&
+            rows.some((row) => row.querySelector('a[href*="sid="]')) &&
             rows.every((row) => {
               const cells = row.querySelectorAll(":scope > td");
               const hrefs = Array.from(
                 row.querySelectorAll("a"),
                 (anchor) => anchor.getAttribute("href") ?? "",
               );
-              const hasSid = /[?&]sid=\d+(?:&|$)/.test(
-                cells[cells.length - 1]
-                  ?.querySelector("a")
-                  ?.getAttribute("href") ?? "",
-              );
+              const hasSid = row.querySelector('a[href*="sid="]') !== null;
               if (
                 cells.length === 1 &&
                 !hrefs.some((href) =>
@@ -160,17 +155,15 @@ export class GroupFeedSurface {
     if (marker === null) return rows;
     const result: Locator[] = [];
     for (const row of rows) {
-      const id = await this.id(row);
-      if (id !== null && BigInt(id) < BigInt(marker)) result.push(row);
+      const id = await this.id(row, page.url());
+      if (BigInt(id) < BigInt(marker)) result.push(row);
     }
     return result;
   }
   async ids(page: Page): Promise<readonly string[]> {
     const result: string[] = [];
-    for (const row of await this.dataRows(page)) {
-      const id = await this.id(row);
-      if (id !== null) result.push(id);
-    }
+    for (const row of await this.dataRows(page))
+      result.push(await this.id(row, page.url()));
     return result;
   }
   async clickMore(page: Page): Promise<void> {
@@ -182,10 +175,21 @@ export class GroupFeedSurface {
     await page.waitForFunction(
       (seen) =>
         Array.from(document.querySelectorAll("table tbody tr")).some((row) => {
-          const href =
-            row.querySelector("td:last-child a")?.getAttribute("href") ?? "";
-          const id = new URL(href, location.href).searchParams.get("sid");
-          return id !== null && !seen.split("|").includes(id);
+          const id = Array.from(row.querySelectorAll("a[href]")).find(
+            (anchor) => {
+              const href = anchor.getAttribute("href");
+              return (
+                href !== null &&
+                new URL(href, location.href).searchParams.has("sid")
+              );
+            },
+          );
+          const href = id?.getAttribute("href");
+          const sid =
+            href === null || href === undefined
+              ? null
+              : new URL(href, location.href).searchParams.get("sid");
+          return sid !== null && !seen.split("|").includes(sid);
         }),
       before,
       { timeout: this.settings.pageTimeoutMs },
@@ -249,16 +253,18 @@ export class GroupFeedSurface {
     }
     return true;
   }
-  private async id(row: Locator): Promise<string | null> {
-    const href = await row
-      .locator("td")
-      .last()
-      .locator("a")
-      .first()
-      .getAttribute("href");
-    return href === null
-      ? null
-      : new URL(href, this.settings.baseUrl).searchParams.get("sid");
+  private async id(row: Locator, documentBaseUrl: string): Promise<string> {
+    try {
+      return submissionIdFromHrefs(await this.hrefs(row), documentBaseUrl);
+    } catch (error) {
+      if (!(error instanceof SubmissionIdExtractionError)) throw error;
+      throw new JungolError("group_feed_row_invalid", {
+        stage: "group_feed_rows_parse",
+        reason: "mismatch",
+        hasSubmissionSid: error.code !== "submission_id_missing",
+        rowVisible: await row.isVisible(),
+      });
+    }
   }
   private async dataRows(page: Page): Promise<readonly Locator[]> {
     const dataRows: Locator[] = [];
@@ -269,14 +275,8 @@ export class GroupFeedSurface {
       .all()) {
       const cells = row.locator(":scope > td");
       const cellCount = await cells.count();
-      const hrefs = await row
-        .locator("a")
-        .evaluateAll((anchors) =>
-          anchors.map((anchor) => anchor.getAttribute("href") ?? ""),
-        );
-      const hasSubmission = hrefs.some((href) =>
-        /[?&]sid=\d+(?:&|$)/.test(href),
-      );
+      const hrefs = await this.hrefs(row);
+      const hasSubmission = hrefs.some((href) => href.includes("sid="));
       const hasAccount = hrefs.some((href) =>
         /\/account\/\d+(?:$|[?#])/.test(href),
       );
@@ -293,8 +293,17 @@ export class GroupFeedSurface {
           hasSubmissionSid: hasSubmission,
           rowVisible: await row.isVisible(),
         });
+      await this.id(row, page.url());
       dataRows.push(row);
     }
     return dataRows;
+  }
+
+  private async hrefs(row: Locator): Promise<readonly string[]> {
+    return row
+      .locator("a")
+      .evaluateAll((anchors) =>
+        anchors.map((anchor) => anchor.getAttribute("href") ?? ""),
+      );
   }
 }
