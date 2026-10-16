@@ -169,20 +169,43 @@ export class GroupMemberCollector {
                       new URL(link.href).pathname.match(
                         /^\/account\/([1-9][0-9]*)\/?$/,
                       )?.[1] ?? "",
-                    jungolName:
-                      Array.from(link.childNodes)
+                    jungolName: (() => {
+                      const directHandle = Array.from(link.childNodes)
                         .filter((node) => node.nodeType === Node.TEXT_NODE)
                         .map((node) => node.textContent ?? "")
                         .join(" ")
-                        .trim() ||
-                      Array.from(link.querySelectorAll("button"))
+                        .trim();
+                      if (directHandle) return directHandle;
+                      // 현재 카드의 이름은 badge와 분리된 account-id 직접 텍스트만 허용한다.
+                      const currentHandleElements = Array.from(
+                        link.querySelectorAll(
+                          ":scope > div > button > span.account-id",
+                        ),
+                      );
+                      if (currentHandleElements.length > 0) {
+                        const currentHandles = currentHandleElements.map(
+                          (handle) =>
+                            Array.from(handle.childNodes)
+                              .filter(
+                                (node) => node.nodeType === Node.TEXT_NODE,
+                              )
+                              .map((node) => node.textContent ?? "")
+                              .join(" ")
+                              .trim(),
+                        );
+                        return currentHandles.length === 1 && currentHandles[0]
+                          ? currentHandles[0]
+                          : "";
+                      }
+                      return Array.from(link.querySelectorAll("button"))
                         .flatMap((button) =>
                           Array.from(button.childNodes)
                             .filter((node) => node.nodeType === Node.TEXT_NODE)
                             .map((node) => node.textContent ?? ""),
                         )
                         .join(" ")
-                        .trim(),
+                        .trim();
+                    })(),
                     imagePaths: Array.from(link.querySelectorAll("img")).map(
                       (image) => image.getAttribute("src")?.trim() ?? "",
                     ),

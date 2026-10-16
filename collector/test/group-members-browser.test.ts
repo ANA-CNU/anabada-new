@@ -161,6 +161,30 @@ test("Given a nested member-card button handle When collecting members Then the 
   ]);
 });
 
+test("Given the current member-card account-id span When collecting members Then only its direct handle is retained", async () => {
+  const members = await collect(
+    groupPeople(
+      member(2),
+      '<a href="/account/42"><div><button>button-badge<span class="account-id">current-handle<span class="keep">tier-badge</span></span><span>nickname</span></button></div></a>',
+      1,
+    ),
+  );
+  assert.deepEqual(members, [
+    { accountId: "2", jungolName: "member-2", tier: 0 },
+    { accountId: "42", jungolName: "current-handle", tier: 0 },
+  ]);
+});
+
+test("Given empty or multiple current account-id spans When collecting members Then badge text is not accepted as a handle", async () => {
+  for (const card of [
+    '<a href="/account/42"><div><button>button-badge<span class="account-id"><span class="keep">tier-badge</span></span></button></div></a>',
+    '<a href="/account/42"><div><button>button-badge<span class="account-id">first</span><span class="account-id">second</span></button></div></a>',
+  ])
+    await assert.rejects(collect(groupPeople(member(2), card, 1)), {
+      code: "invalid_group_members",
+    });
+});
+
 test("Given the official sprout-1 tier image When collecting members Then it maps to tier zero", async () => {
   const members = await collect(
     groupPeople(
