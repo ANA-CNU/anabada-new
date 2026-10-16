@@ -126,3 +126,57 @@ test("Given a delayed DOM feed When a new collector resumes on its existing page
     { code: "group_feed_cursor_not_found" },
   );
 });
+
+test("Given the current responsive submission layout When reading and resuming its existing page Then the 시각 column drives timestamps", async (t) => {
+  const currentRow = (id: number, timestamp: string) =>
+    `<tr><td>${id}</td><td><a href="/account/42">member</a></td><td><a href="/problem/1000">1000</a></td><td>정답 100점</td><td>1ms</td><td>1MB</td><td><a href="?result=AC&sid=${id}">Java</a></td><td><div role="button" tabindex="0">시각</div><span class="timestamp">${timestamp}</span></td><td>번호 · 코드 길이</td></tr>`;
+  let navigations = 0;
+  const server = createServer((request, response) => {
+    if (
+      new URL(request.url ?? "/", "http://127.0.0.1").pathname ===
+      "/group/1125/submission"
+    )
+      navigations += 1;
+    response.setHeader("content-type", "text/html; charset=utf-8");
+    response.end(
+      `<!doctype html><style>.timestamp{display:none}[role=button]:hover + .timestamp{display:inline}</style><button id="result">결과</button><button role="option">정답</button><table><thead><tr><th>번호</th><th>제출자</th><th>문제</th><th>결과</th><th>시간</th><th>메모리</th><th>언어</th><th>시각</th><th>번호 · 코드 길이</th></tr></thead><tbody>${currentRow(9, "2026. 10. 8. 오후 5:26:34")}${currentRow(8, "2026. 10. 8. 오후 5:25:34")}</tbody></table><script>document.querySelector('[role=option]').onclick=()=>history.pushState({},'', '?result=AC')</script>`,
+    );
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const browser = await chromium.launch({
+    headless: true,
+    ...(existsSync(chromium.executablePath()) ? {} : { channel: "chrome" }),
+  });
+  t.after(async () => {
+    await browser.close();
+    await new Promise<void>((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
+  });
+  const page = await browser.newPage();
+  const collector = new GroupFeedCollector(
+    { baseUrl: `http://127.0.0.1:${address.port}`, pageTimeoutMs: 1_000 },
+    new JungolRequestCoordinator({ delay: async () => {} }),
+  );
+  const first = await collector.readPage(page, [member], {
+    lastScannedSubmissionId: null,
+  });
+  const resumed = await collector.readPage(page, [member], {
+    lastScannedSubmissionId: "9",
+  });
+  assert.deepEqual(
+    first.submissions.map((submission) => submission.submissionId),
+    ["9", "8"],
+  );
+  assert.deepEqual(
+    resumed.submissions.map((submission) => submission.submissionId),
+    ["8"],
+  );
+  assert.equal(navigations, 1);
+  assert.equal(
+    first.submissions[0]?.submittedAt.toISOString(),
+    "2026-10-08T08:26:34.000Z",
+  );
+});

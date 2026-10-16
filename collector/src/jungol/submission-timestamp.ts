@@ -84,7 +84,31 @@ export class SubmissionTimestampReader {
 
   /** 이전 tooltip이 숨은 뒤 현재 행의 time wrapper가 연 정확한 tooltip만 반환한다. */
   async read(page: Page, row: Locator): Promise<SubmissionTimestamp> {
-    const timeCell = row.locator(":scope > td").last();
+    // 반응형 표는 시각 열 위치가 바뀌므로 header의 시각 열로 body cell을 정한다.
+    const table = row.locator("xpath=ancestor::table[1]");
+    const headers = await table
+      .locator(":scope > thead > tr > th")
+      .allTextContents();
+    const timeIndexes = headers
+      .map((header, index) => (header.trim() === "시각" ? index : -1))
+      .filter((index) => index >= 0);
+    const timeIndex = timeIndexes[0];
+    if (
+      headers.length !== 9 ||
+      timeIndexes.length !== 1 ||
+      timeIndex === undefined
+    )
+      throw new JungolError("group_feed_timestamp_hover_failed", {
+        stage: "group_feed_timestamp_hover",
+        reason: "mismatch",
+      });
+    const cells = row.locator(":scope > td");
+    if ((await cells.count()) !== 9)
+      throw new JungolError("group_feed_timestamp_hover_failed", {
+        stage: "group_feed_timestamp_hover",
+        reason: "mismatch",
+      });
+    const timeCell = cells.nth(timeIndex);
     const trigger = timeCell.locator('[role="button"][tabindex="0"]').first();
     try {
       await page.mouse.move(0, 0);

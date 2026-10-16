@@ -8,7 +8,7 @@ import {
 
 const path = "/group/1125/submission";
 const acceptedResult = /^정답(?:\s+\d+\s*점)?$/;
-const headers = [
+const legacyHeaders = [
   "번호",
   "제출자",
   "문제",
@@ -16,6 +16,16 @@ const headers = [
   "시간",
   "메모리",
   "코드 길이",
+  "언어",
+  "시각",
+] as const;
+const currentHeaderPrefix = [
+  "번호",
+  "제출자",
+  "문제",
+  "결과",
+  "시간",
+  "메모리",
   "언어",
   "시각",
 ] as const;
@@ -64,7 +74,10 @@ export class GroupFeedSurface {
     await page.waitForFunction(
       (expected) => {
         const table = document.querySelector("table");
-        const actual = Array.from(table?.querySelectorAll("thead th") ?? [])
+        const headerCells = Array.from(
+          table?.querySelectorAll(":scope > thead > tr > th") ?? [],
+        );
+        const actual = headerCells
           .map((cell) => cell.textContent?.trim())
           .join("|");
         const rows = Array.from(table?.querySelectorAll("tbody tr") ?? []);
@@ -74,7 +87,10 @@ export class GroupFeedSurface {
         );
         return (
           boundary ||
-          (actual === expected.join("|") &&
+          (headerCells.length === 9 &&
+            (actual === expected.legacy ||
+              (actual.startsWith(expected.currentPrefix) &&
+                /코드 길이/.test(headerCells.at(-1)?.textContent ?? ""))) &&
             rows.some((row) => row.querySelector('a[href*="sid="]')) &&
             rows.every((row) => {
               const cells = row.querySelectorAll(":scope > td");
@@ -106,7 +122,10 @@ export class GroupFeedSurface {
             }))
         );
       },
-      [...headers],
+      {
+        legacy: legacyHeaders.join("|"),
+        currentPrefix: `${currentHeaderPrefix.join("|")}|`,
+      },
       { timeout: this.settings.pageTimeoutMs },
     );
     await this.requireAccessible(page);
@@ -228,16 +247,17 @@ export class GroupFeedSurface {
     );
   }
   private async hasHeaders(page: Page): Promise<boolean> {
+    const headerCells = await page
+      .getByRole("table")
+      .first()
+      .locator(":scope > thead > tr > th")
+      .allTextContents();
+    const headers = headerCells.map((value) => value.trim()).join("|");
     return (
-      (
-        await page
-          .getByRole("table")
-          .first()
-          .locator("thead th")
-          .allTextContents()
-      )
-        .map((value) => value.trim())
-        .join("|") === headers.join("|")
+      headerCells.length === 9 &&
+      (headers === legacyHeaders.join("|") ||
+        (headers.startsWith(`${currentHeaderPrefix.join("|")}|`) &&
+          /코드 길이/.test(headers)))
     );
   }
   private async hasAcceptedRows(page: Page): Promise<boolean> {
