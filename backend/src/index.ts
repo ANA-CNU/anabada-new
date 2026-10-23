@@ -155,7 +155,9 @@ export function createApplication(dependencies: ApplicationDependencies) {
         "backend.request_received",
       );
     })
-    .onError(async ({ error, request, set }) => {
+    .onError(async ({ code, error, request, set }) => {
+      // 존재하지 않는 경로는 예상된 404이므로 내부 장애 보고 대상이 아니다.
+      if (code === "NOT_FOUND") return json(404, { error: "Not found" });
       if (error instanceof ClientInputError)
         return json(400, { error: "Invalid request" });
       const unavailable = isInfrastructureError(error);

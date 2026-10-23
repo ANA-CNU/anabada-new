@@ -101,10 +101,31 @@ function testDependencies(incidentReporter: InternalIncidentReporter) {
 }
 
 class EmptyPool implements DatabaseConnectionPool {
+  calls = 0;
   async getConnection(): Promise<DatabaseConnection> {
+    this.calls += 1;
     return new EmptyConnection();
   }
 }
+
+test("Given nonexistent API paths When app handles them Then returns 404 without reporting or opening a database session", async () => {
+  const reporter = new RecordingReporter();
+  const pool = new EmptyPool();
+  const app = createApplication({
+    ...testDependencies(reporter),
+    databasePool: new DatabasePool(pool),
+  });
+
+  const responses = await Promise.all(
+    ["/api/.env", "/api/unknown", "/api/version"].map((path) =>
+      app.handle(new Request(`http://localhost${path}`)),
+    ),
+  );
+
+  expect(responses.map((response) => response.status)).toEqual([404, 404, 200]);
+  expect(reporter.incidents).toHaveLength(0);
+  expect(pool.calls).toBe(0);
+});
 
 class EmptyConnection implements DatabaseConnection {
   async query(_options: {
