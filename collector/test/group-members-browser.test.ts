@@ -175,6 +175,32 @@ test("Given the current member-card account-id span When collecting members Then
   ]);
 });
 
+test("Given split member handles When collecting members Then the first character is restored without badge text", async () => {
+  const card = (id: number, prefix: string, remainder: string, badge = "") =>
+    `<a href="/account/${id}"><div><button><span class="account-id"><span class="keep">${badge}${prefix}</span>${remainder}</span><span>nickname</span></button></div></a>`;
+  const members = await collect(
+    groupPeople(
+      card(
+        1,
+        "h",
+        "hs2003",
+        '<main><img src="https://s.jungol.co.kr/solved/11.svg"><span>badge</span></main>',
+      ),
+      `${card(2, "T", "simoo")}${card(3, "우", "주공양이")}${card(4, "", "complete", "<main><span>badge</span></main>")}`,
+      3,
+    ),
+  );
+  assert.deepEqual(
+    members.map(({ jungolName, tier }) => [jungolName, tier]),
+    [
+      ["hhs2003", 11],
+      ["Tsimoo", 0],
+      ["우주공양이", 0],
+      ["complete", 0],
+    ],
+  );
+});
+
 test("Given empty or multiple current account-id spans When collecting members Then badge text is not accepted as a handle", async () => {
   for (const card of [
     '<a href="/account/42"><div><button>button-badge<span class="account-id"><span class="keep">tier-badge</span></span></button></div></a>',

@@ -176,7 +176,7 @@ export class GroupMemberCollector {
                         .join(" ")
                         .trim();
                       if (directHandle) return directHandle;
-                      // 현재 카드의 이름은 badge와 분리된 account-id 직접 텍스트만 허용한다.
+                      // 현재 카드의 이름은 account-id의 직접 텍스트를 기준으로 읽는다.
                       const currentHandleElements = Array.from(
                         link.querySelectorAll(
                           ":scope > div > button > span.account-id",
@@ -184,14 +184,30 @@ export class GroupMemberCollector {
                       );
                       if (currentHandleElements.length > 0) {
                         const currentHandles = currentHandleElements.map(
-                          (handle) =>
-                            Array.from(handle.childNodes)
+                          (handle) => {
+                            const remainder = Array.from(handle.childNodes)
                               .filter(
                                 (node) => node.nodeType === Node.TEXT_NODE,
                               )
                               .map((node) => node.textContent ?? "")
                               .join(" ")
-                              .trim(),
+                              .trim();
+                            // Jungol이 첫 글자를 keep 안에 나누어 넣는 임시 구조다.
+                            // 전체 이름이 다시 account-id 직접 텍스트가 되면 이 복원 분기만 제거한다.
+                            const keep = handle.querySelector(":scope > .keep");
+                            const prefix = keep
+                              ? Array.from(keep.childNodes)
+                                  .filter(
+                                    (node) => node.nodeType === Node.TEXT_NODE,
+                                  )
+                                  .map((node) => node.textContent ?? "")
+                                  .join("")
+                                  .trim()
+                              : "";
+                            return remainder && Array.from(prefix).length === 1
+                              ? prefix + remainder
+                              : remainder;
+                          },
                         );
                         return currentHandles.length === 1 && currentHandles[0]
                           ? currentHandles[0]

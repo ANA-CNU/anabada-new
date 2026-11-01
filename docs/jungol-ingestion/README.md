@@ -194,6 +194,10 @@ production Environment의 해당 secret을 갱신한 뒤 검증된 배포를 실
 
 ## 상태 확인과 문제 대응
 
+2026-11-01 회원 이름 장애: Jungol의 `.account-id > .keep`에 티어 장식과 이름 첫 글자가 있고 나머지 이름은 그 바깥에 있었습니다. 기존 수집기는 `account-id`의 직접 텍스트 노드만 읽어 `Tsimoo`를 `simoo`, `hhs2003`을 `hs2003`으로 DB metadata에 덮어썼습니다. 숫자 계정 ID와 내부 user ID 기준은 유지되었으므로 사용자를 재생성하거나 데이터를 초기화할 필요는 없습니다.
+
+수집기는 `.keep`의 직접 텍스트가 한 글자일 때 나머지 이름 앞에 임시로 복원하며, 한글 이름과 티어가 없는 카드도 같은 방식으로 처리합니다. 수정된 collector의 다음 성공 cycle에서 이름 metadata가 갱신되므로 별도 SQL 수정은 필요하지 않습니다. 전체 이름이 다시 `account-id` 직접 텍스트에 들어가고 `.keep`에 첫 글자가 없으면 기존 경로가 자동으로 사용되며, 임시 처리가 필요 없어지면 첫 글자 복원 분기만 제거합니다.
+
 `healthcheck`는 profile의 `collector-health.json`을 검사합니다. heartbeat는 30초, 허용 age는 90초이며 idle/running만 건강합니다. 실행 20분 이상 또는 degraded는 unhealthy입니다. health success는 실제 수집 최신성을 보장하지 않으므로 checkpoint·inbox·점수 결과를 별도로 확인합니다. 자동 알림 연동 여부는 서버에서 별도 검증해야 합니다.
 
 선택 `WEBHOOK_URL`을 설정하면 내부 순위 알림용 `hook` 테이블과 별개로 긴급 Discord 알림을 사용합니다. collector는 partial/failed cycle, 인증 만료, CAPTCHA·challenge circuit, health 기록 실패와 종료 timeout을 알립니다. backend는 기존 공통 `logger.error` 경계를 통해 요청·DB 오류를 알리며 404·validation 같은 요청 거절은 긴급 알림에서 제외합니다. 메시지는 서비스명, KST 시각, 정규화한 오류 코드, 영향과 즉시 확인 절차만 포함하며 예외 원문, 요청 query, 계정명, credential, cookie와 webhook URL은 포함하지 않습니다. 같은 서비스·오류 코드는 최초 성공 발송 뒤 30분 동안 중복 전송하지 않습니다. backend에서 발송 자체가 실패하면 오류 폭주를 막기 위해 1분 뒤 다시 시도할 수 있습니다.
