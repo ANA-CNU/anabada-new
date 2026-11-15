@@ -22,110 +22,169 @@ const row = (
   return `<tr><td>${10 - id}</td><td><a href="/account/42">member</a></td><td><a href="/problem/${problem}">${problem}</a></td><td>정답 100점</td><td>1ms</td><td>1MB</td><td>10</td><td>C++${submissionLinkInLanguageCell ? submissionLink : ""}</td><td>${submissionLinkInLanguageCell ? "" : submissionLink}<div role="button" tabindex="0">시각</div><span class="timestamp">${timestamp}</span></td></tr>`;
 };
 const firstRow = row(9, 1339, "2026.9.13.오후7:37:16", true);
-const pendingFirstRow = firstRow.replace(
-  '<a href="/account/42">member</a>',
-  '<span class="account-placeholder">member</span>',
-);
 const nextRow = row(8, 1000, "2026.9.13.오후7:36:16");
 const structuralRows = '<tr><td colspan="9"></td></tr>'.repeat(3);
+const reorderedRow = (id: number, problem: number, timestamp: string) =>
+  `<tr><td><a href="/account/42">member</a></td><td><a href="/problem/${problem}">${problem}</a></td><td>정답 75점</td><td>1ms</td><td>1MB</td><td>10</td><td><a href="?result=AC&sid=${id}">Java</a></td><td><div role="button" tabindex="0">시각</div><span class="timestamp">${timestamp}</span></td><td>${id}</td></tr>`;
 
-test("Given a delayed DOM feed When a new collector resumes on its existing page Then it pages after the marker without navigating again", async (t) => {
-  // Given
-  let navigations = 0;
-  let directAcceptedNavigations = 0;
-  const server = createServer((request, response) => {
-    const url = new URL(
-      request.url ?? "/",
-      `http://${request.headers.host ?? "127.0.0.1"}`,
+for (const layout of [
+  {
+    name: "legacy",
+    headers: [
+      "번호",
+      "제출자",
+      "문제",
+      "결과",
+      "시간",
+      "메모리",
+      "코드 길이",
+      "언어",
+      "시각",
+    ],
+    firstRow,
+    nextRow,
+    score: 100,
+  },
+  {
+    name: "number-last",
+    headers: [
+      "제출자",
+      "문제",
+      "결과",
+      "시간",
+      "메모리",
+      "코드 길이",
+      "언어",
+      "시각",
+      "번호  번호",
+    ],
+    firstRow: reorderedRow(9, 1339, "2026.9.13.오후7:37:16"),
+    nextRow: reorderedRow(8, 1000, "2026.9.13.오후7:36:16"),
+    score: 75,
+  },
+]) {
+  test(`Given a delayed ${layout.name} DOM feed When a new collector resumes on its existing page Then it pages after the marker without navigating again`, async (t) => {
+    // Given
+    const pendingFirstRow = layout.firstRow.replace(
+      '<a href="/account/42">member</a>',
+      '<span class="account-placeholder">member</span>',
     );
-    if (url.pathname !== "/group/1125/submission") {
-      response.statusCode = 404;
-      response.end();
-      return;
-    }
-    if (url.searchParams.get("result") === "AC") {
-      directAcceptedNavigations += 1;
+    let navigations = 0;
+    let directAcceptedNavigations = 0;
+    const server = createServer((request, response) => {
+      const url = new URL(
+        request.url ?? "/",
+        `http://${request.headers.host ?? "127.0.0.1"}`,
+      );
+      if (url.pathname !== "/group/1125/submission") {
+        response.statusCode = 404;
+        response.end();
+        return;
+      }
+      if (url.searchParams.get("result") === "AC") {
+        directAcceptedNavigations += 1;
+        response.setHeader("content-type", "text/html; charset=utf-8");
+        response.end(
+          "<main><h1>문제가 발생했어요</h1><p>알 수 없는 오류</p></main>",
+        );
+        return;
+      }
+      navigations += 1;
       response.setHeader("content-type", "text/html; charset=utf-8");
       response.end(
-        "<main><h1>문제가 발생했어요</h1><p>알 수 없는 오류</p></main>",
+        `<!doctype html><style>.timestamp { display: none; position: absolute; } [role="button"]:hover + .timestamp { display: inline; }</style><button type="button" id="result">결과</button><div id="options" hidden><button role="option" data-value="0\u001fAC">정답</button></div><table><thead><tr>${layout.headers.map((header) => `<th>${header}</th>`).join("")}</tr></thead><tbody></tbody></table><button type="button" id="more">더 불러오기</button><script>document.querySelector('#result').addEventListener('click', () => document.querySelector('#options').hidden = false); document.querySelector('[role=option]').addEventListener('click', () => { history.pushState({}, '', '?result=AC'); setTimeout(() => { document.querySelector('tbody').insertAdjacentHTML('beforeend', ${JSON.stringify(pendingFirstRow + structuralRows)}); setTimeout(() => document.querySelector('.account-placeholder').replaceWith(Object.assign(document.createElement('a'), { href: '/account/42', textContent: 'member' })), 25); }, 25); }); document.querySelector('#more').addEventListener('click', () => setTimeout(() => { document.querySelector('tbody').insertAdjacentHTML('beforeend', ${JSON.stringify(layout.nextRow)}); document.querySelector('#more').remove(); }, 25));</script>`,
       );
-      return;
-    }
-    navigations += 1;
-    response.setHeader("content-type", "text/html; charset=utf-8");
-    response.end(
-      `<!doctype html><style>.timestamp { display: none; position: absolute; } [role="button"]:hover + .timestamp { display: inline; }</style><button type="button" id="result">결과</button><div id="options" hidden><button role="option" data-value="0\u001fAC">정답</button></div><table><thead><tr><th>번호</th><th>제출자</th><th>문제</th><th>결과</th><th>시간</th><th>메모리</th><th>코드 길이</th><th>언어</th><th>시각</th></tr></thead><tbody></tbody></table><button type="button" id="more">더 불러오기</button><script>document.querySelector('#result').addEventListener('click', () => document.querySelector('#options').hidden = false); document.querySelector('[role=option]').addEventListener('click', () => { history.pushState({}, '', '?result=AC'); setTimeout(() => { document.querySelector('tbody').insertAdjacentHTML('beforeend', ${JSON.stringify(pendingFirstRow + structuralRows)}); setTimeout(() => document.querySelector('.account-placeholder').replaceWith(Object.assign(document.createElement('a'), { href: '/account/42', textContent: 'member' })), 25); }, 25); }); document.querySelector('#more').addEventListener('click', () => setTimeout(() => { document.querySelector('tbody').insertAdjacentHTML('beforeend', ${JSON.stringify(nextRow)}); document.querySelector('#more').remove(); }, 25));</script>`,
+    });
+    await new Promise<void>((resolve) =>
+      server.listen(0, "127.0.0.1", resolve),
+    );
+    let browser: Browser | undefined;
+    t.after(async () => {
+      try {
+        await browser?.close();
+      } finally {
+        server.closeAllConnections();
+        await new Promise<void>((resolve, reject) =>
+          server.close((error) => (error ? reject(error) : resolve())),
+        );
+      }
+    });
+    const address = server.address();
+    assert.ok(address && typeof address !== "string");
+    browser = await chromium.launch({
+      headless: true,
+      ...(existsSync(chromium.executablePath()) ? {} : { channel: "chrome" }),
+    });
+    const page = await browser.newPage();
+    const settings = {
+      baseUrl: `http://127.0.0.1:${address.port}`,
+      pageTimeoutMs: 1_000,
+    };
+    const requests = new JungolRequestCoordinator({ delay: async () => {} });
+    const first = await new GroupFeedCollector(settings, requests).readPage(
+      page,
+      [member],
+      { lastScannedSubmissionId: null },
+    );
+    const resumedCollector = new GroupFeedCollector(settings, requests);
+
+    // When
+    const resumed = await resumedCollector.readPage(page, [member], {
+      lastScannedSubmissionId: "9",
+    });
+
+    // Then
+    assert.equal(navigations, 1);
+    assert.equal(directAcceptedNavigations, 0);
+    assert.equal(new URL(page.url()).searchParams.get("result"), "AC");
+    assert.deepEqual(
+      first.submissions.map((submission) => submission.submissionId),
+      ["9"],
+    );
+    assert.equal(first.more, true);
+    assert.deepEqual(first.submissions, [
+      {
+        accountId: "42",
+        submissionId: "9",
+        problemId: 1339,
+        score: layout.score,
+        submittedAt: new Date("2026-09-13T10:37:16.000Z"),
+      },
+    ]);
+    assert.deepEqual(
+      resumed.submissions.map((submission) => submission.submissionId),
+      ["8"],
+    );
+    assert.equal(resumed.more, false);
+    assert.deepEqual(resumed.submissions, [
+      {
+        accountId: "42",
+        submissionId: "8",
+        problemId: 1000,
+        score: layout.score,
+        submittedAt: new Date("2026-09-13T10:36:16.000Z"),
+      },
+    ]);
+
+    const freshPage = await browser.newPage();
+    const fresh = await new GroupFeedCollector(settings, requests).readPage(
+      freshPage,
+      [member],
+      { lastScannedSubmissionId: "9" },
+    );
+    assert.deepEqual(
+      fresh.submissions.map((submission) => submission.submissionId),
+      ["8"],
+    );
+
+    await assert.rejects(
+      new GroupFeedCollector(settings, requests).readPage(freshPage, [member], {
+        lastScannedSubmissionId: "7",
+      }),
+      { code: "group_feed_cursor_not_found" },
     );
   });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  let browser: Browser | undefined;
-  t.after(async () => {
-    try {
-      await browser?.close();
-    } finally {
-      server.closeAllConnections();
-      await new Promise<void>((resolve, reject) =>
-        server.close((error) => (error ? reject(error) : resolve())),
-      );
-    }
-  });
-  const address = server.address();
-  assert.ok(address && typeof address !== "string");
-  browser = await chromium.launch({
-    headless: true,
-    ...(existsSync(chromium.executablePath()) ? {} : { channel: "chrome" }),
-  });
-  const page = await browser.newPage();
-  const settings = {
-    baseUrl: `http://127.0.0.1:${address.port}`,
-    pageTimeoutMs: 1_000,
-  };
-  const requests = new JungolRequestCoordinator({ delay: async () => {} });
-  const first = await new GroupFeedCollector(settings, requests).readPage(
-    page,
-    [member],
-    { lastScannedSubmissionId: null },
-  );
-  const resumedCollector = new GroupFeedCollector(settings, requests);
-
-  // When
-  const resumed = await resumedCollector.readPage(page, [member], {
-    lastScannedSubmissionId: "9",
-  });
-
-  // Then
-  assert.equal(navigations, 1);
-  assert.equal(directAcceptedNavigations, 0);
-  assert.equal(new URL(page.url()).searchParams.get("result"), "AC");
-  assert.deepEqual(
-    first.submissions.map((submission) => submission.submissionId),
-    ["9"],
-  );
-  assert.equal(first.more, true);
-  assert.deepEqual(
-    resumed.submissions.map((submission) => submission.submissionId),
-    ["8"],
-  );
-  assert.equal(resumed.more, false);
-
-  const freshPage = await browser.newPage();
-  const fresh = await new GroupFeedCollector(settings, requests).readPage(
-    freshPage,
-    [member],
-    { lastScannedSubmissionId: "9" },
-  );
-  assert.deepEqual(
-    fresh.submissions.map((submission) => submission.submissionId),
-    ["8"],
-  );
-
-  await assert.rejects(
-    new GroupFeedCollector(settings, requests).readPage(freshPage, [member], {
-      lastScannedSubmissionId: "7",
-    }),
-    { code: "group_feed_cursor_not_found" },
-  );
-});
+}
 
 test("Given the current responsive submission layout When reading and resuming its existing page Then the 시각 column drives timestamps", async (t) => {
   const currentRow = (id: number, timestamp: string) =>

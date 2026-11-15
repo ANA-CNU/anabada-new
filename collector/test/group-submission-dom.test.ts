@@ -21,7 +21,7 @@ test("actor mismatch preserves safe submission and problem diagnostics", async (
   try {
     const page = await browser.newPage();
     await page.setContent(
-      '<base href="https://jungol.co.kr/group/1125/submission?result=AC"><table><tbody><tr><td>1</td><td><a href="/account/99">unknown</a></td><td><a href="/problem/1000">1000</a></td><td>정답 100점</td><td>1ms</td><td>1KB</td><td>1</td><td>C++</td><td><a href="/group/1125/submission?result=AC&sid=12">12</a></td></tr></tbody></table>',
+      '<base href="https://jungol.co.kr/group/1125/submission?result=AC"><table><thead><tr><th>번호</th><th>제출자</th><th>문제</th><th>결과</th><th>시간</th><th>메모리</th><th>코드 길이</th><th>언어</th><th>시각</th></tr></thead><tbody><tr><td>1</td><td><a href="/account/99">unknown</a></td><td><a href="/problem/1000">1000</a></td><td>정답 100점</td><td>1ms</td><td>1KB</td><td>1</td><td>C++</td><td><a href="/group/1125/submission?result=AC&sid=12">12</a></td></tr></tbody></table>',
     );
     await assert.rejects(
       new GroupSubmissionDomParser(new SubmissionTimestampReader(1_000)).parse(

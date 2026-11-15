@@ -1,5 +1,6 @@
 import type { Locator, Page } from "playwright";
 import { JungolError, rejectJungolHttpStatus } from "./errors.js";
+import { inspectGroupFeedTable } from "./group-feed-table.js";
 import type { BrowserSettings } from "./page.js";
 import {
   SubmissionIdExtractionError,
@@ -8,36 +9,20 @@ import {
 
 const path = "/group/1125/submission";
 const acceptedResult = /^정답(?:\s+\d+\s*점)?$/;
-const legacyHeaders = [
-  "번호",
-  "제출자",
-  "문제",
-  "결과",
-  "시간",
-  "메모리",
-  "코드 길이",
-  "언어",
-  "시각",
-] as const;
-const currentHeaderPrefix = [
-  "번호",
-  "제출자",
-  "문제",
-  "결과",
-  "시간",
-  "메모리",
-  "언어",
-  "시각",
-] as const;
 
 /** Jungol 그룹 제출 표의 URL·인증·행 식별·pagination DOM 계약을 보관한다. */
 export class GroupFeedSurface {
   constructor(private readonly settings: BrowserSettings) {}
   async isFeedPage(page: Page): Promise<boolean> {
+    if (!(await this.isAcUrl(page))) return false;
+    const columns = await page.evaluate(
+      inspectGroupFeedTable,
+      "headers" as const,
+    );
     return (
-      (await this.isAcUrl(page)) &&
-      (await this.hasHeaders(page)) &&
-      (await this.hasAcceptedRows(page))
+      columns !== null &&
+      columns !== "boundary" &&
+      (await this.hasAcceptedRows(page, columns.result))
     );
   }
   async navigate(page: Page): Promise<void> {
@@ -71,63 +56,9 @@ export class GroupFeedSurface {
     await this.requireAccessible(page);
   }
   async waitForRows(page: Page): Promise<void> {
-    await page.waitForFunction(
-      (expected) => {
-        const table = document.querySelector("table");
-        const headerCells = Array.from(
-          table?.querySelectorAll(":scope > thead > tr > th") ?? [],
-        );
-        const actual = headerCells
-          .map((cell) => cell.textContent?.trim())
-          .join("|");
-        const rows = Array.from(table?.querySelectorAll("tbody tr") ?? []);
-        const boundary = Array.from(document.querySelectorAll("body *")).some(
-          (item) =>
-            /^문제가 발생했어요(?:\s|:|$)/.test(item.textContent?.trim() ?? ""),
-        );
-        return (
-          boundary ||
-          (headerCells.length === 9 &&
-            (actual === expected.legacy ||
-              (actual.startsWith(expected.currentPrefix) &&
-                /코드 길이/.test(headerCells.at(-1)?.textContent ?? ""))) &&
-            rows.some((row) => row.querySelector('a[href*="sid="]')) &&
-            rows.every((row) => {
-              const cells = row.querySelectorAll(":scope > td");
-              const hrefs = Array.from(
-                row.querySelectorAll("a"),
-                (anchor) => anchor.getAttribute("href") ?? "",
-              );
-              const hasSid = row.querySelector('a[href*="sid="]') !== null;
-              if (
-                cells.length === 1 &&
-                !hrefs.some((href) =>
-                  /[?&]sid=\d+(?:&|$)|\/account\/\d+|\/problem\/\d+/.test(href),
-                )
-              )
-                return true;
-              return (
-                cells.length === 9 &&
-                hasSid &&
-                /^정답(?:\s+\d+\s*점)?$/.test(
-                  cells[3]?.textContent?.trim() ?? "",
-                ) &&
-                /\/account\/\d+(?:$|[?#])/.test(
-                  cells[1]?.querySelector("a")?.getAttribute("href") ?? "",
-                ) &&
-                /\/problem\/\d+(?:$|[?#])/.test(
-                  cells[2]?.querySelector("a")?.getAttribute("href") ?? "",
-                )
-              );
-            }))
-        );
-      },
-      {
-        legacy: legacyHeaders.join("|"),
-        currentPrefix: `${currentHeaderPrefix.join("|")}|`,
-      },
-      { timeout: this.settings.pageTimeoutMs },
-    );
+    await page.waitForFunction(inspectGroupFeedTable, "ready" as const, {
+      timeout: this.settings.pageTimeoutMs,
+    });
     await this.requireAccessible(page);
   }
   async requireAccessible(page: Page): Promise<void> {
@@ -246,30 +177,18 @@ export class GroupFeedSurface {
       url.searchParams.get("result") === "AC"
     );
   }
-  private async hasHeaders(page: Page): Promise<boolean> {
-    const headerCells = await page
-      .getByRole("table")
-      .first()
-      .locator(":scope > thead > tr > th")
-      .allTextContents();
-    const headers = headerCells.map((value) => value.trim()).join("|");
-    return (
-      headerCells.length === 9 &&
-      (headers === legacyHeaders.join("|") ||
-        (headers.startsWith(`${currentHeaderPrefix.join("|")}|`) &&
-          /코드 길이/.test(headers)))
-    );
-  }
-  private async hasAcceptedRows(page: Page): Promise<boolean> {
+  private async hasAcceptedRows(
+    page: Page,
+    resultIndex: number,
+  ): Promise<boolean> {
     const rows = await this.dataRows(page);
     if (rows.length === 0) return false;
     for (const row of rows) {
-      if (
-        !acceptedResult.test(
-          (await row.locator("td").nth(3).textContent())?.trim() ?? "",
-        )
-      )
-        return false;
+      const result = await row
+        .locator(":scope > td")
+        .nth(resultIndex)
+        .textContent();
+      if (!acceptedResult.test(result?.trim() ?? "")) return false;
     }
     return true;
   }

@@ -4,6 +4,7 @@ import { accountIdSchema, type GroupMemberSnapshot } from "../domain/sync.js";
 import { problemIdSchema, type SubmissionId } from "../domain.js";
 import type { GroupAcceptedSubmission } from "../group-domain.js";
 import { JungolError } from "./errors.js";
+import { inspectGroupFeedTable } from "./group-feed-table.js";
 import {
   SubmissionIdExtractionError,
   submissionIdFromHrefs,
@@ -22,6 +23,12 @@ export class GroupSubmissionDomParser {
     rows: readonly Locator[],
     members: readonly GroupMemberSnapshot[],
   ): Promise<readonly GroupAcceptedSubmission[]> {
+    const columns = await page.evaluate(
+      inspectGroupFeedTable,
+      "headers" as const,
+    );
+    if (columns === null || columns === "boundary")
+      throw new JungolError("group_feed_row_invalid");
     const memberIds = new Set(members.map((member) => member.accountId));
     const submissions: GroupAcceptedSubmission[] = [];
     for (const [rowIndex, row] of rows.entries()) {
@@ -45,10 +52,10 @@ export class GroupSubmissionDomParser {
           rowVisible: await row.isVisible(),
         });
       const accountId = accountIdSchema.parse(
-        await this.idFrom(cells.nth(1), "account"),
+        await this.idFrom(cells.nth(columns.account), "account"),
       );
       const problemId = problemIdSchema.parse(
-        Number(await this.idFrom(cells.nth(2), "problem")),
+        Number(await this.idFrom(cells.nth(columns.problem), "problem")),
       );
       const submissionId = await this.submissionId(page, row, rowIndex);
       if (!memberIds.has(accountId)) {
@@ -66,9 +73,11 @@ export class GroupSubmissionDomParser {
           ...(location === undefined ? {} : { location }),
         });
       }
-      if (!/정답/.test((await cells.nth(3).textContent()) ?? ""))
+      const result =
+        (await cells.nth(columns.result).textContent())?.trim() ?? "";
+      if (!/^정답(?:\s+\d+\s*점)?$/.test(result))
         throw new JungolError("group_feed_row_invalid");
-      const score = this.score((await cells.nth(3).textContent()) ?? "");
+      const score = this.score(result);
       let timestamp: SubmissionTimestamp;
       try {
         timestamp = await this.timestamps.read(page, row);
