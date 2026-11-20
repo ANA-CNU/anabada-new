@@ -18,7 +18,11 @@ export class MigrationApplication {
 
   public async run(arguments_: readonly string[]): Promise<void> {
     try {
-      if (arguments_.length !== 1 || arguments_[0] !== "up") {
+      const requireBojImport = arguments_[1] === "--require-boj-import";
+      if (
+        arguments_[0] !== "up" ||
+        arguments_.length !== (requireBojImport ? 2 : 1)
+      ) {
         throw new MigrationError(migrationErrorCodes.configurationInvalid);
       }
       const config = parseConfiguration(this.environment);
@@ -29,6 +33,7 @@ export class MigrationApplication {
       );
       await new MigrationRunner(repository, this.logger).run(
         await catalog.load(),
+        requireBojImport,
       );
       this.logger.info("migration.complete");
     } catch (error: unknown) {

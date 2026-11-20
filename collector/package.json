@@ -16,7 +16,7 @@
     "test:group:mysql": "node test/group-mysql-integration.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node --input-type=module -e \"import { writeFileSync } from 'node:fs'; writeFileSync('dist/cli.js', 'import \\\"./collector/src/cli.js\\\";\\n');\"",
     "check-config": "node --enable-source-maps dist/cli.js check-config"
   },
   "dependencies": {

@@ -38,8 +38,8 @@ try {
     const markup = renderToStaticMarkup(createElement(ScoreReasonText, { children: reason }));
     // Then: 모든 문제 번호는 안전한 외부 링크가 되고 주변 텍스트는 유지된다.
     assert.match(markup, /^<span>/u);
-    assert.match(markup, /href="https:\/\/jungol\.co\.kr\/problem\/12312"/u);
-    assert.match(markup, /href="https:\/\/jungol\.co\.kr\/problem\/42"/u);
+    assert.match(markup, /href="https:\/\/www\.acmicpc\.net\/problem\/12312"/u);
+    assert.match(markup, /href="https:\/\/www\.acmicpc\.net\/problem\/42"/u);
     assert.match(markup, /target="_blank"/u);
     assert.match(markup, /rel="noopener noreferrer"/u);
     assert.match(markup, />#12312<\/a>을 해결하고 <a[^>]*>#42<\/a>도 제출했습니다\.<\/span>$/u);
@@ -51,7 +51,15 @@ try {
     // When: 점수 사유를 렌더링한다.
     const markup = renderToStaticMarkup(createElement(ScoreReasonText, { children: reason }));
     // Then: 반복된 번호도 각각 독립적인 링크로 렌더링된다.
-    assert.equal((markup.match(/href="https:\/\/jungol\.co\.kr\/problem\/12312"/gu) ?? []).length, 2);
+    assert.equal((markup.match(/href="https:\/\/www\.acmicpc\.net\/problem\/12312"/gu) ?? []).length, 2);
+  }
+
+  {
+    const markup = renderToStaticMarkup(createElement(ScoreReasonText, {
+      children: "Event(#5)의 1001번 문제 해결",
+    }));
+    assert.match(markup, /Event\(#5\)의 <a [^>]*href="https:\/\/www\.acmicpc\.net\/problem\/1001"/u);
+    assert.doesNotMatch(markup, /\/problem\/5"/u);
   }
 
   {
@@ -62,7 +70,7 @@ try {
     // Then: 일반 텍스트는 React가 이스케이프하고 숫자 참조만 링크가 된다.
     assert.match(markup, /&lt;img src=x&gt; /u);
     assert.doesNotMatch(markup, /<img src=x>/u);
-    assert.match(markup, /href="https:\/\/jungol\.co\.kr\/problem\/7"/u);
+    assert.match(markup, /href="https:\/\/www\.acmicpc\.net\/problem\/7"/u);
   }
 } finally {
   await rm(temporaryDirectory, { force: true, recursive: true });

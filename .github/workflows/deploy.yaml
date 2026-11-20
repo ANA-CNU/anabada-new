@@ -12,33 +12,32 @@ concurrency:
 jobs:
   deploy:
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, deploy]
     timeout-minutes: 30
     # GitHub production Environment의 승인·보호 규칙을 통과한 job만 Secret을 읽는다.
     environment: production
     env:
-      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
-      DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
       DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
       ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
-      JUNGOL_USERNAME: ${{ secrets.JUNGOL_USERNAME }}
-      JUNGOL_PASSWORD: ${{ secrets.JUNGOL_PASSWORD }}
       VITE_KAKAO_MAP_API_KEY: ${{ secrets.VITE_KAKAO_MAP_API_KEY }}
-      # 선택값이며 비어 있으면 backend/collector 긴급 Discord 알림만 비활성화된다.
+      # 선택값이며 비어 있으면 backend 긴급 Discord 알림만 비활성화된다.
       WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+      SOLVED_AC_CLIENT_ID: ${{ secrets.SOLVED_AC_CLIENT_ID }}
+      SOLVED_AC_CLIENT_SECRET: ${{ secrets.SOLVED_AC_CLIENT_SECRET }}
     steps:
-      # 누락된 Secret은 서버 접속이나 임시 파일 생성 전에 이름만 표시하고 즉시 실패시킨다.
-      - name: Validate required GitHub secrets
+      - name: Verify production runner and required secrets
         shell: bash
         run: |
           set +x
           set -euo pipefail
+          if [[ "$RUNNER_NAME" != bada_deploy ]]; then
+            printf 'Production deployment requires the bada_deploy runner\n' >&2
+            exit 1
+          fi
           missing=()
-          for key in DEPLOY_HOST DEPLOY_USER DEPLOY_PORT DEPLOY_KEY DB_PASSWORD JWT_SECRET ADMIN_USERNAME ADMIN_PASSWORD JUNGOL_USERNAME JUNGOL_PASSWORD; do
+          for key in DB_PASSWORD JWT_SECRET ADMIN_USERNAME ADMIN_PASSWORD; do
             if [[ -z "${!key:-}" ]]; then missing+=("$key"); fi
           done
           if (( ${#missing[@]} )); then
@@ -51,44 +50,8 @@ jobs:
         run: |
           set +x
           set -euo pipefail
-          umask 077
-          secret_dir=$(mktemp -d)
-          remote_dir=
-          # GitHub-hosted runner는 일회성이므로 별도 known_hosts Secret 없이 첫 host key를 수락한다.
-          ssh_options=(-i "$secret_dir/key" -p "$DEPLOY_PORT" -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3)
-          target="$DEPLOY_USER@$DEPLOY_HOST"
-          cleanup() {
-            if [[ "$remote_dir" =~ ^/tmp/jungol-deploy\.[a-zA-Z0-9]+$ ]]; then
-              # shellcheck disable=SC2029
-              timeout 30 ssh "${ssh_options[@]}" "$target" "if [ -d '$remote_dir' ]; then rm -f '$remote_dir/.env'; rmdir '$remote_dir'; fi" || true
-            fi
-            rm -f "$secret_dir/key" "$secret_dir/.env"
-            rmdir "$secret_dir"
-          }
-          trap cleanup EXIT
-          trap 'exit 129' HUP
-          trap 'exit 130' INT
-          trap 'exit 143' TERM
-          bash scripts/deploy/render-production-env.sh "$secret_dir/.env"
-          printf '%s\n' "$DEPLOY_KEY" > "$secret_dir/key"
-          remote_dir=$(ssh "${ssh_options[@]}" "$target" 'umask 077; mktemp -d /tmp/jungol-deploy.XXXXXXXX')
-          [[ "$remote_dir" =~ ^/tmp/jungol-deploy\.[a-zA-Z0-9]+$ ]]
-          # 생성된 .env는 저장소가 아닌 권한 0700의 원격 임시 디렉터리를 통해 전달한다.
-          # shellcheck disable=SC2029
-          tar -C "$secret_dir" -cf - .env |
-            ssh "${ssh_options[@]}" "$target" "tar -C '$remote_dir' -xf -"
-          # shellcheck disable=SC2029
-          ssh "${ssh_options[@]}" "$target" "bash -se -- '$remote_dir'" <<'DEPLOY'
-          set -euo pipefail
-          # CI에서 확인된 구버전 Compose/Bake 조합의 이미지 선택 결함만 피한다. BuildKit 캐시와 단일 Compose up의 의존성은 유지한다.
-          export COMPOSE_BAKE=false
-          repository=/home/ana/Desktop/ana/anabada-new
-          transit=$1
-          cleanup() { rm -f "$transit/.env" "$repository/.env.next"; rmdir "$transit" 2>/dev/null || true; }
-          trap cleanup EXIT
-          trap 'exit 129' HUP
-          trap 'exit 130' INT
-          trap 'exit 143' TERM
+          # GitHub Actions 작업 디렉터리와 독립된 checkout에 운영 MySQL bind mount를 유지한다.
+          repository="$HOME/anabada-new"
           if [[ -e "$repository" || -L "$repository" ]]; then
             if [[ ! -d "$repository" ]] || ! git -C "$repository" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
               printf 'Deployment repository path is not a Git working tree\n' >&2
@@ -102,16 +65,14 @@ jobs:
             git clone --depth 1 --branch main --single-branch https://github.com/ANA-CNU/anabada-new.git "$repository"
             cd "$repository"
           fi
-          # 완성된 파일만 0600으로 설치하고 rename하여 부분 작성된 .env가 노출되지 않게 한다.
-          install -m 0600 "$1/.env" .env.next
-          mv -f .env.next .env
-          export COLLECTOR_REVISION="$(git rev-parse HEAD)"
-          docker compose --env-file .env -f docker-compose.prod.yaml config --quiet
-          timeout 1200 docker compose --env-file .env -f docker-compose.prod.yaml build
-          # 005 적용 뒤 구 backend/collector가 제거된 열을 읽거나 쓰지 않도록 앱만 잠시 중지한다.
-          timeout 60 docker compose --env-file .env -f docker-compose.prod.yaml stop anabada-backend jungol-collector
-          timeout 1200 docker compose --env-file .env -f docker-compose.prod.yaml up -d --no-build --remove-orphans --wait --wait-timeout 180
+          bash "$GITHUB_WORKSPACE/scripts/deploy/render-production-env.sh" "$repository/.env"
+          unset DB_PASSWORD JWT_SECRET ADMIN_USERNAME ADMIN_PASSWORD VITE_KAKAO_MAP_API_KEY WEBHOOK_URL SOLVED_AC_CLIENT_ID SOLVED_AC_CLIENT_SECRET
+          sudo -n docker compose --env-file .env -f docker-compose.prod.yaml config --quiet
+          # CI에서 확인된 구버전 Compose/Bake 조합의 이미지 선택 결함을 피한다.
+          timeout 1200 sudo -n COMPOSE_BAKE=false docker compose --env-file .env -f docker-compose.prod.yaml build
+          timeout 1200 sudo -n docker compose --env-file .env -f docker-compose.prod.yaml run --rm database-migrator
+          timeout 60 sudo -n docker compose --env-file .env -f docker-compose.prod.yaml stop anabada-backend
+          timeout 1200 sudo -n docker compose --env-file .env -f docker-compose.prod.yaml up -d --no-build --remove-orphans --wait --wait-timeout 180
           # 변경되지 않은 nginx도 이전 backend 컨테이너 IP를 계속 가리킬 수 있어 배포마다 재시작한다.
-          timeout 60 docker compose --env-file .env -f docker-compose.prod.yaml restart bada-nginx
-          docker compose --env-file .env -f docker-compose.prod.yaml ps
-          DEPLOY
+          timeout 60 sudo -n docker compose --env-file .env -f docker-compose.prod.yaml restart bada-nginx
+          sudo -n docker compose --env-file .env -f docker-compose.prod.yaml ps

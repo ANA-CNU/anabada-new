@@ -150,7 +150,7 @@ async function count(
 }
 
 test(
-  "Given a disposable MySQL 9.3 database When 002 is seeded and migrations through 005 run Then group storage preserves approved state and commits atomically",
+  "Given a disposable MySQL 9.3 database When the shared migrator runs without a legacy BOJ source Then group storage preserves approved state and commits atomically",
   {
     skip:
       !enabled ||
@@ -219,7 +219,7 @@ test(
           >("SELECT version FROM migrations ORDER BY version");
           assert.deepEqual(
             migrations.map((migration) => migration.version),
-            [2, 3, 4, 5],
+            [2, 3, 4, 5, 6],
           );
           assert.equal(await count(pool, "problem"), 0);
           assert.equal(await count(pool, "ranking_boards"), 0);

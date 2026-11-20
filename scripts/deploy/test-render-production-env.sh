@@ -6,8 +6,8 @@ script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 renderer="$script_dir/render-production-env.sh"
 test_dir=$(mktemp -d)
 trap 'rm -rf -- "$test_dir"' EXIT
-required=(DB_PASSWORD JWT_SECRET ADMIN_USERNAME ADMIN_PASSWORD JUNGOL_USERNAME JUNGOL_PASSWORD)
-keys=("${required[@]}" VITE_KAKAO_MAP_API_KEY WEBHOOK_URL)
+required=(DB_PASSWORD JWT_SECRET ADMIN_USERNAME ADMIN_PASSWORD)
+keys=("${required[@]}" VITE_KAKAO_MAP_API_KEY WEBHOOK_URL SOLVED_AC_CLIENT_ID SOLVED_AC_CLIENT_SECRET)
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 fixture=$' fixture # $INERT ${INERT:?do-not-expand} single\' double" slash\\ literal\\n tab\t tail\\ '
@@ -24,7 +24,7 @@ cmp -s "$test_dir/keys" "$test_dir/expected-keys" || fail 'exact key allowlist'
 mode=$(stat -c '%a' "$test_dir/production.env" 2>/dev/null || stat -f '%Lp' "$test_dir/production.env")
 [[ "$mode" == 600 ]] || fail 'mode 0600'
 cp "$test_dir/production.env" "$test_dir/original"
-pass 'valid input produces exactly eight keys, no logs, mode 0600'
+pass 'valid input produces the allowlisted keys, no logs, mode 0600'
 
 # Given an existing artifact, when required input is absent/empty or has CR/LF, then preserve it.
 for key in "${required[@]}"; do

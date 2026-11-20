@@ -5,6 +5,7 @@ import {
   type ScoreHistoryPatch,
   ScoreHistoryRepository,
 } from "../../infrastructure/mysql/repositories/score-history-repository.js";
+import type { UserHandleColumn } from "../../infrastructure/mysql/repositories/user-repository.js";
 
 export interface ScoreHistoryUnitOfWork {
   unitOfWork<T>(work: (database: DatabaseExecutor) => Promise<T>): Promise<T>;
@@ -17,6 +18,7 @@ export class ScoreHistoryService {
     private readonly reader: ScoreHistoryReader,
     private readonly transactions: ScoreHistoryUnitOfWork,
     private readonly clock: () => Date = () => new Date(),
+    private readonly handleColumn: UserHandleColumn = "jungol_name",
   ) {}
   async bulk(records: readonly ManualScoreHistory[]) {
     return this.transactions.unitOfWork(async (database) => {
@@ -40,7 +42,11 @@ export class ScoreHistoryService {
   }
   async list(page: number, limit: number, username: string | undefined) {
     return this.reader.withSession((database) =>
-      new ScoreHistoryRepository(database).list(page, limit, username),
+      new ScoreHistoryRepository(database, this.handleColumn).list(
+        page,
+        limit,
+        username,
+      ),
     );
   }
   async update(id: number, patch: ScoreHistoryPatch) {

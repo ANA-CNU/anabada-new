@@ -14,6 +14,12 @@ export type SqlOperation = Readonly<{
   readonly id: SqlOperationId;
   readonly timeoutMs: number;
 }>;
+export function defineSqlOperation(
+  id: string,
+  timeoutMs = 2_000,
+): SqlOperation {
+  return { id: id as SqlOperationId, timeoutMs };
+}
 export interface SqlOperationObserver {
   observe(operationId: SqlOperationId): void;
 }

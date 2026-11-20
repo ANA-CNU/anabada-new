@@ -61,7 +61,7 @@ export class MigrationRepository {
     this.connection = connection;
     let lockHeld = false;
     try {
-      lockHeld = await this.acquireLock();
+      lockHeld = await this.acquireLock("jungol_bada:migrations");
       const result = await operation();
       const cleanupError = await this.cleanup(connection, lockHeld);
       this.connection = undefined;
@@ -97,8 +97,34 @@ export class MigrationRepository {
     return rows.length > 0;
   }
 
+  public async hasBojSource(): Promise<boolean> {
+    const [rows] = await this.requireConnection().query(
+      "SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = 'anabada'",
+    );
+    return rows.length > 0;
+  }
+
+  public async hasAppliedBojImport(): Promise<boolean> {
+    const [rows] = await this.requireConnection().query(
+      "SELECT version FROM migrations WHERE version = 7 AND filename = '007_import_anabada.sql'",
+    );
+    return rows.length > 0;
+  }
+
+  public async hasBojImportMarker(): Promise<boolean> {
+    const [rows] = await this.requireConnection().query(
+      "SELECT id FROM boj_bada.boj_import WHERE id = 1",
+    );
+    return rows.length > 0;
+  }
+
   public async executeSql(sql: string): Promise<void> {
     await this.requireConnection().query(sql);
+  }
+
+  public async lockBojWorkers(): Promise<void> {
+    await this.acquireLock("boj_bada:collector");
+    await this.acquireLock("boj_bada:solved-ac");
   }
 
   public async createMigrationTable(): Promise<void> {
@@ -125,10 +151,10 @@ export class MigrationRepository {
     );
   }
 
-  private async acquireLock(): Promise<boolean> {
+  private async acquireLock(name: string): Promise<boolean> {
     const [rows] = await this.requireConnection().query(
       "SELECT GET_LOCK(?, 60) AS acquired",
-      ["jungol_bada:migrations"],
+      [name],
     );
     if (rows[0]?.["acquired"] !== 1) {
       throw new MigrationError(migrationErrorCodes.lockUnavailable);

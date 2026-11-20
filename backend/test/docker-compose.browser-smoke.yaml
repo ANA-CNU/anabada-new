@@ -28,19 +28,22 @@ services:
       DB_PORT: "3306"
       DB_USER: root
       DB_PASSWORD: browser-smoke-only
-      DB_NAME: jungol_bada
+      DB_NAME: boj_bada
     depends_on:
       jungol-migrator: { condition: service_completed_successfully }
     restart: "no"
 
   anabada-backend:
-    build: { context: ../../backend, dockerfile: Dockerfile.prod }
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile.prod
+      additional_contexts: {automatic_scoring: ../../shared}
     environment:
       DB_HOST: anabada-mysql
       DB_PORT: "3306"
       DB_USER: root
       DB_PASSWORD: browser-smoke-only
-      DB_NAME: jungol_bada
+      DB_NAME: boj_bada
       NODE_ENV: test
       ALLOWED_ORIGIN: http://bada-nginx
       JWT_SECRET: browser-smoke-jwt

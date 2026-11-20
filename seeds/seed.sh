@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-if [ "${PREVIEW_SEED:-}" != "anabada-dev-seeded" ] || [ "${DB_HOST:-}" != "anabada-mysql" ] || [ "${DB_NAME:-}" != "jungol_bada" ]; then
+if [ "${PREVIEW_SEED:-}" != "anabada-dev-seeded" ] || [ "${DB_HOST:-}" != "anabada-mysql" ] || [ "${DB_NAME:-}" != "boj_bada" ]; then
   echo "미리보기 전용 시드 대상 검증에 실패했습니다." >&2
   exit 1
 fi

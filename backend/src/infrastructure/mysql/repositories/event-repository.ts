@@ -49,7 +49,10 @@ export interface EventRepositoryPort {
 }
 
 export class EventRepository implements EventRepositoryPort {
-  constructor(private readonly database: DatabaseExecutor) {}
+  constructor(
+    private readonly database: DatabaseExecutor,
+    private readonly clock: () => Date = () => new Date(),
+  ) {}
 
   async create(
     input: Readonly<{
@@ -144,32 +147,34 @@ export class EventRepository implements EventRepositoryPort {
       );
   }
 
-  async count(): Promise<number> {
-    const row = await this.database.selectOne(
-      sqlOperations.eventList,
-      "SELECT COUNT(*) AS total FROM event",
-      [],
-      z.object({ total: z.coerce.number().int().nonnegative() }),
-    );
-    return row?.total ?? 0;
-  }
-  list(limit: number, offset: number): Promise<readonly EventListRow[]> {
-    return this.database.select(
-      sqlOperations.eventList,
-      "SELECT e.id, e.title, e.`desc`, e.begin, e.end, e.created_at, COUNT(ep.problem) AS problem_count FROM event e LEFT JOIN event_problem ep ON e.id = ep.event_id GROUP BY e.id ORDER BY e.created_at DESC LIMIT ? OFFSET ?",
-      [limit, offset],
-      eventListRowSchema,
-    );
+  async page(limit: number, offset: number, activeOnly: boolean) {
+    const where = activeOnly ? "WHERE e.begin <= ? AND e.end > ?" : "";
+    const now = this.clock();
+    const parameters = activeOnly ? [now, now] : [];
+    const [count, rows] = await Promise.all([
+      this.database.selectOne(
+        sqlOperations.eventList,
+        `SELECT COUNT(*) AS total FROM event e ${where}`,
+        parameters,
+        z.object({ total: z.coerce.number().int().nonnegative() }),
+      ),
+      this.database.select(
+        sqlOperations.eventList,
+        `SELECT e.id, e.title, e.\`desc\`, e.begin, e.end, e.created_at, COUNT(ep.problem) AS problem_count FROM event e LEFT JOIN event_problem ep ON e.id = ep.event_id ${where} GROUP BY e.id ORDER BY e.created_at DESC, e.id DESC LIMIT ? OFFSET ?`,
+        [...parameters, limit, offset],
+        eventListRowSchema,
+      ),
+    ]);
+    return { total: count?.total ?? 0, rows };
   }
   recent(ongoing: boolean): Promise<readonly RecentEventRow[]> {
-    const predicate = ongoing
-      ? "e.begin <= UTC_TIMESTAMP() AND e.end >= UTC_TIMESTAMP()"
-      : "e.end < UTC_TIMESTAMP()";
+    const now = this.clock();
+    const predicate = ongoing ? "e.begin <= ? AND e.end >= ?" : "e.end < ?";
     const order = ongoing ? "ASC" : "DESC";
     return this.database.select(
       ongoing ? sqlOperations.eventOngoing : sqlOperations.eventPast,
       `SELECT e.title AS event_title, e.begin, e.end, GROUP_CONCAT(ep.problem ORDER BY ep.id) AS problems FROM event e LEFT JOIN event_problem ep ON e.id = ep.event_id WHERE ${predicate} GROUP BY e.id ORDER BY e.end ${order} LIMIT 3`,
-      [],
+      ongoing ? [now, now] : [now],
       recentRowSchema,
     );
   }

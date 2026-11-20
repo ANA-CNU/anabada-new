@@ -11,17 +11,23 @@ export class MigrationRunner {
     private readonly logger: Logger,
   ) {}
 
-  public async run(migrations: readonly Migration[]): Promise<void> {
+  public async run(
+    migrations: readonly Migration[],
+    requireBojImport = false,
+  ): Promise<void> {
     await this.repository.withLock(async () => {
       if (!(await this.repository.databaseExists())) {
         await this.bootstrap(migrations);
-        return;
+      } else {
+        await this.repository.useDatabase();
+        if (!(await this.repository.hasMigrationTable())) {
+          throw new MigrationError(migrationErrorCodes.unmanagedDatabase);
+        }
+        await this.applyPending(migrations);
       }
-      await this.repository.useDatabase();
-      if (!(await this.repository.hasMigrationTable())) {
-        throw new MigrationError(migrationErrorCodes.unmanagedDatabase);
+      if (requireBojImport && !(await this.repository.hasAppliedBojImport())) {
+        throw new MigrationError(migrationErrorCodes.bojSourceUnavailable);
       }
-      await this.applyPending(migrations);
     });
   }
 
@@ -44,10 +50,34 @@ export class MigrationRunner {
       await this.repository.readApplied(),
     );
     for (const migration of pending) {
-      await this.repository.executeSql(migration.sql);
+      if (migration.filename === "007_import_anabada.sql") {
+        if (!(await this.applyBojImport(migration))) return;
+      } else {
+        // Until the deployment stops the old backend, prevent writes between copying and dropping its tables.
+        if (migration.filename === "012_simplify_boj_ingestion.sql")
+          await this.repository.lockBojWorkers();
+        await this.repository.executeSql(migration.sql);
+      }
       await this.repository.record(migration);
       this.logApplied(migration);
     }
+  }
+
+  private async applyBojImport(migration: Migration): Promise<boolean> {
+    // The import marker commits with the copied rows, so a retry can restore the ledger entry.
+    if (await this.repository.hasBojImportMarker()) return true;
+    if (!(await this.repository.hasBojSource())) {
+      this.logger.warn(
+        { filename: migration.filename },
+        "migration.boj_source_unavailable",
+      );
+      return false;
+    }
+    await this.repository.executeSql(migration.sql);
+    if (!(await this.repository.hasBojImportMarker())) {
+      throw new MigrationError(migrationErrorCodes.migrationHistoryInvalid);
+    }
+    return true;
   }
 
   private logApplied(migration: Migration): void {

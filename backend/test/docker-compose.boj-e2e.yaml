@@ -1,0 +1,23 @@
+services:
+  anabada-backend:
+    command: ["bun", "run", "test/boj/one-member-e2e.ts"]
+    volumes:
+      - ../src:/app/src:ro
+      - ../../shared:/shared:ro
+      - ./boj/one-member-e2e.ts:/app/test/boj/one-member-e2e.ts:ro
+    depends_on: !override
+      anabada-mysql: { condition: service_healthy }
+    healthcheck:
+      start_period: 75s
+
+  anabada-frontend:
+    depends_on: !reset []
+
+  anabada-middleware:
+    depends_on: !reset []
+
+  browser-smoke:
+    command: ["node", "boj-e2e.mjs"]
+    volumes: !override
+      - ../../frontend/test/boj-e2e.mjs:/smoke/boj-e2e.mjs:ro
+      - ../../test-output/boj-e2e:/artifacts

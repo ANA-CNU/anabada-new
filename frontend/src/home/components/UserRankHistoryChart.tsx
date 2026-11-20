@@ -1,42 +1,12 @@
 import { ChartTooltip } from "./ChartTooltip";
 import { SquircleSurface } from "@/components/ui/squircle";
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { URL } from '@/resource/constant';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, BarChart, Bar, type TooltipContentProps } from 'recharts';
 
-interface RankPoint {
-  board_id: number;
-  created_at: string;
-  rank: number;
-}
+import type { RankPoint } from '../../types';
 
-interface Props {
-  userId: number;
-}
-
-const UserRankHistoryChart: React.FC<Props> = ({ userId }) => {
-  const [data, setData] = useState<RankPoint[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(`${URL}/api/board/user/${userId}/rank-history`);
-        if (res.ok) {
-          const json = await res.json();
-          setData(Array.isArray(json) ? json : json.data || []);
-        }
-      } catch (e) {
-        console.error('랭킹 히스토리 로딩 실패', e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [userId]);
-
+const UserRankHistoryChart: React.FC<{ data: readonly RankPoint[] }> = ({ data }) => {
   const chartData = useMemo(() => {
     // 전체 데이터를 모두 표시 + 숫자형 타임스탬프 추가
     return data.map(d => {
@@ -100,9 +70,7 @@ const UserRankHistoryChart: React.FC<Props> = ({ userId }) => {
         <CardTitle className="text-xl">랭킹 변화 ({data.length}개 데이터)</CardTitle>
       </CardHeader>
       <CardContent>
-        {loading ? (
-          <div className="text-gray-300">로딩 중...</div>
-        ) : chartData.length === 0 ? (
+        {chartData.length === 0 ? (
           <div className="text-gray-400">랭킹 데이터가 없습니다.</div>
         ) : (
           <>

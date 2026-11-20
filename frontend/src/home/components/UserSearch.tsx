@@ -3,20 +3,20 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
-import { Search, User } from 'lucide-react';
+import { Search, User as UserIcon } from 'lucide-react';
 import { URL } from '@/resource/constant';
 import { getTierName } from '../../lib/utils';
-import type { User as JungolUser } from '@/types';
+import type { User } from '@/types';
 
 interface UserSearchProps {
-  onUserSelect?: (user: JungolUser) => void;
+  onUserSelect?: (user: User) => void;
   wide?: boolean;
 }
 
 const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect, wide = false }) => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState<JungolUser[]>([]);
+  const [searchResults, setSearchResults] = useState<User[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
   const handleSearch = async () => {
@@ -27,7 +27,7 @@ const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect, wide = false }) =
       const response = await fetch(`${URL}/api/user/search?q=${encodeURIComponent(searchTerm)}`);
       const data = await response.json();
       if (!response.ok) throw new Error(data?.error || '검색에 실패했습니다.');
-      setSearchResults(data as JungolUser[]);
+      setSearchResults(data as User[]);
     } catch (error) {
       console.error('사용자 검색 중 오류 발생:', error);
     } finally {
@@ -55,7 +55,7 @@ const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect, wide = false }) =
     ? 'w-full p-6 bg-white/5 backdrop-blur-sm border border-white/10'
     : 'w-full max-w-2xl mx-auto p-6 bg-white/5 backdrop-blur-sm border border-white/10';
 
-  const goProfile = (user: JungolUser) => {
+  const goProfile = (user: User) => {
     if (onUserSelect) {
       onUserSelect(user);
       return;
@@ -102,7 +102,7 @@ const UserSearch: React.FC<UserSearchProps> = ({ onUserSelect, wide = false }) =
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex items-center gap-3">
                       <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
-                        <User className="w-5 h-5 text-white" />
+                        <UserIcon className="w-5 h-5 text-white" />
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">

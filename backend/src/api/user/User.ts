@@ -89,6 +89,7 @@ export const createUserRoutes = (
   dependencies: Readonly<{
     service: UserService;
     adminAuthorizer: AdminAuthorizer;
+    boj?: boolean;
   }>,
 ) =>
   new Elysia()
@@ -125,6 +126,14 @@ export const createUserRoutes = (
       const patch = requestPatchSchema.safeParse(body);
       if (!id.success || !patch.success)
         return json(400, { error: "유효하지 않은 요청입니다." });
+      if (
+        dependencies.boj &&
+        (patch.data.jungol_account_id !== undefined ||
+          patch.data.rank_wrong_count !== undefined ||
+          (patch.data.jungol_name !== undefined &&
+            !/^[a-zA-Z0-9_]+$/.test(patch.data.jungol_name)))
+      )
+        return json(400, { error: "유효하지 않은 백준 사용자 정보입니다." });
       const normalized = userPatchSchema.safeParse(patch.data);
       if (!normalized.success)
         return json(400, { error: "유효하지 않은 요청입니다." });

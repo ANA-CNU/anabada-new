@@ -164,3 +164,40 @@ test("Given 002 applied, when running, then it executes every pending migration 
 
   assert.deepEqual(connection.executedSql, ["SQL_003", "SQL_004", "SQL_005"]);
 });
+
+test("waits for both BOJ workers before removing their old tables", async () => {
+  const migration = {
+    ...migrations[0],
+    version: 12,
+    filename: "012_simplify_boj_ingestion.sql",
+    sql: "SQL_012",
+    checksumSha256: "e".repeat(64),
+  };
+  const locks: (string | number)[] = [];
+  class WorkerConnection extends HistoryConnection {
+    override async query(
+      sql: string,
+      parameters: readonly (number | string)[] = [],
+    ) {
+      if (sql.startsWith("SELECT GET_LOCK")) locks.push(...parameters);
+      if (sql === migration.sql)
+        assert.deepEqual(locks, [
+          "jungol_bada:migrations",
+          "boj_bada:collector",
+          "boj_bada:solved-ac",
+        ]);
+      return super.query(sql);
+    }
+  }
+  const connection = new WorkerConnection(
+    migrations.map((entry) => ({
+      version: entry.version,
+      filename: entry.filename,
+      checksum_sha256: entry.checksumSha256,
+    })),
+  );
+
+  await runner(connection).run([...migrations, migration]);
+
+  assert.deepEqual(connection.executedSql, [migration.sql]);
+});
