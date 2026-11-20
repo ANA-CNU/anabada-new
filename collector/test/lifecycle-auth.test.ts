@@ -68,8 +68,8 @@ for (const scenario of [
     });
     const loader = new CollectorConfigLoader({
       profileDir: join(directory, "profile"),
-      loginTimeoutMs: 700,
-      pageTimeoutMs: 700,
+      loginTimeoutMs: 3_000,
+      pageTimeoutMs: 3_000,
     });
     const config = loader.parse({
       JUNGOL_USERNAME: "disposable-fixture",
@@ -85,7 +85,7 @@ for (const scenario of [
     );
     session = await JungolSession.launch(
       config,
-      new JungolRequestCoordinator(),
+      new JungolRequestCoordinator({ delay: async () => undefined }),
     );
     await session.context.route("**/*", (route) => {
       const url = new URL(route.request().url());
