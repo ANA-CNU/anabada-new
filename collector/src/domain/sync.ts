@@ -72,26 +72,5 @@ export class AccountInitialSnapshot {
   ) {}
 }
 
-export type ScoreRule = "daily" | "event";
-
-/** 점수 정책이 만들고 저장소만 INSERT할 수 있는 멱등 점수 명령이다. */
-export class ScoreAward {
-  readonly bias = 1;
-
-  constructor(
-    readonly ruleType: ScoreRule,
-    readonly awardKey: string,
-    readonly userId: number,
-    readonly problemRowId: number,
-    readonly problemNumber: number,
-    readonly eventId: number | null,
-    readonly scoreDay: string,
-    readonly createdAt: Date,
-  ) {}
-
-  get description(): string {
-    return this.ruleType === "daily"
-      ? `#${this.problemNumber}를 해결하여, 일일 점수 획득`
-      : `이벤트 ID #event${this.eventId} 문제를 풀어 점수 획득`;
-  }
-}
+export type { ScoreRule } from "../../../shared/automatic-scoring.js";
+export { ScoreAward } from "../../../shared/automatic-scoring.js";

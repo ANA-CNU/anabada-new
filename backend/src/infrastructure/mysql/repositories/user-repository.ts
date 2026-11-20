@@ -3,8 +3,7 @@ import type { DatabaseExecutor } from "../database-session.js";
 import { sqlOperations } from "../database-session.js";
 import { type UserDto, type UserPatch, userDtoSchema } from "./contracts.js";
 
-const userColumns =
-  "id, jungol_name, korean_name, corrects, submissions, CAST(solution AS CHAR) AS solution, tier, ignored, CAST(jungol_account_id AS CHAR) AS jungol_account_id, rank_wrong_count";
+export type UserHandleColumn = "handle" | "jungol_name";
 const idSchema = z.object({ id: z.number().int().positive() });
 const userOperations = {
   list: sqlOperations.userList,
@@ -28,12 +27,23 @@ const writableColumns = [
 type WritableColumn = (typeof writableColumns)[number];
 
 export class UserRepository {
-  constructor(private readonly database: DatabaseExecutor) {}
+  constructor(
+    private readonly database: DatabaseExecutor,
+    private readonly handleColumn: UserHandleColumn = "jungol_name",
+  ) {}
+
+  private get userColumns(): string {
+    const legacyFields =
+      this.handleColumn === "handle"
+        ? "'0' AS jungol_account_id, 0 AS rank_wrong_count"
+        : "CAST(jungol_account_id AS CHAR) AS jungol_account_id, rank_wrong_count";
+    return `id, ${this.handleColumn} AS jungol_name, korean_name, corrects, submissions, CAST(solution AS CHAR) AS solution, tier, ignored, ${legacyFields}`;
+  }
 
   async list(): Promise<readonly UserDto[]> {
     return this.database.select(
       userOperations.list,
-      `SELECT ${userColumns} FROM user ORDER BY id ASC`,
+      `SELECT ${this.userColumns} FROM user ORDER BY id ASC`,
       [],
       userDtoSchema,
     );
@@ -42,7 +52,7 @@ export class UserRepository {
   async find(id: number): Promise<UserDto | undefined> {
     return this.database.selectOne(
       userOperations.find,
-      `SELECT ${userColumns} FROM user WHERE id = ?`,
+      `SELECT ${this.userColumns} FROM user WHERE id = ?`,
       [id],
       userDtoSchema,
     );
@@ -56,7 +66,7 @@ export class UserRepository {
     const pattern = `%${escaped}%`;
     return this.database.select(
       userOperations.search,
-      `SELECT ${userColumns} FROM user WHERE ignored = 0 AND (jungol_name LIKE ? ESCAPE '\\\\' OR korean_name LIKE ? ESCAPE '\\\\') ORDER BY tier DESC, corrects DESC LIMIT 50`,
+      `SELECT ${this.userColumns} FROM user WHERE ignored = 0 AND (${this.handleColumn} LIKE ? ESCAPE '\\\\' OR korean_name LIKE ? ESCAPE '\\\\') ORDER BY tier DESC, corrects DESC LIMIT 50`,
       [pattern, pattern],
       userDtoSchema,
     );
@@ -66,7 +76,9 @@ export class UserRepository {
     const keys = writableColumns.filter(
       (key): key is WritableColumn => key in patch,
     );
-    const assignments = keys.map((key) => `${key} = ?`).join(", ");
+    const assignments = keys
+      .map((key) => `${key === "jungol_name" ? this.handleColumn : key} = ?`)
+      .join(", ");
     const values = keys.map((key) =>
       key === "ignored" ? Number(patch[key]) : patch[key],
     );

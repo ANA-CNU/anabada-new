@@ -74,20 +74,30 @@ test("Given an in-flight backend alert When the same error repeats Then sends on
   expect(transport.calls).toBe(1);
 });
 
-test("Given a failed emergency delivery When the same error repeats Then backs off", async () => {
-  const transport = new FailingTransport();
-  const notifier = new BackendEmergencyWebhook(
-    "https://discord.com/api/webhooks/test/token",
-    transport,
-  );
+test.each(["rejected", "thrown"] as const)(
+  "backs off after a %s emergency delivery",
+  async (failure) => {
+    const transport = new FailingTransport(failure);
+    const notifier = new BackendEmergencyWebhook(
+      "https://discord.com/api/webhooks/test/token",
+      transport,
+    );
 
-  const first = await notifier.notify(incident);
-  const second = await notifier.notify(incident);
+    const first = await notifier.notify(incident);
+    const second = await notifier.notify(incident);
 
-  expect(first).toBe("failed");
-  expect(second).toBe("suppressed");
-  expect(transport.calls).toBe(1);
-});
+    expect(first).toBe("failed");
+    expect(second).toBe("suppressed");
+    expect(transport.calls).toBe(1);
+    expect(
+      await notifier.notify({
+        ...incident,
+        occurredAt: new Date(incident.occurredAt.getTime() + 60_000),
+      }),
+    ).toBe("failed");
+    expect(transport.calls).toBe(2);
+  },
+);
 
 test("Given a Discord endpoint When notifying Then posts the Markdown payload over HTTP", async () => {
   let received = "";
@@ -147,8 +157,11 @@ class DeferredTransport implements BackendEmergencyWebhookTransport {
 class FailingTransport implements BackendEmergencyWebhookTransport {
   calls = 0;
 
+  constructor(private readonly failure: "rejected" | "thrown") {}
+
   async send(): Promise<boolean> {
     this.calls += 1;
+    if (this.failure === "thrown") throw new Error("transport unavailable");
     return false;
   }
 }

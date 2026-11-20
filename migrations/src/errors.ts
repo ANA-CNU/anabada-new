@@ -2,6 +2,7 @@
 export const migrationErrorCodes = {
   appliedMigrationModified: "applied_migration_modified",
   catalogInvalid: "catalog_invalid",
+  bojSourceUnavailable: "boj_source_unavailable",
   configurationInvalid: "configuration_invalid",
   lockUnavailable: "lock_unavailable",
   migrationHistoryInvalid: "migration_history_invalid",

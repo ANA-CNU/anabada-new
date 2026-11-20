@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome check src tests test",
     "dev": "bun run --watch src/cli.ts",
-    "build": "bun build src/cli.ts --outdir dist --target bun",
+    "build": "bun build src/cli.ts --outdir dist --target bun --external playwright-core",
     "start": "bun run dist/cli.js"
   },
   "dependencies": {
@@ -23,6 +23,7 @@
     "mysql2": "^3.14.3",
     "pino": "^9.9.0",
     "pino-pretty": "^13.1.1",
+    "playwright-core": "1.63.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {

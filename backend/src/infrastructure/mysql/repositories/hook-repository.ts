@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { DatabaseExecutor } from "../database-session.js";
-import { sqlOperations } from "../database-session.js";
+import { defineSqlOperation, sqlOperations } from "../database-session.js";
 
 const hookRowSchema = z.object({
   id: z.number().int().positive(),
@@ -19,6 +19,8 @@ const hookOperations = {
   update: sqlOperations.hookUpdate,
   remove: sqlOperations.hookRemove,
   toggle: sqlOperations.hookToggle,
+  listActive: defineSqlOperation("hook.list_active"),
+  disableFailed: defineSqlOperation("hook.disable_failed"),
 } as const;
 
 export type HookDto = Readonly<{
@@ -74,6 +76,23 @@ export class HookRepository {
       hookRowSchema,
     );
     return { items: rows.map(toDto), total };
+  }
+
+  listActive() {
+    return this.database.select(
+      hookOperations.listActive,
+      "SELECT id,url FROM hook WHERE ignored=0 ORDER BY id",
+      [],
+      hookRowSchema.pick({ id: true, url: true }),
+    );
+  }
+
+  async disableFailed(id: number, url: string): Promise<void> {
+    await this.database.execute(
+      hookOperations.disableFailed,
+      "UPDATE hook SET ignored=1 WHERE id=? AND url=?",
+      [id, url],
+    );
   }
 
   async find(id: number): Promise<HookDto | undefined> {

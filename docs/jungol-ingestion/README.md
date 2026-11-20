@@ -81,7 +81,7 @@ npm --prefix collector run lint
 npm --prefix collector test
 npm --prefix collector run build
 node collector/dist/cli.js --help
-docker build --target test -t anabada-jungol-collector-test:local collector
+docker build --build-context automatic_scoring=./shared --target test -t anabada-jungol-collector-test:local collector
 docker run --rm --init --ipc=host anabada-jungol-collector-test:local
 ```
 
@@ -94,7 +94,7 @@ docker run --rm --init --ipc=host anabada-jungol-collector-test:local
 ```sh
 export COLLECTOR_SOURCE_REVISION="$(git rev-parse HEAD)"
 if git diff --quiet && git diff --cached --quiet; then export COLLECTOR_SOURCE_DIRTY=false; else export COLLECTOR_SOURCE_DIRTY=true; fi
-docker build --target test --build-arg COLLECTOR_REVISION="$COLLECTOR_SOURCE_REVISION" -t anabada-jungol-live-contract:local collector
+docker build --build-context automatic_scoring=./shared --target test --build-arg COLLECTOR_REVISION="$COLLECTOR_SOURCE_REVISION" -t anabada-jungol-live-contract:local collector
 docker run --rm --init \
   --user pwuser \
   -e JUNGOL_USERNAME -e JUNGOL_PASSWORD \
@@ -143,7 +143,7 @@ docker compose --env-file .env -f docker-compose.dev.yaml -p jungol-dev ps
 
 ## production 파일·배포 순서
 
-[운영 Compose](../../docker-compose.prod.yaml)와 [stage Compose](../../docker-compose.stage.yaml)는 기존 `./database/mysql_data` bind mount를 유지하고 SQL init mount를 사용하지 않습니다. 두 환경은 `mysql:9.3.0`을 사용하므로 기존 data directory의 9.3 호환성은 별도 운영 acceptance가 필요합니다. stage와 production의 external network `bada-network`, `dmoj_nginx_network`는 Compose 실행 전에 서버에 미리 존재해야 합니다. 같은 checkout에서 stage와 prod를 동시에 실행하지 않습니다. collector는 외부 포트를 열지 않으며 non-root image, init, 1GB shared memory, dropped capabilities, no-new-privileges를 사용합니다.
+[운영 Compose](../../docker-compose.prod.yaml)와 [stage Compose](../../docker-compose.stage.yaml)는 기존 `./database/mysql_data` bind mount를 유지하고 SQL init mount를 사용하지 않습니다. 두 환경은 `mysql:9.3.0`을 사용하므로 기존 data directory의 9.3 호환성은 별도 운영 acceptance가 필요합니다. stage에 필요한 외부 네트워크는 Compose 실행 전에 서버에 생성합니다. production은 Compose 기본 네트워크를 사용합니다. 같은 checkout에서 stage와 prod를 동시에 실행하지 않습니다. collector는 외부 포트를 열지 않으며 non-root image, init, 1GB shared memory, dropped capabilities, no-new-privileges를 사용합니다.
 
 `jungol-profile`은 project 이름에 종속됩니다. 운영 Compose project 이름/작업 경로를 변경하면 다른 profile volume을 만들 수 있으므로 이름을 유지합니다. profile에는 인증 상태가 있으므로 백업·접근 권한을 제한하고 로그/artifact로 업로드하지 않습니다. image 기본 CMD는 `start`이며 별도 host cron/systemd timer를 추가하지 않습니다. container healthcheck 실패만으로 Docker가 자동 재시작하는 것은 아닙니다.
 
@@ -152,7 +152,7 @@ docker compose --env-file .env -f docker-compose.dev.yaml -p jungol-dev ps
 1. 이전 backend/config 복구 경로와 DB 백업을 확보하고 기존 레거시 수집/sync 작업을 정지합니다.
 2. stage에서 `COMPOSE_BAKE=false docker compose --env-file .env -f docker-compose.stage.yaml up -d --build --wait --wait-timeout 180`를 성공시킨 뒤 status SELECT와 9개 업무 테이블을 검증합니다. CI에서 확인된 구버전 Compose/Bake 조합 호환성을 위해 Bake 위임만 끄며 BuildKit 캐시·단일 `up`·migration 의존성은 유지합니다. production workflow도 `COMPOSE_BAKE=false`인 하나의 Compose `up -d --build --remove-orphans --wait` 안에서 migrator 성공 뒤에만 앱을 시작합니다.
 3. GitHub production Environment에 아래 필수 secrets를 등록합니다. workflow가 서버 루트 `.env`를 생성합니다. 기존 MySQL root 비밀번호와 `DB_PASSWORD`가 일치하고 backend/collector가 `anabada-mysql:3306/jungol_bada`에 접속하는지 확인합니다.
-4. `.env`와 profile 권한, external networks, MySQL image 호환성을 확인합니다. 운영자가 통제하는 단일 one-shot으로 초기 적재·점수·재실행을 검증합니다.
+4. `.env`와 profile 권한, MySQL image 호환성을 확인합니다. stage에서는 외부 네트워크도 확인합니다. 운영자가 통제하는 단일 one-shot으로 초기 적재·점수·재실행을 검증합니다.
 5. backend와 collector를 배포하고 health 및 사용자별 적재 결과를 확인합니다. 초기 empty 응답과 나중의 projection 노출을 구분합니다.
 6. 아래 acceptance를 실제 운영 서버에서 완료한 후 일반 서비스 전환을 확정합니다.
 
@@ -171,8 +171,6 @@ docker compose --env-file .env -f docker-compose.prod.yaml stop jungol-collector
 
 | GitHub secret | 용도 |
 |---|---|
-| `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PORT` | SSH 대상 |
-| `DEPLOY_KEY` | SSH private key |
 | `DB_PASSWORD` | MySQL root 초기화와 backend/collector root 접속 |
 | `JWT_SECRET` | middleware/backend JWT 서명 |
 | `ADMIN_USERNAME`, `ADMIN_PASSWORD` | middleware 관리자 인증 |

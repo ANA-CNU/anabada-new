@@ -10,6 +10,7 @@ RUN bun install --frozen-lockfile
 
 # 소스 코드 복사
 COPY . .
+COPY --from=automatic_scoring . /shared
 
 ENV NODE_ENV=production
 # 프로덕션 빌드
@@ -21,7 +22,7 @@ FROM oven/bun:1.4.2-alpine AS runtime
 WORKDIR /app
 
 # 프로덕션 의존성만 설치
-RUN apk add --no-cache curl
+RUN apk add --no-cache curl chromium
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile --production
 
@@ -31,6 +32,8 @@ COPY --from=builder /app/dist ./dist
 # 환경 변수 설정
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV CHROMIUM_PATH=/usr/bin/chromium
+USER bun
 
 # 포트 노출
 EXPOSE 3000

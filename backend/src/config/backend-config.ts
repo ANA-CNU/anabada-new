@@ -26,6 +26,8 @@ const baseSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "stage", "production"]),
   ALLOWED_ORIGIN: z.string().url(),
   WEBHOOK_URL: webhookUrl,
+  SOLVED_AC_CLIENT_ID: z.string().trim().optional(),
+  SOLVED_AC_CLIENT_SECRET: z.string().trim().optional(),
 });
 
 export type BackendConfig = Readonly<z.infer<typeof baseSchema>>;

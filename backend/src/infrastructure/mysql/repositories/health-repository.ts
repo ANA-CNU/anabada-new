@@ -7,6 +7,7 @@ const migrationSchema = z.object({
   version: z.coerce.number().int().nonnegative(),
 });
 const tableSchema = z.object({ table_name: z.string() });
+const bojIngestionMigration = 12;
 export const requiredApplicationTables = [
   "event",
   "event_problem",
@@ -20,7 +21,11 @@ export const requiredApplicationTables = [
 ] as const;
 
 export class HealthRepository {
-  constructor(private readonly database: DatabaseExecutor) {}
+  constructor(
+    private readonly database: DatabaseExecutor,
+    private readonly boj = false,
+    private readonly requireImport = false,
+  ) {}
 
   async ready(): Promise<boolean> {
     const result = await this.database.selectOne(
@@ -36,8 +41,10 @@ export class HealthRepository {
     return (
       (await this.database.selectOne(
         sqlOperations.healthMigrations,
-        "SELECT version FROM migrations WHERE version >= ? ORDER BY version DESC LIMIT 1",
-        [5],
+        this.boj
+          ? "SELECT version FROM jungol_bada.migrations WHERE version = ?"
+          : "SELECT version FROM migrations WHERE version >= ? ORDER BY version DESC LIMIT 1",
+        [this.boj ? (this.requireImport ? bojIngestionMigration : 6) : 5],
         migrationSchema,
       )) !== undefined
     );
@@ -46,7 +53,7 @@ export class HealthRepository {
     const placeholders = requiredApplicationTables.map(() => "?").join(", ");
     const rows = await this.database.select(
       sqlOperations.healthTables,
-      `SELECT table_name AS table_name FROM information_schema.tables WHERE table_schema = 'jungol_bada' AND table_name IN (${placeholders})`,
+      `SELECT table_name AS table_name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN (${placeholders})`,
       requiredApplicationTables,
       tableSchema,
     );

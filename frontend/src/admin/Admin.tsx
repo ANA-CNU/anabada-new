@@ -34,6 +34,13 @@ import UserManagement from "./components/UserManagement";
 import WebhookManagement from "./components/WebhookManagement";
 import type { User } from "@/types";
 import { RankingBoardManagement } from "./components/ranking-boards/RankingBoardManagement";
+import { loadActiveEventCount, loadAdminUsers } from "./dashboard-api";
+
+const formatCount = (count: number | null | undefined) => {
+  if (count === undefined) return "불러오는 중";
+  if (count === null) return "조회 실패";
+  return count.toLocaleString("ko-KR");
+};
 
 function Admin() {
 
@@ -62,32 +69,26 @@ function Admin() {
     navigate("/login");
   };
 
-  // 유저 정보 목록 상태
-  const [userList, setUserList] = useState<User[]>([]);
+  const [userList, setUserList] = useState<User[] | null>();
+  const [activeEventCount, setActiveEventCount] = useState<number | null>();
 
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const res = await fetch(`${URL}/api/users/all`, {
-          credentials: 'include',
-        });
-        const json = await res.json();
-        if (!mounted) return;
-        if (!res.ok || !json?.success) {
-          throw new Error(json?.message || "유저 목록을 가져오지 못했습니다.");
-        }
-        if (Array.isArray(json.data)) {
-          setUserList(json.data as User[]);
-        } else {
-          throw new Error("유저 목록 응답이 올바르지 않습니다.");
-        }
-      } catch (err) {
-        console.error('유저 목록 불러오기 오류:', err);
-      }
-    })();
-    return () => { mounted = false; };
-  }, []);
+    if (activeSection !== "dashboard" && activeSection !== "score-status") return;
+    const controller = new AbortController();
+    loadAdminUsers(URL, controller.signal).then(setUserList).catch(() => {
+      if (!controller.signal.aborted) setUserList(null);
+    });
+    return () => controller.abort();
+  }, [activeSection]);
+
+  useEffect(() => {
+    if (activeSection !== "dashboard") return;
+    const controller = new AbortController();
+    loadActiveEventCount(URL, controller.signal).then(setActiveEventCount).catch(() => {
+      if (!controller.signal.aborted) setActiveEventCount(null);
+    });
+    return () => controller.abort();
+  }, [activeSection]);
 
   const menuItems = [
     {
@@ -146,7 +147,7 @@ function Admin() {
                   <Users className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">1,234</div>
+                  <div className="text-2xl font-bold" data-testid="admin-user-count">{formatCount(userList === null ? null : userList?.length)}</div>
                 </CardContent>
               </Card>
               <Card>
@@ -155,7 +156,7 @@ function Admin() {
                   <Calendar className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">5</div>
+                  <div className="text-2xl font-bold" data-testid="admin-active-event-count">{formatCount(activeEventCount)}</div>
                 </CardContent>
               </Card>
             </div>
@@ -164,7 +165,7 @@ function Admin() {
       case "user-list":
         return <UserManagement />;
       case "score-status":
-        return <ScoreManagement userList={userList} />;
+        return <ScoreManagement userList={userList ?? []} />;
       case "log-management":
         return <LogManagement />;
       case "bias-management":

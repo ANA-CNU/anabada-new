@@ -1,4 +1,5 @@
 import { mkdir } from "node:fs/promises";
+import assert from "node:assert/strict";
 import { join } from "node:path";
 import { chromium } from "playwright";
 
@@ -55,6 +56,27 @@ async function open(pathname, locatorText) {
 
 async function capture(name) {
   await capturePage(page, name);
+}
+
+function waitForApi(target, pathname, method = "GET") {
+  return target.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return `${url.pathname}${url.search}` === pathname && response.request().method() === method;
+  });
+}
+
+async function readApi(pendingResponse) {
+  const response = await pendingResponse;
+  assert.equal(response.status(), 200, response.url());
+  return response.json();
+}
+
+async function checkAdminOverview(target, usersResponse, eventsResponse) {
+  const [users, events] = await Promise.all([readApi(usersResponse), readApi(eventsResponse)]);
+  assert.ok(users.data.length > 0);
+  assert.ok(events.pagination.total > 0);
+  await target.getByTestId("admin-user-count").and(target.getByText(users.data.length.toLocaleString("ko-KR"), { exact: true })).waitFor();
+  await target.getByTestId("admin-active-event-count").and(target.getByText(events.pagination.total.toLocaleString("ko-KR"), { exact: true })).waitFor();
 }
 
 async function capturePage(target, name) {
@@ -116,6 +138,55 @@ async function assertSearchMetricTokens(target) {
   }
 }
 
+async function assertUserProfile(target) {
+  await target.getByRole("heading", { name: "사용자 프로필", exact: true }).waitFor();
+  for (const value of ["정답 수", "75%", "수동 차감", "이번 달 요약", "랭킹 변화 (7개 데이터)"]) {
+    await target.getByText(value, { exact: true }).waitFor({ timeout: 5_000 });
+  }
+  const problem = target.getByRole("link", { name: "현재월", exact: true });
+  await problem.waitFor({ timeout: 5_000 });
+  if ((await problem.getAttribute("href")) !== "https://www.acmicpc.net/problem/1000") {
+    throw new Error("profile problem did not link to Baekjoon");
+  }
+}
+
+async function assertProfileErrors(target, screenshotPrefix) {
+  // This page intentionally triggers API errors. Keep it out of the success-path error counters.
+  const errorPage = await target.newPage();
+  try {
+    const missingUser = errorPage.waitForResponse(
+      (response) => new URL(response.url()).pathname === "/api/users/2147483647",
+      { timeout: 5_000 },
+    );
+    await errorPage.goto(`${baseUrl}/user/2147483647`);
+    if ((await missingUser).status() !== 404) throw new Error("missing profile API did not return 404");
+    await errorPage.getByRole("alert").filter({ hasText: "사용자를 찾을 수 없습니다." })
+      .waitFor({ timeout: 5_000 });
+    await capturePage(errorPage, `${screenshotPrefix}user-profile-not-found`);
+
+    await errorPage.route("**/api/users/1", (route) => route.fulfill({ status: 503 }));
+    await errorPage.goto(`${baseUrl}/user/1`);
+    await errorPage.getByRole("alert").filter({ hasText: "사용자 정보를 불러오지 못했습니다." })
+      .waitFor({ timeout: 5_000 });
+    await capturePage(errorPage, `${screenshotPrefix}user-profile-unavailable`);
+    await errorPage.getByRole("button", { name: "뒤로 가기", exact: true }).click();
+    await errorPage.waitForURL(`${baseUrl}/`, { timeout: 5_000 });
+
+    await errorPage.unroute("**/api/users/1");
+    await errorPage.route("**/api/user/1/problems", (route) => route.fulfill({ status: 503 }));
+    await errorPage.goto(`${baseUrl}/user/1`);
+    await errorPage.getByRole("alert").filter({ hasText: "문제 풀이 기록을 불러오지 못했습니다." })
+      .waitFor({ timeout: 5_000 });
+    await errorPage.getByText("수동 차감", { exact: true }).waitFor({ timeout: 5_000 });
+    if (await errorPage.getByText("해결한 문제가 없습니다.", { exact: true }).isVisible()) {
+      throw new Error("profile shows an empty history when the problems request failed");
+    }
+    await capturePage(errorPage, `${screenshotPrefix}user-profile-activity-unavailable`);
+  } finally {
+    await errorPage.close();
+  }
+}
+
 try {
   const health = await page.request.get("http://anabada-backend:3000/health");
   if (health.status() !== 200) throw new Error(`backend health returned ${health.status()}`);
@@ -140,24 +211,63 @@ try {
   const alphaResult = page.getByRole("button", { name: /alpha/u });
   await alphaResult.focus();
   await alphaResult.press("Enter");
-  await page.getByText("사용자 프로필", { exact: true }).waitFor();
-  await page.getByText("정답 수", { exact: true }).waitFor();
+  await assertUserProfile(page);
   await capture("user-profile");
+  await assertProfileErrors(context, "");
 
-  await open("/login", "로그인");
+  const unauthenticated = await page.request.get(`${baseUrl}/admin`, { headers: { Accept: "application/json" } });
+  assert.equal(unauthenticated.status(), 401);
+  await open("/admin", "로그인");
+  await page.waitForURL(`${baseUrl}/login`);
   await page.locator("#username").fill("smoke-admin");
   await page.locator("#password").fill("smoke-password");
+  const dashboardUsers = waitForApi(page, "/api/users/all");
+  const dashboardEvents = waitForApi(page, "/api/events?status=active&limit=1");
   await page.getByRole("button", { name: "로그인", exact: true }).click();
   await page.waitForURL(`${baseUrl}/admin`, { timeout: 10_000 });
   await page.getByRole("heading", { name: "대시보드", exact: true }).waitFor();
+  await checkAdminOverview(page, dashboardUsers, dashboardEvents);
+  await capture("admin-dashboard");
 
   await page.getByRole("button", { name: "유저 목록", exact: true }).click();
   await page.getByText("유저 정보를 조회·수정·삭제합니다.", { exact: false }).waitFor();
+  await page.getByPlaceholder("백준 아이디, 한국명 검색").fill("alpha");
+  await page.getByRole("cell", { name: "alpha", exact: true }).waitFor();
   await capture("admin-users");
 
   await page.getByRole("button", { name: "점수 관리", exact: true }).click();
   await page.getByRole("heading", { name: "점수 관리", exact: true }).waitFor();
+  await page.getByLabel("사용자 이름").fill("alpha");
+  await page.getByText(/\(alpha\)$/u).click();
+  await page.getByLabel("사용자 이름").press("Enter");
+  await page.getByPlaceholder("가중치 입력").fill("4");
+  const scoreReason = "관리자 브라우저 테스트 점수";
+  await page.getByPlaceholder("가중치 적용 이유").fill(scoreReason);
+  const scorePost = waitForApi(page, "/api/score-history/bulk", "POST");
+  await page.getByRole("button", { name: "점수 관리 적용", exact: true }).click();
+  assert.equal((await readApi(scorePost)).insertedCount, 1);
   await capture("admin-score");
+
+  await page.getByRole("button", { name: "로그 관리", exact: true }).click();
+  await page.getByRole("heading", { name: "로그 관리", exact: true }).waitFor();
+  await page.getByPlaceholder("username").fill("alpha");
+  const filteredLogs = waitForApi(page, "/api/admin/score-history?page=1&limit=10&username=alpha");
+  await page.getByRole("button", { name: "검색", exact: true }).click();
+  const scoreLog = (await readApi(filteredLogs)).data.find((row) => row.desc === scoreReason);
+  assert.ok(scoreLog);
+  assert.equal(scoreLog.bias, 4);
+  const scoreRow = page.getByRole("row", { name: new RegExp(scoreReason, "u") });
+  await scoreRow.waitFor();
+  await capture("admin-score-logs");
+
+  await page.getByRole("button", { name: "가중치 관리", exact: true }).click();
+  await page.getByRole("heading", { name: "가중치 관리", exact: true }).waitFor();
+  const biasRows = await readApi(page.request.get(`${baseUrl}/api/bias/all`));
+  const alphaBias = biasRows.data.find((row) => row.jungol_name === "alpha");
+  assert.ok(alphaBias);
+  await page.getByPlaceholder("사용자 검색").fill("alpha");
+  await page.getByRole("row", { name: /\(alpha\)/u }).getByRole("cell", { name: String(alphaBias.total_point), exact: true }).waitFor();
+  await capture("admin-bias");
 
   await page.getByRole("button", { name: "웹훅 관리", exact: true }).click();
   await page.getByRole("heading", { name: "Webhook 관리", exact: true }).waitFor();
@@ -264,6 +374,43 @@ try {
     throw new Error("event update changed the stored begin or end instant");
   }
   await capture("admin-events");
+  await page.getByRole("button", { name: "이벤트 추가", exact: true }).click();
+  await page.getByRole("heading", { name: "이벤트 추가", exact: true }).waitFor();
+  const eventTitle = "관리자 브라우저 테스트 이벤트";
+  await page.getByLabel("이벤트 제목 *").fill(eventTitle);
+  const calendarDay = await page.evaluate(() => new Date().toLocaleDateString());
+  for (const field of ["start-date-picker", "end-date-picker"]) {
+    const trigger = page.locator(`#${field}`);
+    await trigger.click();
+    const calendarId = await trigger.getAttribute("aria-controls");
+    assert.ok(calendarId);
+    const calendar = page.locator(`[id=${JSON.stringify(calendarId)}]`);
+    await calendar.locator(`button[data-day=${JSON.stringify(calendarDay)}]`).click();
+    await page.keyboard.press("Escape");
+    await calendar.waitFor({ state: "hidden" });
+  }
+  await page.getByPlaceholder(/문제 ID를 쉼표/u).fill("1000,1001");
+  await page.getByRole("button", { name: "추가", exact: true }).click();
+  await capture("admin-event-add");
+  const eventPost = waitForApi(page, "/api/event/create", "POST");
+  await page.getByRole("button", { name: "이벤트 추가하기", exact: true }).click();
+  const createdEvent = await readApi(eventPost);
+  assert.equal(createdEvent.problems_count, 2);
+  await page.getByText("이벤트가 성공적으로 생성되었습니다!", { exact: true }).waitFor();
+  const newEventDetail = await readApi(page.request.get(`${baseUrl}/api/events/${createdEvent.event_id}`));
+  assert.equal(newEventDetail.data.title, eventTitle);
+  assert.deepEqual(newEventDetail.data.problems, [1000, 1001]);
+
+  for (const section of ["활동 로그", "시스템 로그", "접속 기록", "알림 관리"]) {
+    await page.getByRole("button", { name: section, exact: true }).click();
+    await page.getByRole("heading", { name: section, exact: true }).waitFor();
+    await page.getByText("해당 기능은 추후 구현 예정입니다.", { exact: true }).waitFor();
+  }
+  const logout = waitForApi(page, "/logout", "POST");
+  await page.getByRole("button", { name: "로그아웃", exact: true }).click();
+  assert.equal((await logout).status(), 200);
+  await page.goto(`${baseUrl}/admin`);
+  await page.waitForURL(`${baseUrl}/login`);
 
   mobileContext = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -310,15 +457,20 @@ try {
     throw new Error("mobile user result did not receive keyboard focus");
   }
   await mobilePage.keyboard.press("Enter");
-  await mobilePage.getByText("사용자 프로필", { exact: true }).waitFor();
+  await assertUserProfile(mobilePage);
   await capturePage(mobilePage, "mobile-user-profile");
+  await assertProfileErrors(mobileContext, "mobile-");
 
   await openMobile("/login", "로그인");
   await mobilePage.locator("#username").fill("smoke-admin");
   await mobilePage.locator("#password").fill("smoke-password");
+  const mobileUsers = waitForApi(mobilePage, "/api/users/all");
+  const mobileEvents = waitForApi(mobilePage, "/api/events?status=active&limit=1");
   await mobilePage.getByRole("button", { name: "로그인", exact: true }).click();
   await mobilePage.waitForURL(`${baseUrl}/admin`, { timeout: 10_000 });
   await mobilePage.getByRole("heading", { name: "대시보드", exact: true }).waitFor();
+  await checkAdminOverview(mobilePage, mobileUsers, mobileEvents);
+  await capturePage(mobilePage, "mobile-admin-dashboard");
 
   await selectMobileAdminSection("유저 목록", "유저 목록");
   await capturePage(mobilePage, "mobile-admin-users");
@@ -329,6 +481,14 @@ try {
   await capturePage(mobilePage, "mobile-admin-hooks");
   await selectMobileAdminSection("이벤트 목록", "이벤트 목록");
   await capturePage(mobilePage, "mobile-admin-events");
+  await selectMobileAdminSection("로그 관리", "로그 관리");
+  await mobilePage.getByText(scoreReason, { exact: true }).waitFor();
+  await capturePage(mobilePage, "mobile-admin-score-logs");
+  await selectMobileAdminSection("가중치 관리", "가중치 관리");
+  await mobilePage.getByRole("row", { name: /\(alpha\)/u }).waitFor();
+  await capturePage(mobilePage, "mobile-admin-bias");
+  await selectMobileAdminSection("이벤트 추가", "이벤트 추가");
+  await capturePage(mobilePage, "mobile-admin-event-add");
 
   if (consoleFailures.length > 0) throw new Error(`browser console errors: ${consoleFailures.join(" | ")}`);
   if (pageFailures.length > 0) throw new Error(`uncaught page errors: ${pageFailures.join(" | ")}`);

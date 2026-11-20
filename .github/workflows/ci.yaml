@@ -1,4 +1,4 @@
-name: Verify Jungol
+name: Verify ANABADA
 # main 배포와 분리하여 feature branch push와 pull request만 검증한다.
 on:
   push:
@@ -122,6 +122,7 @@ jobs:
           npm ci --ignore-scripts --no-audit --no-fund
           node scripts/problem-reason-links.test.mjs
           node scripts/contest-landing.test.mjs
+          node --experimental-strip-types --test scripts/admin-dashboard.test.mjs
           npm run lint
           npm run check:corners
           npm run build
@@ -132,8 +133,6 @@ jobs:
           JWT_SECRET: ci-placeholder-not-a-live-secret
           ADMIN_USERNAME: ci-placeholder
           ADMIN_PASSWORD: ci-placeholder-not-a-live-secret
-          JUNGOL_USERNAME: ci-placeholder
-          JUNGOL_PASSWORD: ci-placeholder-not-a-live-secret
           VITE_KAKAO_MAP_API_KEY: ci-map-build-placeholder
           WEBHOOK_URL: https://discord.com/api/webhooks/ci-placeholder/not-live
         run: |
@@ -147,55 +146,36 @@ jobs:
             docker compose --env-file "$secret_dir/.env" -f "docker-compose.$mode.yaml" config --quiet
             docker compose --env-file "$secret_dir/.env" -f "docker-compose.$mode.yaml" config --format json |
               jq -e --arg mode "$mode" '
-                . as $root | .services["jungol-collector"] as $c |
-                ($c != null) and
-                ($root.services | has("anabada-crawling") | not) and
-                (if $mode == "dev" then
-                  ($root.services | has("jungol-migrator") | not)
-                else
-                  $root.services["jungol-migrator"] as $m |
-                  ($m.profiles == null) and
-                  ($m.build.context | type == "string" and length > 0) and
-                  ($m.build.context | endswith("/migrations")) and
-                  ($m.build.dockerfile == "Dockerfile") and
-                  ($m.environment | keys == ["DB_PASSWORD"]) and
-                  ($m.networks | has("bada-network")) and
-                  ($m.depends_on["anabada-mysql"].condition == "service_healthy") and
-                  ($m.restart == "no") and ($m.ports == null) and ($m.volumes == null) and ($m.healthcheck == null)
-                end) and
+                . as $root | .services["database-migrator"] as $m |
+                ($root.services | (has("jungol-collector") or has("anabada-crawling")) | not) and
+                ($m.profiles == null) and
+                ($m.build.context | endswith("/migrations")) and
+                ($m.build.dockerfile == "Dockerfile") and
+                ($m.environment | keys == ["DB_PASSWORD"]) and
+                ($m.networks | has(if $mode == "prod" then "default" else "bada-network" end)) and
+                ($m.depends_on["anabada-mysql"].condition == "service_healthy") and
+                ($m.restart == "no") and ($m.ports == null) and ($m.volumes == null) and
                 ($root.services["anabada-frontend"].build.args | has("VITE_KAKAO_MAP_API_KEY")) and
-                (if $mode == "dev" then true else
-                  (["anabada-frontend", "anabada-middleware", "anabada-backend", "jungol-collector"] | all(.[];
-                    $root.services[.].depends_on["jungol-migrator"].condition == "service_completed_successfully"))
-                end) and
-                ($c.build.context | endswith("/collector")) and
-                ($c.build.dockerfile == "Dockerfile") and
-                ($c.command == null) and ($c.entrypoint == null) and
-                ($c.ports == null) and ($c.init == true) and
-                ($c.restart == "unless-stopped") and ($c.shm_size == "1073741824") and
-                ($c.cap_drop == ["ALL"]) and
-                ($c.security_opt == ["no-new-privileges:true"]) and
-                ($c.depends_on["anabada-mysql"].condition == "service_healthy") and
-                ($c.networks | has("bada-network")) and
-                ($c.environment | keys == ["DB_PASSWORD", "JUNGOL_PASSWORD", "JUNGOL_USERNAME", "WEBHOOK_URL"]) and
-                ($root.services["anabada-backend"].environment.WEBHOOK_URL == $c.environment.WEBHOOK_URL) and
+                (["anabada-frontend", "anabada-middleware", "anabada-backend"] |
+                  all(.[]; $root.services[.].depends_on["database-migrator"].condition == "service_completed_successfully")) and
                 ($root.secrets == null) and
                 ($root.services | all(.[]; .secrets == null and .env_file == null)) and
-                ($c.environment.DB_PASSWORD == $root.services["anabada-mysql"].environment.MYSQL_ROOT_PASSWORD) and
-                ($c.environment.DB_PASSWORD == $root.services["anabada-backend"].environment.DB_PASSWORD) and
+                ($m.environment.DB_PASSWORD == $root.services["anabada-mysql"].environment.MYSQL_ROOT_PASSWORD) and
+                ($m.environment.DB_PASSWORD == $root.services["anabada-backend"].environment.DB_PASSWORD) and
                 ($root.services["anabada-backend"].environment.DB_USER == "root") and
                 ($root.services["anabada-backend"].environment.JWT_SECRET == $root.services["anabada-middleware"].environment.JWT_SECRET) and
-                ($c.volumes | length == 1) and
-                ($c.volumes[0].type == "volume") and
-                ($c.volumes[0].source == "jungol-profile") and
-                ($c.volumes[0].target == "/var/lib/jungol/profile") and
-                ($root.volumes | has("jungol-profile")) and
-                ($root.services["anabada-backend"].environment.DB_NAME == "jungol_bada") and
-                ($root.services["anabada-backend"].depends_on["anabada-mysql"].condition == "service_healthy") and
+                ($root.services["anabada-backend"].environment.DB_NAME == "boj_bada") and
+                ($root.services["anabada-backend"].depends_on["database-migrator"].condition == "service_completed_successfully") and
                 ($root.services["anabada-mysql"].healthcheck.test | join(" ") | contains("mysqladmin")) and
                 ($root.services["anabada-mysql"].volumes | any(.[]; .type == "bind" and (.source | endswith("/database/my.cnf")) and .target == "/etc/mysql/conf.d/my.cnf" and .read_only == true)) and
                 (if $mode == "prod" then
-                  $root.services["anabada-mysql"].ports | any(.[]; .published == "20040" and .target == 3306 and .protocol == "tcp")
+                  ($root.networks | keys == ["default"]) and
+                  ($root.networks.default.external != true) and
+                  ($root.services | all(.[]; .networks | keys == ["default"])) and
+                  ($root.services | with_entries(select((.value.ports // []) | length > 0)) | keys == ["bada-nginx"]) and
+                  ($root.services["bada-nginx"].ports | length == 1 and all(.[]; .published == "80" and .target == 80 and .protocol == "tcp")) and
+                  ($root.services["anabada-backend"].environment.ALLOWED_ORIGIN == "https://bada.anacnu.com") and
+                  ($root.services["anabada-middleware"].environment.ALLOWED_ORIGIN == "https://bada.anacnu.com")
                 elif $mode == "stage" then
                   $root.services["anabada-backend"].ports | any(.[]; .published == "20031" and .target == 3000 and .protocol == "tcp")
                 else true end) and
@@ -208,9 +188,6 @@ jobs:
                   end
                 )'
           done
-          # 설정 파싱뿐 아니라 최종 image가 빌드되고 non-root collector 계약을 유지하는지도 확인한다.
-          timeout 900 docker compose --env-file "$secret_dir/.env" -p "jungol-ci-$GITHUB_RUN_ID" -f docker-compose.dev.yaml build jungol-collector anabada-backend anabada-frontend anabada-middleware
-          docker run --rm --entrypoint sh "jungol-ci-$GITHUB_RUN_ID-anabada-frontend" -ec 'grep -Rq ci-map-build-placeholder /app/dist'
-          docker image inspect "jungol-ci-$GITHUB_RUN_ID-jungol-collector" |
-            jq -e '.[0].Config | .User == "pwuser" and .Cmd == ["start"] and .Entrypoint == ["node", "dist/cli.js"] and (.Healthcheck.Test | index("healthcheck") != null)'
-          docker run --rm --entrypoint sh "jungol-ci-$GITHUB_RUN_ID-jungol-collector" -ec 'test "$(id -u)" = 1001; test "$(id -g)" = 1001'
+          # 실제 배포 이미지와 프런트엔드의 빌드 인자도 확인한다.
+          timeout 900 docker compose --env-file "$secret_dir/.env" -p "anabada-ci-$GITHUB_RUN_ID" -f docker-compose.dev.yaml build database-migrator anabada-backend anabada-frontend anabada-middleware
+          docker run --rm --entrypoint sh "anabada-ci-$GITHUB_RUN_ID-anabada-frontend" -ec 'grep -Rq ci-map-build-placeholder /app/dist'

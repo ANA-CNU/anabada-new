@@ -113,9 +113,12 @@ function monthTimestamp(day: number, minute: number): string {
 async function seedPreview(connection: PoolConnection): Promise<void> {
   await connection.beginTransaction();
   try {
+    await connection.execute(
+      "UPDATE event SET `end`=GREATEST(`end`,UTC_DATE()+INTERVAL 2 DAY) WHERE id=201",
+    );
     await connection.execute("UPDATE ranking_boards SET is_active = 0");
     await connection.execute(
-      `INSERT INTO user (id, jungol_name, corrects, submissions, solution, korean_name, tier, ignored, jungol_account_id, rank_wrong_count) VALUES ${previewUsers.map(() => "(?, ?, ?, ?, ?, ?, ?, 0, ?, ?)").join(", ")}`,
+      `INSERT INTO user (id, handle, corrects, submissions, solution, korean_name, tier, ignored) VALUES ${previewUsers.map(() => "(?, ?, ?, ?, ?, ?, ?, 0)").join(", ")}`,
       previewUsers.flatMap((user, index) => [
         user.id,
         user.jungolName,
@@ -124,8 +127,6 @@ async function seedPreview(connection: PoolConnection): Promise<void> {
         20_000 + index,
         user.koreanName,
         user.tier,
-        30_000 + index,
-        index,
       ]),
     );
 
@@ -276,13 +277,13 @@ const pool = createPool({
   port: Number(process.env.DB_PORT ?? "3306"),
   user: process.env.DB_USER ?? "root",
   password: process.env.DB_PASSWORD ?? "",
-  database: process.env.DB_NAME ?? "jungol_bada",
+  database: process.env.DB_NAME ?? "boj_bada",
   waitForConnections: true,
   connectionLimit: 1,
 });
 
 try {
-  await new SeedDatabase(pool).resetAndSeed();
+  await new SeedDatabase(pool, true).resetAndSeed();
   const connection = await pool.getConnection();
   try {
     await seedPreview(connection);

@@ -14,31 +14,28 @@
 
 ## 1) 환경 변수 (.env) 설정
 
-프로젝트 루트의 [.env.example](./.env.example)을 같은 위치의 `.env`로 복사한 뒤 아래 필수 여섯 값을 채웁니다. 서비스별 환경 파일은 만들지 않습니다. 실제 값은 커밋하지 않고 파일 권한을 0600으로 제한합니다.
+프로젝트 루트의 [.env.example](./.env.example)을 같은 위치의 `.env`로 복사한 뒤 아래 필수 네 값을 채웁니다. 서비스별 환경 파일은 만들지 않습니다. 실제 값은 커밋하지 않고 파일 권한을 0600으로 제한합니다.
 
 ```dotenv
 DB_PASSWORD=
 JWT_SECRET=
 ADMIN_USERNAME=
 ADMIN_PASSWORD=
-JUNGOL_USERNAME=
-JUNGOL_PASSWORD=
 
 # 선택: 프런트엔드 빌드에 사용하는 공개 Kakao JavaScript 앱 키
 VITE_KAKAO_MAP_API_KEY=
 
-# 선택: backend/collector 긴급 Discord 장애 알림 주소
+# 선택: backend 긴급 Discord 장애 알림 주소
 WEBHOOK_URL=
 ```
 
-MySQL, backend, collector는 root 계정과 동일한 `DB_PASSWORD`를 사용합니다. DB 주소·이름, 서비스 URL·포트·모드와 수집 설정은 코드/Compose에 고정되어 있습니다. Compose는 각 서비스에 필요한 값만 전달합니다. 기존 MySQL 데이터가 있으면 `DB_PASSWORD` 변경만으로 실제 root 비밀번호가 바뀌지 않으므로 운영자가 계정 비밀번호와 배포 값을 맞춰야 합니다.
+MySQL과 backend는 root 계정과 동일한 `DB_PASSWORD`를 사용합니다. DB 주소·이름, 서비스 URL·포트·모드와 수집 설정은 코드/Compose에 고정되어 있습니다. Compose는 각 서비스에 필요한 값만 전달합니다. 기존 MySQL 데이터가 있으면 `DB_PASSWORD` 변경만으로 실제 root 비밀번호가 바뀌지 않으므로 운영자가 계정 비밀번호와 배포 값을 맞춰야 합니다.
 
 ## 2) 실행과 배포
 
 일상 개발, PR 통합, `main` 전용 production 배포의 브랜치 절차는
 [개발 브랜치와 배포 통합 절차](./docs/branch-workflow.md)를 따른다.
-collector의 예정 실행 주기와 운영 관측 기준은
-[Collector 운영 동작](./docs/collector-operations.md)을 따른다.
+백준 수집과 적재 확인 방법은 [백준 수집 운영 안내](./docs/boj-ingestion.md)를 참고하세요.
 
 아래 명령은 저장소 루트에서 실행합니다. 개발 환경도 루트 `.env`를 명시적으로 읽습니다.
 
@@ -47,22 +44,24 @@ docker compose --env-file .env -f docker-compose.dev.yaml config --quiet
 docker compose --env-file .env -f docker-compose.dev.yaml up -d anabada-mysql
 ```
 
-stage와 production의 일반 Compose 실행은 MySQL healthcheck 뒤 일회성 마이그레이터를 실행하고, 성공(`Exited (0)`)한 뒤에만 frontend·middleware·backend·collector를 시작합니다. 개발 Compose는 의도적으로 자동 적용하지 않습니다. 활성 파일 규칙과 불변 checksum 정책은 [migrations 안내](./migrations/README.md)를 따릅니다.
+dev·stage·production의 Compose는 MySQL healthcheck 뒤 일회성 마이그레이터를 실행하고, 성공(`Exited (0)`)한 뒤에만 frontend·middleware·backend를 시작합니다. API와 백준 수집기는 같은 `boj_bada` DB를 사용합니다. 활성 파일 규칙과 불변 checksum 정책은 [migrations 안내](./migrations/README.md)를 따릅니다.
 
 ```sh
 docker compose --env-file .env -f docker-compose.dev.yaml up -d --build --wait
 ```
 
-개발 접속 주소는 `http://localhost:20050`입니다. stage/production에는 루트 `.env`와 미리 생성한 external network가 필요합니다. 배포에는 반드시 `COMPOSE_BAKE=false`와 `--build`를 포함한 일반 Compose 실행을 사용합니다. 이는 CI에서 확인된 구버전 Compose/Bake 조합의 이미지 선택 결함을 피하기 위한 호환성 설정으로, Bake 위임만 끄고 BuildKit 캐시·단일 `up`·migration 의존성은 유지합니다. 근거는 [Compose v2.38.2](https://github.com/docker/compose/blob/v2.38.2/pkg/compose/build_bake.go#L333-L343)와 [v2.39.4](https://github.com/docker/compose/blob/v2.39.4/pkg/compose/build_bake.go#L376-L388)의 이미지 결과 매핑 변경입니다.
+개발 접속 주소는 `http://localhost:20050`입니다. stage와 production은 루트 `.env`를 사용합니다. stage에는 사전에 생성한 외부 네트워크가 필요합니다. production 서비스는 Compose 기본 네트워크에 연결되며, Nginx가 VM의 80번 포트에서 `bada.anacnu.com` 요청을 받습니다. 배포에는 반드시 `COMPOSE_BAKE=false`와 `--build`를 포함한 일반 Compose 실행을 사용합니다. 이는 CI에서 확인된 구버전 Compose/Bake 조합의 이미지 선택 결함을 피하기 위한 호환성 설정으로, Bake 위임만 끄고 BuildKit 캐시·단일 `up`·migration 의존성은 유지합니다. 근거는 [Compose v2.38.2](https://github.com/docker/compose/blob/v2.38.2/pkg/compose/build_bake.go#L333-L343)와 [v2.39.4](https://github.com/docker/compose/blob/v2.39.4/pkg/compose/build_bake.go#L376-L388)의 이미지 결과 매핑 변경입니다.
 
 ```sh
 COMPOSE_BAKE=false docker compose --env-file .env -f docker-compose.stage.yaml up -d --build --wait --wait-timeout 180
 COMPOSE_BAKE=false docker compose --env-file .env -f docker-compose.prod.yaml up -d --build --wait --wait-timeout 180
 ```
 
-`docker compose ... ps`와 `docker compose ... logs jungol-migrator`로 상태와 실패 원인을 확인합니다. 마이그레이터는 성공 시 `Exited (0)`이 정상이며 재시작하지 않습니다. migration 실패는 Compose 명령을 실패시키고 종속 앱을 시작하지 않습니다. 자동 rollback은 없습니다. 동일 checkout에서 stage와 prod를 동시에 실행하지 마세요. 두 환경은 bind mount와 external network를 공유하는 배포 대상입니다.
+`docker compose ... ps`와 `docker compose ... logs database-migrator`로 상태와 실패 원인을 확인합니다. 마이그레이터는 성공 시 `Exited (0)`이 정상이며 재시작하지 않습니다. migration 실패는 Compose 명령을 실패시키고 종속 앱을 시작하지 않습니다. 자동 rollback은 없습니다. stage와 prod는 같은 checkout에서 MySQL 데이터 디렉터리를 공유하므로 각각 별도 checkout에서 실행합니다.
 
-운영 배포는 GitHub `production` Environment의 Secrets에서 필수 여섯 값과 선택 Kakao 키·`WEBHOOK_URL`을 받아 서버 루트 `.env` 하나를 생성합니다. SSH 배포 Secrets는 `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PORT`, `DEPLOY_KEY`입니다. GitHub Actions의 일회성 runner는 첫 SSH 연결에서 서버 host key를 자동 수락합니다. workflow는 `COMPOSE_BAKE=false`로 한 번의 Compose `up -d --build --remove-orphans --wait`을 실행해 MySQL → migrator → apps 순서를 적용하며, migration 실패 시 종속 앱 rollout을 시작하지 않습니다.
+운영 배포는 `bada` VM의 `bada_deploy` 러너에서 직접 실행합니다. 러너는 운영 checkout `~/anabada-new`에서 `sudo -n docker compose`를 호출합니다. GitHub `production` Environment의 Secrets를 읽어 운영 checkout에 `.env`를 생성합니다. 필요한 항목은 [`.env.example`](./.env.example)에 있습니다. 이미 MySQL을 초기화했다면 `DB_PASSWORD`는 초기화에 사용한 비밀번호와 같아야 합니다.
+
+서버 이관을 준비할 때는 운영 checkout의 `database/mysql_data`를 사용하는 MySQL에 기존 `anabada` 및 `jungol_bada` 덤프를 먼저 복원합니다. 배포 workflow가 같은 디렉터리의 데이터를 사용해 백준 스키마를 이관한 뒤 앱과 Nginx를 시작합니다. `anabada` 원본과 이관 완료 기록이 모두 없으면 기존 백엔드에 손대기 전에 배포가 종료됩니다.
 
 ```sh
 docker compose --env-file .env -f docker-compose.prod.yaml config --quiet

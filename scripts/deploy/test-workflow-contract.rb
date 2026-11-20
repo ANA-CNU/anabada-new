@@ -10,40 +10,29 @@ end
 
 root = File.expand_path('../..', __dir__)
 Dir.chdir(root)
-runtime = %w[DB_PASSWORD JWT_SECRET ADMIN_USERNAME ADMIN_PASSWORD JUNGOL_USERNAME JUNGOL_PASSWORD]
-ssh = %w[DEPLOY_HOST DEPLOY_USER DEPLOY_PORT DEPLOY_KEY]
-optional = %w[VITE_KAKAO_MAP_API_KEY WEBHOOK_URL]
-local_debug = %w[COLLECTOR_RUN_ONCE]
+runtime = %w[DB_PASSWORD JWT_SECRET ADMIN_USERNAME ADMIN_PASSWORD]
+optional = %w[VITE_KAKAO_MAP_API_KEY WEBHOOK_URL SOLVED_AC_CLIENT_ID SOLVED_AC_CLIENT_SECRET]
 example = File.read('.env.example')
-check(example.scan(/^([A-Z_]+)=/).flatten.sort == (runtime + optional + local_debug).sort, 'Unexpected .env.example assignments')
+check(example.scan(/^([A-Z_]+)=/).flatten.sort == (runtime + optional).sort, 'Unexpected .env.example assignments')
 inventory = example.lines.grep(/^#/).join.scan(/\b[A-Z][A-Z_]+\b/)
-(runtime + ssh + optional).each { |key| check(inventory.include?(key), "Missing secret inventory: #{key}") }
+(runtime + optional).each { |key| check(inventory.include?(key), "Missing secret inventory: #{key}") }
 
 workflow = YAML.load_file('.github/workflows/deploy.yaml')
-deploy_environment = workflow.fetch('jobs').fetch('deploy').fetch('env')
+deploy_job = workflow.fetch('jobs').fetch('deploy')
+check(deploy_job.fetch('runs-on') == %w[self-hosted Linux X64 deploy], 'Production must use the self-hosted deploy runner labels')
+deploy_environment = deploy_job.fetch('env')
 check(deploy_environment.fetch('WEBHOOK_URL') == '${{ secrets.WEBHOOK_URL }}', 'Optional webhook must reach renderer environment')
+check(deploy_environment.keys.sort == (runtime + optional).sort, 'Unexpected deployment secrets')
 check(!deploy_environment.key?('COLLECTOR_RUN_ONCE'), 'Local collector one-shot setting must not reach deployment')
-steps = workflow.fetch('jobs').fetch('deploy').fetch('steps')
-check(steps.first['name'] == 'Validate required GitHub secrets', 'Validation must be first')
+steps = deploy_job.fetch('steps')
+check(steps.first['name'] == 'Verify production runner and required secrets', 'Validation must be first')
 check(steps[1]['uses'] == 'actions/checkout@v4', 'Checkout must follow validation')
 validate = steps.first.fetch('run')
 deploy = steps.find { |step| step['name'] == 'Render root environment and deploy' }.fetch('run')
-cleanup_line = deploy.lines.find { |line| line.include?('timeout 30 ssh') }
-cleanup_command = cleanup_line&.match(/"\$target" "(.*)" \|\| true/)&.[](1)
-check(!cleanup_command.nil?, 'Missing remote cleanup command')
-Dir.mktmpdir('deployment-cleanup-contract-') do |dir|
-  transit = File.join(dir, 'transit')
-  Dir.mkdir(transit)
-  File.write(File.join(transit, '.env'), 'fixture')
-  2.times do
-    output, errors, status = Open3.capture3('bash', '-c', cleanup_command.gsub('$remote_dir', transit))
-    check(status.success? && output.empty? && errors.empty?, 'Remote cleanup must be silent and successful when repeated')
-  end
-end
-check(!validate.match?(/\bWEBHOOK_URL\b/), 'Optional webhook must not become a required GitHub secret')
-check(!deploy.match?(/runtime-secrets|\.secrets|\bsource\b|JUNGOL_DB_PASSWORD/), 'Obsolete secret provisioning')
-%w[StrictHostKeyChecking=accept-new BatchMode=yes].each { |text| check(deploy.include?(text), "Missing SSH safety: #{text}") }
-['repository=/home/ana/Desktop/ana/anabada-new', 'git clone --depth 1 --branch main --single-branch https://github.com/ANA-CNU/anabada-new.git "$repository"', 'git fetch --depth 1 origin main', 'git reset --hard origin/main', 'install -m 0600 "$1/.env" .env.next', 'mv -f .env.next .env', 'docker compose --env-file .env -f docker-compose.prod.yaml config --quiet', 'docker compose --env-file .env -f docker-compose.prod.yaml build', 'docker compose --env-file .env -f docker-compose.prod.yaml stop anabada-backend jungol-collector', 'docker compose --env-file .env -f docker-compose.prod.yaml up -d --no-build --remove-orphans --wait --wait-timeout 180'].each do |text|
+check(validate.include?('[[ "$RUNNER_NAME" != bada_deploy ]]'), 'Deployment must verify the runner name')
+check(optional.none? { |key| validate.include?(key) }, 'Optional secrets must stay optional')
+check(!deploy.match?(/runtime-secrets|\.secrets|\bsource\b|\bssh\b|JUNGOL_DB_PASSWORD/), 'Obsolete secret provisioning or remote deployment')
+['repository="$HOME/anabada-new"', 'git clone --depth 1 --branch main --single-branch https://github.com/ANA-CNU/anabada-new.git "$repository"', 'git fetch --depth 1 origin main', 'git reset --hard origin/main', 'bash "$GITHUB_WORKSPACE/scripts/deploy/render-production-env.sh" "$repository/.env"'].each do |text|
   check(deploy.include?(text), "Missing deployment gate: #{text}")
 end
 check(deploy.scan(/docker compose --env-file \.env -f docker-compose\.prod\.yaml up /).length == 1, 'Deployment must have one canonical Compose-up path')
@@ -53,16 +42,18 @@ check(!File.read('scripts/deploy/render-production-env.sh').include?('COLLECTOR_
 
 expected = {
   'anabada-frontend' => ['VITE_KAKAO_MAP_API_KEY'], 'anabada-mysql' => ['DB_PASSWORD'],
-  'anabada-backend' => %w[DB_PASSWORD JWT_SECRET WEBHOOK_URL],
+  'anabada-backend' => %w[DB_PASSWORD JWT_SECRET WEBHOOK_URL SOLVED_AC_CLIENT_ID SOLVED_AC_CLIENT_SECRET],
   'anabada-middleware' => %w[JWT_SECRET ADMIN_USERNAME ADMIN_PASSWORD],
-  'jungol-migrator' => ['DB_PASSWORD'],
-  'jungol-collector' => %w[DB_PASSWORD JUNGOL_USERNAME JUNGOL_PASSWORD WEBHOOK_URL], 'bada-nginx' => []
+  'database-migrator' => ['DB_PASSWORD'],
+  'bada-nginx' => []
 }
 
 ci = YAML.load_file('.github/workflows/ci.yaml')
-verify_environment = ci.fetch('jobs').fetch('verify').fetch('env')
+verify_job = ci.fetch('jobs').fetch('verify')
+check(verify_job.fetch('runs-on') == 'ubuntu-latest', 'CI verification must use the GitHub-hosted runner')
+verify_environment = verify_job.fetch('env')
 check(verify_environment.fetch('COMPOSE_BAKE') == 'false', 'CI must disable Compose Bake delegation')
-backend_step = ci.fetch('jobs').fetch('verify').fetch('steps').find do |step|
+backend_step = verify_job.fetch('steps').find do |step|
   step['name'] == 'Backend unit, type, build, and migrated MySQL contracts'
 end
 check(!backend_step.nil?, 'CI backend migrated-MySQL gate is missing')
@@ -72,20 +63,17 @@ backend_commands = backend_step.fetch('run')
 end
 check(!backend_commands.match?(/backend_qa|TEST_DATABASE_URL|CREATE DATABASE/), 'CI backend gate must not use the legacy shared MySQL flow')
 
-remote_deploy = /<<'DEPLOY'\n(?<script>.*?)\nDEPLOY\n\z/m.match(deploy)&.[](:script)
-check(!remote_deploy.nil?, 'Deployment must retain the remote deployment shell')
-check(remote_deploy.include?('export COMPOSE_BAKE=false'), 'Remote deployment shell must disable Compose Bake delegation')
-check(remote_deploy.index('export COMPOSE_BAKE=false') < remote_deploy.index('docker compose --env-file .env -f docker-compose.prod.yaml up '), 'Remote deployment shell must disable Compose Bake before its canonical Compose up')
-compose_config = 'docker compose --env-file .env -f docker-compose.prod.yaml config --quiet'
-compose_build = 'timeout 1200 docker compose --env-file .env -f docker-compose.prod.yaml build'
-compose_stop = 'timeout 60 docker compose --env-file .env -f docker-compose.prod.yaml stop anabada-backend jungol-collector'
-compose_up = 'timeout 1200 docker compose --env-file .env -f docker-compose.prod.yaml up -d --no-build --remove-orphans --wait --wait-timeout 180'
-compose_restart = 'timeout 60 docker compose --env-file .env -f docker-compose.prod.yaml restart bada-nginx'
-compose_ps = 'docker compose --env-file .env -f docker-compose.prod.yaml ps'
-check(remote_deploy.scan(Regexp.new(Regexp.escape(compose_restart))).length == 1, 'Deployment must restart nginx exactly once')
-check(remote_deploy.index(compose_config) < remote_deploy.index(compose_build) && remote_deploy.index(compose_build) < remote_deploy.index(compose_stop) && remote_deploy.index(compose_stop) < remote_deploy.index(compose_up) && remote_deploy.index(compose_up) < remote_deploy.index(compose_restart) && remote_deploy.index(compose_restart) < remote_deploy.index(compose_ps), 'Deployment Compose sequence must build before stopping apps, then migrate/start, restart nginx, and report state')
-check(remote_deploy.include?('git -C "$repository" rev-parse --is-inside-work-tree'), 'Existing deployment path must be a Git working tree')
-check(remote_deploy.include?('Deployment repository path is not a Git working tree'), 'Non-Git deployment path must fail safely')
+compose_config = 'sudo -n docker compose --env-file .env -f docker-compose.prod.yaml config --quiet'
+compose_build = 'timeout 1200 sudo -n COMPOSE_BAKE=false docker compose --env-file .env -f docker-compose.prod.yaml build'
+compose_migrate = 'timeout 1200 sudo -n docker compose --env-file .env -f docker-compose.prod.yaml run --rm database-migrator'
+compose_stop = 'timeout 60 sudo -n docker compose --env-file .env -f docker-compose.prod.yaml stop anabada-backend'
+compose_up = 'timeout 1200 sudo -n docker compose --env-file .env -f docker-compose.prod.yaml up -d --no-build --remove-orphans --wait --wait-timeout 180'
+compose_restart = 'timeout 60 sudo -n docker compose --env-file .env -f docker-compose.prod.yaml restart bada-nginx'
+compose_ps = 'sudo -n docker compose --env-file .env -f docker-compose.prod.yaml ps'
+check(deploy.scan(Regexp.new(Regexp.escape(compose_restart))).length == 1, 'Deployment must restart nginx exactly once')
+check(deploy.index(compose_config) < deploy.index(compose_build) && deploy.index(compose_build) < deploy.index(compose_migrate) && deploy.index(compose_migrate) < deploy.index(compose_stop) && deploy.index(compose_stop) < deploy.index(compose_up) && deploy.index(compose_up) < deploy.index(compose_restart) && deploy.index(compose_restart) < deploy.index(compose_ps), 'Deployment Compose sequence must build before stopping apps, then migrate/start, restart nginx, and report state')
+check(deploy.include?('git -C "$repository" rev-parse --is-inside-work-tree'), 'Existing deployment path must be a Git working tree')
+check(deploy.include?('Deployment repository path is not a Git working tree'), 'Non-Git deployment path must fail safely')
 
 %w[dev stage prod].each do |mode|
   config = YAML.load_file("docker-compose.#{mode}.yaml")
@@ -95,59 +83,24 @@ check(remote_deploy.include?('Deployment repository path is not a Git working tr
     keys = service.to_yaml.scan(/\$\{([A-Z_]+)/).flatten.uniq.reject { |key| key == 'COLLECTOR_REVISION' }.sort
     check(keys == expected.fetch(name).sort, "Wrong secret distribution: #{mode}/#{name}")
   end
-  collector = config.fetch('services').fetch('jungol-collector')
-  check(collector.fetch('environment').keys.sort == %w[DB_PASSWORD JUNGOL_PASSWORD JUNGOL_USERNAME WEBHOOK_URL], 'Collector settings must be static')
-  check(collector.fetch('build').fetch('args').fetch('COLLECTOR_REVISION') == '${COLLECTOR_REVISION:-unknown}', 'Collector revision must be a build-only argument')
-  if mode == 'dev'
-    check(!config.fetch('services').key?('jungol-migrator'), 'Dev must not include the automatic migrator')
-  else
-    migrator = config.fetch('services').fetch('jungol-migrator')
-    check(!migrator.key?('profiles'), "#{mode} migrator must be included in normal Compose up")
-    %w[anabada-frontend anabada-middleware anabada-backend jungol-collector].each do |service|
-      check(config.fetch('services').fetch(service).fetch('depends_on').fetch('jungol-migrator').fetch('condition') == 'service_completed_successfully', "#{mode}/#{service} must wait for migrator success")
+  services = config.fetch('services')
+  check(!services.key?('jungol-collector'), "#{mode} must only run the Baekjoon backend worker")
+  check(services.fetch('anabada-backend').fetch('environment').fetch('DB_NAME') == 'boj_bada', "#{mode} must read the BOJ database")
+  migrator = services.fetch('database-migrator')
+  check(!migrator.key?('profiles'), "#{mode} migrator must be included in normal Compose up")
+  if mode == 'prod'
+    check(migrator.fetch('command').last == '--require-boj-import', 'Production migration must require the legacy import')
+    check(!config.key?('networks') && services.values.none? { |service| service.key?('networks') || service.key?('network_mode') }, 'Production must use the implicit Compose network')
+    published_ports = services.select { |_, service| service.key?('ports') }.transform_values { |service| service.fetch('ports') }
+    check(published_ports == { 'bada-nginx' => ['80:80'] }, 'Production must publish only Nginx on port 80')
+    %w[anabada-backend anabada-middleware].each do |service|
+      check(services.fetch(service).fetch('environment').fetch('ALLOWED_ORIGIN') == 'https://bada.anacnu.com', "Wrong production origin: #{service}")
     end
   end
-end
+  %w[anabada-frontend anabada-middleware anabada-backend].each do |service|
+    check(services.fetch(service).fetch('depends_on').fetch('database-migrator').fetch('condition') == 'service_completed_successfully', "#{mode}/#{service} must wait for migrator success")
+  end
 
-Dir.mktmpdir('workflow-contract-') do |dir|
-  mock = File.join(dir, 'ssh')
-  File.write(mock, <<~'SH')
-    #!/usr/bin/env bash
-    set -euo pipefail
-    printf 'ssh-deploy\n' >> "$MOCK_LOG"
-    [[ "$1" == '-i' ]]
-    env_file="${2%/key}/.env"
-    test -f "$env_file"
-    grep -Fqx "WEBHOOK_URL=\"${EXPECTED_WEBHOOK}\"" "$env_file"
-    printf '%s' "${2%/key}" > "$MOCK_TEMP"
-    docker compose --env-file "$env_file" -f docker-compose.prod.yaml config --quiet
-    cat > /dev/null
-    exit 73
-  SH
-  File.chmod(0700, mock)
-  env = (runtime + ssh).to_h { |key| [key, 'fake-workflow-value'] }
-  env.merge!('DEPLOY_PORT' => '22', 'VITE_KAKAO_MAP_API_KEY' => nil, 'WEBHOOK_URL' => nil,
-             'EXPECTED_WEBHOOK' => '', 'PATH' => "#{dir}:#{ENV.fetch('PATH')}", 'MOCK_LOG' => "#{dir}/calls", 'MOCK_TEMP' => "#{dir}/transit")
-  combined = validate + "\n" + deploy
-  _, errors, status = Open3.capture3('bash', '-n', stdin_data: combined)
-  check(status.success?, "Invalid deployment shell: #{errors}")
-  (runtime + ssh).each do |key|
-    output, errors, status = Open3.capture3(env.merge(key => ''), 'bash', '-c', combined)
-    check(!status.success? && output.empty? && errors == "Missing required GitHub secret: #{key}\n", "Missing-secret failure: #{key}")
-    check(!File.exist?(env['MOCK_LOG']), 'SSH ran before validation')
-  end
-  _, _, status = Open3.capture3(env.merge('DB_PASSWORD' => "bad\nvalue"), 'bash', '-c', combined)
-  check(!status.success? && !File.exist?(env['MOCK_LOG']), 'Malformed runtime secret reached SSH')
-  [nil, 'fake-kakao'].each do |kakao|
-    output, errors, status = Open3.capture3(env.merge('VITE_KAKAO_MAP_API_KEY' => kakao, 'WEBHOOK_URL' => nil, 'EXPECTED_WEBHOOK' => '', 'JUNGOL_PASSWORD' => '$(touch /tmp/forbidden-workflow-command); `id` # literal'), 'bash', '-c', combined)
-    check(status.exitstatus == 73 && output.empty? && errors.empty?, 'Valid fake secrets did not stop at mock deployment')
-    check(!Dir.exist?(File.read(env['MOCK_TEMP'])), 'Runner transit directory leaked')
-  end
-  webhook = 'https://discord.com/api/webhooks/000000000000000000/placeholder-not-live'
-  output, errors, status = Open3.capture3(env.merge('WEBHOOK_URL' => webhook, 'EXPECTED_WEBHOOK' => webhook), 'bash', '-c', combined)
-  check(status.exitstatus == 73 && output.empty? && errors.empty?, 'Optional webhook did not reach mock deployment without logs')
-  check(!Dir.exist?(File.read(env['MOCK_TEMP'])), 'Runner transit directory leaked after webhook render')
-  check(File.readlines(env['MOCK_LOG']).length == 3, 'Unexpected SSH calls beyond mock deployment')
 end
 
 Dir.mktmpdir('deployment-git-contract-') do |dir|
@@ -155,9 +108,9 @@ Dir.mktmpdir('deployment-git-contract-') do |dir|
   seed = File.join(dir, 'seed')
   repository = File.join(dir, 'checkout', 'anabada-new')
   docker = File.join(dir, 'docker')
+  sudo = File.join(dir, 'sudo')
   timeout = File.join(dir, 'timeout')
   compose_log = File.join(dir, 'compose-calls')
-  transit = File.join(dir, 'transit')
   check(system('git', 'init', '--bare', origin), 'Cannot create disposable bare repository')
   check(system('git', 'init', '-b', 'main', seed), 'Cannot create disposable source repository')
   File.write(File.join(seed, 'README.md'), "first\n")
@@ -171,32 +124,66 @@ Dir.mktmpdir('deployment-git-contract-') do |dir|
     printf '%s\n' "$*" >> "$COMPOSE_LOG"
     case "${MOCK_COMPOSE_FAILURE:-}" in
       build) if [[ "$*" == *' build' ]]; then exit 70; fi ;;
+      migrate) if [[ "$*" == *' run --rm database-migrator' ]]; then exit 74; fi ;;
       up) if [[ "$*" == *' up '* ]]; then exit 71; fi ;;
       restart) if [[ "$*" == *' restart bada-nginx' ]]; then exit 72; fi ;;
     esac
   SH
   File.chmod(0700, docker)
+  File.write(sudo, <<~'SH')
+    #!/usr/bin/env bash
+    set -euo pipefail
+    [[ "$1" == '-n' ]]
+    shift
+    if [[ "$1" == 'COMPOSE_BAKE=false' ]]; then
+      export COMPOSE_BAKE=false
+      shift
+    fi
+    if [[ "$*" == *' build' ]]; then
+      [[ "${COMPOSE_BAKE:-}" == 'false' ]]
+    fi
+    exec "$@"
+  SH
+  File.chmod(0700, sudo)
   File.write(timeout, "#!/usr/bin/env bash\nshift\nexec \"$@\"\n")
   File.chmod(0700, timeout)
-  fixture = remote_deploy.sub('/home/ana/Desktop/ana/anabada-new', repository).sub('https://github.com/ANA-CNU/anabada-new.git', "file://#{origin}")
-  write_transit = lambda do
-    Dir.mkdir(transit)
-    File.write(File.join(transit, '.env'), "DB_PASSWORD=fixture\n")
+  fixture = (validate + "\n" + deploy).sub('https://github.com/ANA-CNU/anabada-new.git', "file://#{origin}")
+  command_env = runtime.to_h { |key| [key, 'fake-workflow-value'] }
+  command_env.merge!(
+    'HOME' => File.join(dir, 'checkout'), 'GITHUB_WORKSPACE' => root,
+    'RUNNER_NAME' => 'bada_deploy', 'PATH' => "#{dir}:#{ENV.fetch('PATH')}",
+    'COMPOSE_LOG' => compose_log, 'VITE_KAKAO_MAP_API_KEY' => nil, 'WEBHOOK_URL' => nil,
+    'SOLVED_AC_CLIENT_ID' => nil, 'SOLVED_AC_CLIENT_SECRET' => nil
+  )
+  _, errors, status = Open3.capture3('bash', '-n', stdin_data: fixture)
+  check(status.success?, "Invalid deployment shell: #{errors}")
+  runtime.each do |key|
+    output, errors, status = Open3.capture3(command_env.merge(key => ''), 'bash', '-se', stdin_data: fixture)
+    check(!status.success? && output.empty? && errors == "Missing required GitHub secret: #{key}\n", "Missing-secret failure: #{key}")
   end
-  command_env = { 'PATH' => "#{dir}:#{ENV.fetch('PATH')}", 'COMPOSE_LOG' => compose_log }
+  _, errors, status = Open3.capture3(command_env.merge('RUNNER_NAME' => 'other_runner'), 'bash', '-se', stdin_data: fixture)
+  check(!status.success? && errors.include?('requires the bada_deploy runner'), 'Wrong runner must fail safely')
+  check(!File.exist?(repository) && !File.exist?(compose_log), 'Runner or secret validation reached deployment')
   compose_sequence = [
     'compose --env-file .env -f docker-compose.prod.yaml config --quiet',
     'compose --env-file .env -f docker-compose.prod.yaml build',
-    'compose --env-file .env -f docker-compose.prod.yaml stop anabada-backend jungol-collector',
+    'compose --env-file .env -f docker-compose.prod.yaml run --rm database-migrator',
+    'compose --env-file .env -f docker-compose.prod.yaml stop anabada-backend',
     'compose --env-file .env -f docker-compose.prod.yaml up -d --no-build --remove-orphans --wait --wait-timeout 180',
     'compose --env-file .env -f docker-compose.prod.yaml restart bada-nginx',
     'compose --env-file .env -f docker-compose.prod.yaml ps'
   ]
 
-  write_transit.call
-  _, errors, status = Open3.capture3(command_env, 'bash', '-se', '--', transit, stdin_data: fixture)
+  _, errors, status = Open3.capture3(command_env, 'bash', '-se', stdin_data: fixture)
   check(status.success?, "Fresh clone deployment fixture failed: #{errors}")
   check(File.exist?(File.join(repository, '.git')), 'Fresh deployment did not clone main')
+  env_path = File.join(repository, '.env')
+  check((File.stat(env_path).mode & 0o777) == 0o600, 'Deployment .env must be private')
+  check(File.readlines(env_path).include?("WEBHOOK_URL=\"\"\n"), 'Optional webhook must render as empty')
+  calls_before_bad_secret = File.readlines(compose_log).length
+  _, _, status = Open3.capture3(command_env.merge('DB_PASSWORD' => "bad\nvalue"), 'bash', '-se', stdin_data: fixture)
+  check(!status.success?, 'Malformed runtime secret must stop deployment')
+  check(File.readlines(compose_log).length == calls_before_bad_secret, 'Malformed runtime secret reached Compose')
   history, _, history_status = Open3.capture3('git', '-C', repository, 'rev-list', '--count', 'HEAD')
   check(history_status.success? && history.strip == '1', 'Fresh deployment is not shallow')
   check(File.readlines(compose_log).map(&:strip) == compose_sequence, 'Fresh clone Compose sequence must restart nginx after up')
@@ -209,33 +196,37 @@ Dir.mktmpdir('deployment-git-contract-') do |dir|
   check(system('git', '-C', seed, 'add', 'README.md'), 'Cannot stage disposable update')
   check(system('git', '-C', seed, '-c', 'user.name=fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'second'), 'Cannot commit disposable update')
   check(system('git', '-C', seed, 'push', 'origin', 'main'), 'Cannot push disposable update')
-  write_transit.call
-  _, errors, status = Open3.capture3(command_env, 'bash', '-se', '--', transit, stdin_data: fixture)
+  webhook = 'https://discord.com/api/webhooks/000000000000000000/placeholder-not-live'
+  _, errors, status = Open3.capture3(command_env.merge('WEBHOOK_URL' => webhook), 'bash', '-se', stdin_data: fixture)
   check(status.success?, 'Existing checkout reset fixture failed')
+  check(File.readlines(env_path).include?(%Q(WEBHOOK_URL="#{webhook}"\n)), 'Optional webhook did not reach the deployment environment')
   check(File.read(File.join(repository, 'README.md')) == "second\n", 'Existing checkout did not reset tracked code to main')
   history, _, history_status = Open3.capture3('git', '-C', repository, 'rev-list', '--count', 'HEAD')
   check(history_status.success? && history.strip == '1', 'Existing deployment is not shallow after reset')
   check(File.read(File.join(repository, 'local-untracked')) == "preserve\n", 'Existing checkout lost an untracked file')
   check(File.read(File.join(repository, 'database', 'mysql_data', 'sentinel')) == "preserve\n", 'Existing checkout lost untracked database data')
-  check(File.readlines(compose_log).last(6).map(&:strip) == compose_sequence, 'Existing checkout Compose sequence must build before app downtime')
+  check(File.readlines(compose_log).last(compose_sequence.length).map(&:strip) == compose_sequence, 'Existing checkout Compose sequence must build before app downtime')
 
-  write_transit.call
   calls_before_build_failure = File.readlines(compose_log).length
-  _, _, status = Open3.capture3(command_env.merge('MOCK_COMPOSE_FAILURE' => 'build'), 'bash', '-se', '--', transit, stdin_data: fixture)
+  _, _, status = Open3.capture3(command_env.merge('MOCK_COMPOSE_FAILURE' => 'build'), 'bash', '-se', stdin_data: fixture)
   check(!status.success?, 'Compose build failure must stop deployment')
   failed_build_calls = File.readlines(compose_log).drop(calls_before_build_failure).map(&:strip)
-  check(failed_build_calls.any? { |call| call.end_with?(' build') } && failed_build_calls.none? { |call| call.include?(' stop anabada-backend jungol-collector') || call.include?(' up ') || call.include?(' restart bada-nginx') }, 'Build failure must occur before app downtime')
+  check(failed_build_calls.any? { |call| call.end_with?(' build') } && failed_build_calls.none? { |call| call.include?(' stop anabada-backend') || call.include?(' up ') || call.include?(' restart bada-nginx') }, 'Build failure must occur before app downtime')
 
-  write_transit.call
+  calls_before_migration_failure = File.readlines(compose_log).length
+  _, _, status = Open3.capture3(command_env.merge('MOCK_COMPOSE_FAILURE' => 'migrate'), 'bash', '-se', stdin_data: fixture)
+  check(!status.success?, 'Failed BOJ import must stop the deployment')
+  failed_migration_calls = File.readlines(compose_log).drop(calls_before_migration_failure).map(&:strip)
+  check(failed_migration_calls == compose_sequence.take(3), 'Failed BOJ import must leave the running backend online')
+
   calls_before_up_failure = File.readlines(compose_log).length
-  _, _, status = Open3.capture3(command_env.merge('MOCK_COMPOSE_FAILURE' => 'up'), 'bash', '-se', '--', transit, stdin_data: fixture)
+  _, _, status = Open3.capture3(command_env.merge('MOCK_COMPOSE_FAILURE' => 'up'), 'bash', '-se', stdin_data: fixture)
   check(!status.success?, 'Compose up failure must stop deployment')
   failed_up_calls = File.readlines(compose_log).drop(calls_before_up_failure).map(&:strip)
-  check(failed_up_calls.any? { |call| call.include?(' stop anabada-backend jungol-collector') } && failed_up_calls.any? { |call| call.include?(' up ') } && failed_up_calls.none? { |call| call.include?(' restart bada-nginx') || call.end_with?(' ps') }, 'Compose up failure must prevent nginx restart and ps')
+  check(failed_up_calls.any? { |call| call.include?(' stop anabada-backend') } && failed_up_calls.any? { |call| call.include?(' up ') } && failed_up_calls.none? { |call| call.include?(' restart bada-nginx') || call.end_with?(' ps') }, 'Compose up failure must prevent nginx restart and ps')
 
-  write_transit.call
   calls_before_restart_failure = File.readlines(compose_log).length
-  _, _, status = Open3.capture3(command_env.merge('MOCK_COMPOSE_FAILURE' => 'restart'), 'bash', '-se', '--', transit, stdin_data: fixture)
+  _, _, status = Open3.capture3(command_env.merge('MOCK_COMPOSE_FAILURE' => 'restart'), 'bash', '-se', stdin_data: fixture)
   check(!status.success?, 'Nginx restart failure must propagate nonzero')
   failed_restart_calls = File.readlines(compose_log).drop(calls_before_restart_failure).map(&:strip)
   check(failed_restart_calls.any? { |call| call.include?(' restart bada-nginx') } && failed_restart_calls.none? { |call| call.end_with?(' ps') }, 'Nginx restart failure must prevent ps')
@@ -243,12 +234,11 @@ Dir.mktmpdir('deployment-git-contract-') do |dir|
   non_git = File.join(dir, 'non-git')
   Dir.mkdir(non_git)
   File.write(File.join(non_git, 'sentinel'), "preserve\n")
-  non_git_fixture = fixture.sub(repository, non_git)
-  write_transit.call
+  non_git_fixture = fixture.sub('repository="$HOME/anabada-new"', "repository=\"#{non_git}\"")
   calls_before = File.readlines(compose_log).length
-  _, errors, status = Open3.capture3(command_env, 'bash', '-se', '--', transit, stdin_data: non_git_fixture)
+  _, errors, status = Open3.capture3(command_env, 'bash', '-se', stdin_data: non_git_fixture)
   check(!status.success? && errors.include?('Deployment repository path is not a Git working tree'), 'Non-Git path must fail before deployment')
   check(File.read(File.join(non_git, 'sentinel')) == "preserve\n", 'Non-Git path was modified')
   check(File.readlines(compose_log).length == calls_before, 'Non-Git path reached Compose')
 end
-puts 'Workflow contract passed: 10 missing secrets, malformed input, optional Kakao/webhook, literal secret values, mock deployment/config, cleanup, and static topology.'
+puts 'Workflow contract passed: runner, required/optional secrets, shallow checkout, data preservation, deployment order, failure gates, and Compose topology.'

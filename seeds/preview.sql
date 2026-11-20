@@ -9,16 +9,15 @@ SET @next_month_utc = DATE_SUB(DATE_ADD(@current_score_month, INTERVAL 1 MONTH),
 START TRANSACTION;
 
 -- demo 고정 ID UPSERT는 재실행에서 동일 행을 갱신하고, 다른 데이터를 삭제하지 않는다.
-INSERT INTO user (id, jungol_name, corrects, submissions, solution, korean_name, tier, ignored, jungol_account_id, rank_wrong_count, initialized_at, initial_submission_id)
+INSERT INTO user (id, handle, corrects, submissions, solution, korean_name, tier, ignored, initial_submission_id)
 WITH RECURSIVE n AS (SELECT 1 AS value UNION ALL SELECT value + 1 FROM n WHERE value < 30)
 SELECT 80000 + value, CONCAT('demo', LPAD(value, 2, '0')), 0, 0, 990000 + value,
   ELT(value, '김서준', '이민서', '박지호', '최도윤', '정하은', '강준우', '윤수진', '한유나', '김민재', '이서연', '박준혁', '최유진', '정민준', '강지민', '윤도현', '한서윤', '김도현', '이채원', '박시우', '최하린', '정지훈', '강예린', '윤현우', '한지민', '김주원', '이도윤', '박서아', '최민석', '정유나', '강하준'),
-  31 - value, 0, 880000 + value, value % 6,
-  UTC_TIMESTAMP(), 990000 + value
+  31 - value, 0, 990000 + value
 FROM n
-ON DUPLICATE KEY UPDATE jungol_name=VALUES(jungol_name), korean_name=VALUES(korean_name), tier=VALUES(tier), ignored=0, rank_wrong_count=VALUES(rank_wrong_count), initialized_at=VALUES(initialized_at), initial_submission_id=VALUES(initial_submission_id);
+ON DUPLICATE KEY UPDATE handle=VALUES(handle), korean_name=VALUES(korean_name), tier=VALUES(tier), ignored=0, initial_submission_id=VALUES(initial_submission_id);
 
-INSERT INTO problem (id, user_id, problem, problem_name, problem_tier, submitted_at, level, repeatation, verdict, external_submission_id, score, estimated_tier)
+INSERT INTO problem (id, user_id, problem, problem_name, problem_tier, submitted_at, level, repeatation, verdict, external_submission_id, score)
 WITH RECURSIVE users AS (SELECT 1 AS user_no UNION ALL SELECT user_no + 1 FROM users WHERE user_no < 30), submissions AS (SELECT 1 AS submission_no UNION ALL SELECT submission_no + 1 FROM submissions WHERE submission_no < 6)
 SELECT 910000 + users.user_no * 10 + submissions.submission_no, 80000 + users.user_no,
   4000 + users.user_no * 10 + CASE WHEN submissions.submission_no = 6 THEN 1 ELSE submissions.submission_no END,
@@ -31,9 +30,9 @@ SELECT 910000 + users.user_no * 10 + submissions.submission_no, 80000 + users.us
     WHEN 5 THEN UTC_TIMESTAMP() - INTERVAL (2 + users.user_no % 7) DAY
     ELSE UTC_TIMESTAMP() - INTERVAL (1 + users.user_no % 5) DAY + INTERVAL 30 MINUTE END,
   LEAST(31, 34 - users.user_no) - (31 - users.user_no), CASE WHEN submissions.submission_no = 6 THEN 1 ELSE 0 END, 'accepted',
-  9900000 + users.user_no * 10 + submissions.submission_no, 80.000000 + users.user_no, LEAST(31, 34 - users.user_no)
+  9900000 + users.user_no * 10 + submissions.submission_no, 80.000000 + users.user_no
 FROM users CROSS JOIN submissions WHERE TRUE
-ON DUPLICATE KEY UPDATE user_id=VALUES(user_id), problem=VALUES(problem), problem_name=VALUES(problem_name), problem_tier=VALUES(problem_tier), submitted_at=VALUES(submitted_at), level=VALUES(level), repeatation=VALUES(repeatation), verdict='accepted', score=VALUES(score), estimated_tier=VALUES(estimated_tier);
+ON DUPLICATE KEY UPDATE user_id=VALUES(user_id), problem=VALUES(problem), problem_name=VALUES(problem_name), problem_tier=VALUES(problem_tier), submitted_at=VALUES(submitted_at), level=VALUES(level), repeatation=VALUES(repeatation), verdict='accepted', score=VALUES(score);
 
 UPDATE user u
 SET corrects=(SELECT COUNT(DISTINCT p.problem) FROM problem p WHERE p.user_id=u.id AND p.verdict='accepted'),

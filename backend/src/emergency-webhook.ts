@@ -45,7 +45,9 @@ export class BackendEmergencyAlertFormatter {
         : []),
       "",
       "## 영향",
-      "backend가 요청을 정상 처리하지 못했습니다.",
+      incident.operationId?.startsWith("boj.")
+        ? "백준 수집 또는 solved.ac 갱신 작업을 정상 처리하지 못했습니다."
+        : "backend가 요청을 정상 처리하지 못했습니다.",
       "",
       "## 즉시 확인",
       "1. backend 컨테이너 상태와 같은 시각의 오류 로그를 확인하세요.",
@@ -100,9 +102,8 @@ export class BackendEmergencyWebhook {
         this.url,
         this.formatter.format(incident),
       );
-    } catch (error) {
-      if (!(error instanceof Error)) throw error;
-      return "failed";
+    } catch {
+      delivered = false;
     } finally {
       this.inFlight.delete(key);
     }
@@ -125,8 +126,16 @@ export class EmergencyIncidentReporter implements InternalIncidentReporter {
   }
 }
 
-class BackendDiscordTransport implements BackendEmergencyWebhookTransport {
-  async send(urlText: string, content: string): Promise<boolean> {
+export class BackendDiscordTransport
+  implements BackendEmergencyWebhookTransport
+{
+  constructor(private readonly includeText = false) {}
+
+  async send(
+    urlText: string,
+    content: string,
+    signal?: AbortSignal,
+  ): Promise<boolean> {
     let url: URL;
     try {
       url = new URL(urlText);
@@ -141,7 +150,12 @@ class BackendDiscordTransport implements BackendEmergencyWebhookTransport {
           ? httpRequest
           : undefined;
     if (!requester) return false;
-    const body = JSON.stringify({ content });
+    const body = JSON.stringify({
+      content,
+      ...(this.includeText
+        ? { text: content, allowed_mentions: { parse: [] } }
+        : {}),
+    });
     return new Promise<boolean>((resolve) => {
       let settled = false;
       const finish = (result: boolean) => {
@@ -153,17 +167,19 @@ class BackendDiscordTransport implements BackendEmergencyWebhookTransport {
         url,
         {
           method: "POST",
+          signal,
           headers: {
             "content-type": "application/json",
             "content-length": Buffer.byteLength(body),
           },
         },
         (response) => {
-          response.resume();
+          response.on("error", () => finish(false));
           response.on("end", () => {
             const status = response.statusCode ?? 0;
             finish(status >= 200 && status < 300);
           });
+          response.resume();
         },
       );
       request.setTimeout(10_000, () => {

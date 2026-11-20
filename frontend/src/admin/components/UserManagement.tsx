@@ -56,8 +56,6 @@ export default function UserManagement() {
       korean_name: user.korean_name,
       tier: user.tier,
       ignored: user.ignored,
-      jungol_account_id: user.jungol_account_id,
-      rank_wrong_count: user.rank_wrong_count
     });
   };
 
@@ -76,8 +74,6 @@ export default function UserManagement() {
       if (typeof editForm.korean_name !== "undefined") payload.korean_name = editForm.korean_name;
       if (typeof editForm.tier !== "undefined") payload.tier = Number(editForm.tier) || 0;
       if (typeof editForm.ignored !== "undefined") payload.ignored = editForm.ignored;
-      if (typeof editForm.jungol_account_id !== "undefined") payload.jungol_account_id = editForm.jungol_account_id;
-      if (typeof editForm.rank_wrong_count !== "undefined") payload.rank_wrong_count = Number(editForm.rank_wrong_count) || 0;
 
       const res = await fetch(`${URL}/api/users/${id}`, {
         method: 'PUT',
@@ -126,7 +122,7 @@ export default function UserManagement() {
             <Input 
               value={filter} 
               onChange={(e) => setFilter(e.target.value)} 
-              placeholder="정올명, 한국명 검색"
+              placeholder="백준 아이디, 한국명 검색"
               className="max-w-xs" 
             />
             <Button variant="outline" onClick={fetchUsers}>새로고침</Button>
@@ -140,14 +136,12 @@ export default function UserManagement() {
           <thead className="bg-muted/40">
             <tr>
               <th className="text-left px-4 py-2">ID</th>
-              <th className="text-left px-4 py-2">정올명</th>
+              <th className="text-left px-4 py-2">백준 아이디</th>
               <th className="text-left px-4 py-2">한국명</th>
               <th className="text-left px-4 py-2">Corrects</th>
               <th className="text-left px-4 py-2">Submissions</th>
               <th className="text-left px-4 py-2">Solution</th>
               <th className="text-left px-4 py-2">Tier</th>
-              <th className="text-left px-4 py-2">정올 계정 ID</th>
-              <th className="text-left px-4 py-2">오답 수</th>
               <th className="text-left px-4 py-2">Ignored</th>
               <th className="text-left px-4 py-2">Actions</th>
             </tr>
@@ -236,18 +230,6 @@ export default function UserManagement() {
                   </td>
                   <td className="px-4 py-2">
                     {isEditing ? (
-                      <Input
-                        inputMode="numeric"
-                        value={editForm.jungol_account_id ?? ""}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, jungol_account_id: e.target.value }))}
-                        className="w-24"
-                      />
-                    ) : (
-                      user.jungol_account_id
-                    )}
-                  </td>
-                  <td className="px-4 py-2">
-                    {isEditing ? (
                       <SquircleSurface asChild radius="control">
                       <select
                         value={String(editForm.ignored ?? false)}
@@ -261,11 +243,6 @@ export default function UserManagement() {
                     ) : (
                       user.ignored ? "Yes" : "No"
                     )}
-                  </td>
-                  <td className="px-4 py-2">
-                    {isEditing ? (
-                      <Input type="number" value={String(editForm.rank_wrong_count ?? 0)} onChange={(e) => setEditForm(prev => ({ ...prev, rank_wrong_count: Number(e.target.value) }))} className="w-20" />
-                    ) : user.rank_wrong_count}
                   </td>
                   <td className="px-4 py-2">
                     {isEditing ? (

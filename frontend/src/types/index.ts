@@ -7,8 +7,6 @@ export interface User {
   solution: string;
   tier: number;
   ignored: boolean;
-  jungol_account_id: string;
-  rank_wrong_count: number;
 }
 
 export interface Problem {
@@ -31,7 +29,7 @@ export interface ScoreHistory {
   display_name: string;
   desc: string | null;
   bias: number;
-  rule_type: "custom" | "daily" | "event";
+  rule_type: "custom" | "daily" | "event" | "legacy";
   score_day: string | null;
   event_id: number | null;
   problem_id: string | null;

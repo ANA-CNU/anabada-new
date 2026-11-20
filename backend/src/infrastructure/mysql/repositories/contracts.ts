@@ -16,7 +16,7 @@ export const userDtoSchema = z.object({
   tier: z.number().int().min(0).max(31),
   ignored: tinyintBoolean,
   jungol_account_id: decimalString,
-  rank_wrong_count: z.number().int().nonnegative(),
+  rank_wrong_count: z.coerce.number().int().nonnegative(),
 });
 export type UserDto = Readonly<z.output<typeof userDtoSchema>>;
 
@@ -41,7 +41,7 @@ export const scoreHistoryDtoSchema = z.object({
   display_name: z.string(),
   desc: z.string().nullable(),
   bias: z.number().int(),
-  rule_type: z.enum(["custom", "daily", "event"]),
+  rule_type: z.enum(["custom", "daily", "event", "legacy"]),
   score_day: z.string().nullable(),
   event_id: z.number().int().nullable(),
   problem_id: decimalString.nullable(),

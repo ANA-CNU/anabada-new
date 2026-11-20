@@ -35,7 +35,10 @@ import { ActivityRepository } from "./infrastructure/mysql/repositories/activity
 import { EventRepository } from "./infrastructure/mysql/repositories/event-repository.js";
 import { HealthRepository } from "./infrastructure/mysql/repositories/health-repository.js";
 import { RankingRepository } from "./infrastructure/mysql/repositories/ranking-repository.js";
-import { UserRepository } from "./infrastructure/mysql/repositories/user-repository.js";
+import {
+  type UserHandleColumn,
+  UserRepository,
+} from "./infrastructure/mysql/repositories/user-repository.js";
 import { type Clock, KstCalendar, SystemClock } from "./infrastructure/time.js";
 import { logger } from "./logger.js";
 
@@ -47,7 +50,8 @@ export type ApplicationDependencies = Readonly<{
   readonly incidentReporter: InternalIncidentReporter;
   readonly clock?: Clock;
   readonly calendar?: KstCalendar;
-  readonly config: Pick<BackendConfig, "NODE_ENV" | "ALLOWED_ORIGIN">;
+  readonly config: Pick<BackendConfig, "NODE_ENV" | "ALLOWED_ORIGIN"> &
+    Partial<Pick<BackendConfig, "DB_NAME">>;
 }>;
 
 const json = (status: number, body: object): Response =>
@@ -73,10 +77,13 @@ function incidentApi(request: Request): string {
   return `${request.method} ${new URL(request.url).pathname}`;
 }
 
-function sessionServices(pool: DatabasePool) {
+function sessionServices(pool: DatabasePool, handleColumn: UserHandleColumn) {
   const withRepository = <T>(
     work: (repository: UserRepository) => Promise<T>,
-  ) => pool.withSession((session) => work(new UserRepository(session)));
+  ) =>
+    pool.withSession((session) =>
+      work(new UserRepository(session, handleColumn)),
+    );
   const userService = new UserService({
     list: () => withRepository((repository) => repository.list()),
     find: (id) => withRepository((repository) => repository.find(id)),
@@ -90,7 +97,7 @@ function sessionServices(pool: DatabasePool) {
       withRepository((repository) => repository.find(id)),
     problemsForUser: (id: number) =>
       pool.withSession((session) =>
-        new ActivityRepository(session).problemsForUser(id),
+        new ActivityRepository(session, handleColumn).problemsForUser(id),
       ),
     monthlySummary: (
       id: number,
@@ -100,7 +107,7 @@ function sessionServices(pool: DatabasePool) {
       endDate: string,
     ) =>
       pool.withSession((session) =>
-        new ActivityRepository(session).monthlySummary(
+        new ActivityRepository(session, handleColumn).monthlySummary(
           id,
           start,
           end,
@@ -112,15 +119,18 @@ function sessionServices(pool: DatabasePool) {
       buckets: readonly import("./infrastructure/time.js").KstMonthBucket[],
     ) =>
       pool.withSession((session) =>
-        new ActivityRepository(session).monthlyStats(buckets),
+        new ActivityRepository(session, handleColumn).monthlyStats(buckets),
       ),
     totalProblems: () =>
       pool.withSession((session) =>
-        new ActivityRepository(session).totalProblems(),
+        new ActivityRepository(session, handleColumn).totalProblems(),
       ),
     recentlySolved: (limit: number, offset: number) =>
       pool.withSession((session) =>
-        new ActivityRepository(session).recentlySolved(limit, offset),
+        new ActivityRepository(session, handleColumn).recentlySolved(
+          limit,
+          offset,
+        ),
       ),
   };
   return { userService, activities };
@@ -130,16 +140,34 @@ export function createApplication(dependencies: ApplicationDependencies) {
   const clock = dependencies.clock ?? new SystemClock();
   const calendar = dependencies.calendar ?? new KstCalendar();
   const { databasePool, authorizer, incidentReporter, config } = dependencies;
-  const { userService, activities } = sessionServices(databasePool);
-  const scoreService = new ScoreHistoryService(databasePool, databasePool);
-  const biasService = new BiasService(databasePool, databasePool);
+  const boj = config.DB_NAME === "boj_bada";
+  const handleColumn = boj ? "handle" : "jungol_name";
+  const { userService, activities } = sessionServices(
+    databasePool,
+    handleColumn,
+  );
+  const now = () => clock.now();
+  const scoreService = new ScoreHistoryService(
+    databasePool,
+    databasePool,
+    now,
+    handleColumn,
+  );
+  const biasService = new BiasService(
+    databasePool,
+    databasePool,
+    now,
+    handleColumn,
+  );
   const eventService = {
     unitOfWork: <T>(work: (repository: EventRepository) => Promise<T>) =>
       databasePool.unitOfWork((session) => work(new EventRepository(session))),
   };
   const eventReads = {
     withSession: <T>(work: (repository: EventRepository) => Promise<T>) =>
-      databasePool.withSession((session) => work(new EventRepository(session))),
+      databasePool.withSession((session) =>
+        work(new EventRepository(session, now)),
+      ),
   };
   const scoreRoutes: ScoreHistoryRouteDependencies = {
     service: scoreService,
@@ -213,7 +241,11 @@ export function createApplication(dependencies: ApplicationDependencies) {
         {
           check: () =>
             databasePool.withSession((session) =>
-              new HealthRepository(session).check(),
+              new HealthRepository(
+                session,
+                boj,
+                config.NODE_ENV === "production",
+              ).check(),
             ),
         },
         clock,
@@ -231,6 +263,7 @@ export function createApplication(dependencies: ApplicationDependencies) {
     .use(
       createUserRoutes({
         service: userService,
+        boj,
         adminAuthorizer: {
           authorize: (request) => authorizer.isAdmin(request),
         },
@@ -245,7 +278,7 @@ export function createApplication(dependencies: ApplicationDependencies) {
       createRankingRoutes({
         withRepository: (work) =>
           databasePool.withSession((session) =>
-            work(new RankingRepository(session)),
+            work(new RankingRepository(session, handleColumn)),
           ),
         clock,
         calendar,
@@ -255,12 +288,12 @@ export function createApplication(dependencies: ApplicationDependencies) {
       createAdminRankingBoardRoutes({
         withRepository: (work) =>
           databasePool.withSession((session) =>
-            work(new RankingRepository(session)),
+            work(new RankingRepository(session, handleColumn)),
           ),
         service: new AdminRankingBoardService({
           unitOfWork: (work) =>
             databasePool.unitOfWork((session) =>
-              work(new RankingRepository(session)),
+              work(new RankingRepository(session, handleColumn)),
             ),
         }),
         authorizer,
@@ -271,6 +304,7 @@ export function createApplication(dependencies: ApplicationDependencies) {
       createBiasRoutes({
         service: biasService,
         authorize: (request) => authorizer.isAdmin(request),
+        clock: now,
       }),
     )
     .use(

@@ -10,6 +10,7 @@ import {
   problemDtoSchema,
   recentSolvedDtoSchema,
 } from "./contracts.js";
+import type { UserHandleColumn } from "./user-repository.js";
 
 const operations = {
   userProblems: sqlOperations.activityUserProblems,
@@ -27,7 +28,10 @@ const totalSchema = z.object({
 });
 
 export class ActivityRepository {
-  constructor(private readonly database: DatabaseExecutor) {}
+  constructor(
+    private readonly database: DatabaseExecutor,
+    private readonly handleColumn: UserHandleColumn = "jungol_name",
+  ) {}
   async problemsForUser(userId: number): Promise<readonly ProblemDto[]> {
     return this.database.select(
       operations.userProblems,
@@ -42,7 +46,7 @@ export class ActivityRepository {
   ): Promise<readonly RecentSolvedDto[]> {
     return this.database.select(
       operations.recent,
-      "SELECT u.jungol_name AS display_name, u.jungol_name, u.korean_name, p.problem, p.problem_name, p.submitted_at FROM problem p JOIN user u ON p.user_id = u.id WHERE p.repeatation = 0 AND p.verdict = 'accepted' ORDER BY p.submitted_at DESC LIMIT ? OFFSET ?",
+      `SELECT u.${this.handleColumn} AS display_name, u.${this.handleColumn} AS jungol_name, u.korean_name, p.problem, p.problem_name, p.submitted_at FROM problem p JOIN user u ON p.user_id = u.id WHERE p.repeatation = 0 AND p.verdict = 'accepted' ORDER BY p.submitted_at DESC LIMIT ? OFFSET ?`,
       [limit, offset],
       recentSolvedDtoSchema,
     );

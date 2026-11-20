@@ -27,74 +27,83 @@ import {
   calculateAverageScore 
 } from '../../lib/utils';
 
-const UserProfile: React.FC = () => {
-  const navigate = useNavigate();
-  const { id } = useParams();
+type ProfileActivity = {
+  scores: ScoreHistory[] | null;
+  problems: Problem[] | null;
+  ranks: RankPoint[] | null;
+  monthly: MonthlySummary | null;
+};
 
-  const [user, setUser] = useState<User | null>(null);
-  const [scoreHistory, setScoreHistory] = useState<ScoreHistory[]>([]);
-  const [recentProblems, setRecentProblems] = useState<Problem[]>([]);
-  const [rankHistory, setRankHistory] = useState<RankPoint[]>([]);
-  const [monthly, setMonthly] = useState<MonthlySummary | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+async function readActivity<T>(path: string, signal: AbortSignal): Promise<T> {
+  const response = await fetch(`${URL}${path}`, { signal });
+  if (!response.ok) throw new Error(`Activity request failed: ${response.status}`);
+  return response.json();
+}
+
+function resultOrNull<T>(result: PromiseSettledResult<T>): T | null {
+  return result.status === 'fulfilled' ? result.value : null;
+}
+
+const UserProfile: React.FC = () => {
+  const { id } = useParams();
+  return <Profile key={id} id={id} />;
+};
+
+const Profile: React.FC<{ id: string | undefined }> = ({ id }) => {
+  const navigate = useNavigate();
+
+  const [profile, setProfile] = useState<{ user: User } | { error: string } | null>(null);
+  const [activity, setActivity] = useState<ProfileActivity | null>(null);
+  const scoreHistory = activity?.scores ?? [];
+  const recentProblems = activity?.problems ?? [];
+  const rankHistory = activity?.ranks ?? [];
+  const monthly = activity?.monthly;
+  const user = profile && 'user' in profile ? profile.user : null;
   const userId = user?.id;
 
   useEffect(() => {
-    const fetchAll = async () => {
-      setIsLoading(true);
+    const controller = new AbortController();
+    const loadProfile = async () => {
       try {
-        const userRes = await fetch(`${URL}/api/users/${id}`);
+        const userRes = await fetch(`${URL}/api/users/${id}`, { signal: controller.signal });
+        if (userRes.status === 400 || userRes.status === 404) {
+          setProfile({ error: '사용자를 찾을 수 없습니다.' });
+          return;
+        }
+        if (!userRes.ok) throw new Error(`Profile request failed: ${userRes.status}`);
         const json = await userRes.json();
-        if (!userRes.ok || !json?.success) throw new Error(json?.error || "사용자 정보를 가져오지 못했습니다.");
-        setUser(json.data);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setIsLoading(false);
+        if (!json?.success || !json.data) throw new Error('Missing profile data');
+        setProfile({ user: json.data });
+      } catch {
+        if (!controller.signal.aborted) {
+          setProfile({ error: '사용자 정보를 불러오지 못했습니다.' });
+        }
       }
     };
-    if (id) fetchAll();
+    void loadProfile();
+    return () => controller.abort();
   }, [id]);
 
   useEffect(() => {
-    const fetchUserData = async () => {
-      if (!userId) return;
-      try {
-        // 점수 히스토리
-        const historyResponse = await fetch(`${URL}/api/score_history/user/${userId}`);
-        if (historyResponse.ok) {
-          const historyData = await historyResponse.json();
-          setScoreHistory(historyData);
-        }
-
-        // 최근 문제
-        const problemsResponse = await fetch(`${URL}/api/user/${userId}/problems`);
-        if (problemsResponse.ok) {
-          const problemsData = await problemsResponse.json();
-          setRecentProblems(problemsData);
-        }
-
-        // 랭킹 히스토리
-        const rankRes = await fetch(`${URL}/api/board/user/${userId}/rank-history`);
-        if (rankRes.ok) {
-          const rankData = await rankRes.json();
-          setRankHistory(rankData);
-        }
-
-        // 월별 요약
-        const monthlyRes = await fetch(`${URL}/api/user/${userId}/monthly-summary`);
-        if (monthlyRes.ok) {
-          const monthlyData = await monthlyRes.json();
-          setMonthly(monthlyData['data']);
-        } else {
-          console.error('월별 요약 API 오류:', monthlyRes.status, monthlyRes.statusText);
-        }
-      } catch (error) {
-        console.error('사용자 데이터 로딩 중 오류:', error);
+    if (!userId) return;
+    const controller = new AbortController();
+    const { signal } = controller;
+    void Promise.allSettled([
+      readActivity<ScoreHistory[]>(`/api/score_history/user/${userId}`, signal),
+      readActivity<Problem[]>(`/api/user/${userId}/problems`, signal),
+      readActivity<RankPoint[]>(`/api/board/user/${userId}/rank-history`, signal),
+      readActivity<{ data: MonthlySummary }>(`/api/user/${userId}/monthly-summary`, signal),
+    ]).then(([scores, problems, ranks, summary]) => {
+      if (!signal.aborted) {
+        setActivity({
+          scores: resultOrNull(scores),
+          problems: resultOrNull(problems),
+          ranks: resultOrNull(ranks),
+          monthly: resultOrNull(summary)?.data ?? null,
+        });
       }
-    };
-
-    fetchUserData();
+    });
+    return () => controller.abort();
   }, [userId]);
 
   // 랭크 분포 및 확률 계산 (1~8위 + 9위 이상)
@@ -123,10 +132,18 @@ const UserProfile: React.FC = () => {
 
   const barData = tableRows.map(r => ({ label: r.label, count: r.count }));
 
-  if (isLoading || !user) {
+  if (!user) {
     return (
-      <div className="min-h-screen bg-[#0a1026] flex items-center justify-center text-white">
-        로딩 중...
+      <div className="min-h-screen bg-[#0a1026] flex flex-col items-center justify-center gap-4 p-6 text-center text-white">
+        {profile && 'error' in profile ? (
+          <>
+            <p role="alert">{profile.error}</p>
+            <Button onClick={() => navigate('/')} variant="ghost" className="text-white hover:bg-white/10">
+              <ArrowLeft className="w-5 h-5 mr-2" />
+              뒤로 가기
+            </Button>
+          </>
+        ) : <p role="status">로딩 중...</p>}
       </div>
     );
   }
@@ -191,18 +208,27 @@ const UserProfile: React.FC = () => {
             />
             <StatCard
               icon={Calendar}
-              value={calculateAverageScore(scoreHistory)}
+              value={activity?.scores ? calculateAverageScore(scoreHistory) : "—"}
               label="평균 점수"
               iconColor="text-purple-400"
             />
           </div>
 
-          {/* 랭킹 변화 차트 */}
-          <div className="mb-8">
-            <UserRankHistoryChart userId={user.id} />
-          </div>
+          {!activity && <p role="status" className="mb-8 text-gray-300">활동 기록을 불러오는 중...</p>}
+
+          {activity?.ranks && (
+            <div className="mb-8">
+              <UserRankHistoryChart data={rankHistory} />
+            </div>
+          )}
+          {activity?.ranks === null && (
+            <p role="alert" className="mb-8 text-gray-300">순위 기록을 불러오지 못했습니다.</p>
+          )}
 
           {/* 이번 달 요약 */}
+          {monthly === null && (
+            <p role="alert" className="mb-8 text-gray-300">이번 달 요약을 불러오지 못했습니다.</p>
+          )}
           {monthly && (
             <Card className="bg-white/5 border-white/20 text-white mb-8">
               <CardHeader>
@@ -240,7 +266,7 @@ const UserProfile: React.FC = () => {
           )}
 
           {/* 랭킹 분포: 바차트 + 확률 테이블 (2컬럼) */}
-          <Card className="bg-white/5 border-white/20 text-white mb-8">
+          {activity?.ranks && <Card className="bg-white/5 border-white/20 text-white mb-8">
             <CardHeader>
               <CardTitle className="text-xl">순위별 분포 및 확률</CardTitle>
             </CardHeader>
@@ -282,7 +308,7 @@ const UserProfile: React.FC = () => {
                 </div>
               </div>
             </CardContent>
-          </Card>
+          </Card>}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* 최근 점수 기록 */}
@@ -311,7 +337,10 @@ const UserProfile: React.FC = () => {
                       </Badge>
                     </SquircleSurface>
                   ))}
-                  {scoreHistory.length === 0 && (
+                  {activity?.scores === null && (
+                    <p role="alert" className="text-center text-gray-300 py-8">점수 기록을 불러오지 못했습니다.</p>
+                  )}
+                  {activity?.scores?.length === 0 && (
                     <div className="text-center text-gray-400 py-8">
                       점수 기록이 없습니다.
                     </div>
@@ -334,7 +363,13 @@ const UserProfile: React.FC = () => {
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
-                          <div className="font-medium">{problem.problem_name ?? `JUNGOL #${problem.problem}`}</div>
+                          <a className="font-medium hover:underline"
+                            href={`https://www.acmicpc.net/problem/${problem.problem}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {problem.problem_name ?? `백준 #${problem.problem}`}
+                          </a>
                           <div className="text-sm text-gray-300">
                             Difficulty {problem.level} • Problem Tier {problem.problem_tier}
                           </div>
@@ -347,7 +382,10 @@ const UserProfile: React.FC = () => {
                       </div>
                     </SquircleSurface>
                   ))}
-                  {recentProblems.length === 0 && (
+                  {activity?.problems === null && (
+                    <p role="alert" className="text-center text-gray-300 py-8">문제 풀이 기록을 불러오지 못했습니다.</p>
+                  )}
+                  {activity?.problems?.length === 0 && (
                     <div className="text-center text-gray-400 py-8">
                       해결한 문제가 없습니다.
                     </div>

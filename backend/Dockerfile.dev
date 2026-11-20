@@ -10,15 +10,17 @@ RUN bun install --frozen-lockfile
 
 # 소스 코드 복사
 COPY . .
+COPY --from=automatic_scoring . /shared
 
 # 환경 변수 설정
 ENV NODE_ENV=development
 ENV PORT=3000
+ENV CHROMIUM_PATH=/usr/bin/chromium
 
 # 포트 노출
 EXPOSE 3000
 
-RUN apk add --no-cache curl
+RUN apk add --no-cache curl chromium
 
 # 헬스체크
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \

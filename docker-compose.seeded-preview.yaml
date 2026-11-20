@@ -33,7 +33,7 @@ services:
     environment:
       DB_HOST: anabada-mysql
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the explicit env file}
-      DB_NAME: jungol_bada
+      DB_NAME: boj_bada
       PREVIEW_SEED: anabada-dev-seeded
     volumes: ["./seeds:/seeds:ro"]
     networks: [seeded-preview]
@@ -71,13 +71,16 @@ services:
       retries: 3
 
   anabada-backend:
-    build: {context: ./backend, dockerfile: Dockerfile.prod}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+      additional_contexts: {automatic_scoring: ./shared}
     environment:
       DB_HOST: anabada-mysql
       DB_PORT: "3306"
       DB_USER: root
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the explicit env file}
-      DB_NAME: jungol_bada
+      DB_NAME: boj_bada
       NODE_ENV: development
       ALLOWED_ORIGIN: http://localhost:20050
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in the explicit env file}

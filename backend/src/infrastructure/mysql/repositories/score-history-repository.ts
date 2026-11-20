@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { DatabaseExecutor } from "../database-session.js";
 import { sqlOperations } from "../database-session.js";
+import type { UserHandleColumn } from "./user-repository.js";
 
 const operations = {
   userExists: sqlOperations.scoreHistoryUserExists,
@@ -31,7 +32,7 @@ export const adminScoreHistorySchema = z.object({
   korean_name: z.string().nullable(),
   desc: z.string().nullable(),
   bias: z.number().int(),
-  rule_type: z.enum(["custom", "daily", "event"]),
+  rule_type: z.enum(["custom", "daily", "event", "legacy"]),
   score_day: scoreDay,
   event_id: z.number().int().positive().nullable(),
   problem_id: z.string().regex(/^\d+$/).nullable(),
@@ -53,7 +54,10 @@ export type ScoreHistoryPatch = Readonly<
 >;
 
 export class ScoreHistoryRepository {
-  constructor(private readonly database: DatabaseExecutor) {}
+  constructor(
+    private readonly database: DatabaseExecutor,
+    private readonly handleColumn: UserHandleColumn = "jungol_name",
+  ) {}
 
   async referencesExist(record: ManualScoreHistory): Promise<string | null> {
     if (
@@ -129,7 +133,7 @@ export class ScoreHistoryRepository {
     const filter =
       username === undefined
         ? ""
-        : " WHERE u.jungol_name LIKE ? OR u.korean_name LIKE ?";
+        : ` WHERE u.${this.handleColumn} LIKE ? OR u.korean_name LIKE ?`;
     const values =
       username === undefined ? [] : [`%${username}%`, `%${username}%`];
     const total = await this.database.selectOne(
@@ -140,7 +144,7 @@ export class ScoreHistoryRepository {
     );
     const data = await this.database.select(
       operations.list,
-      `SELECT sh.id, sh.user_id, u.jungol_name AS display_name, u.jungol_name, u.korean_name, sh.\`desc\`, sh.bias, sh.rule_type, sh.score_day, sh.event_id, CAST(sh.problem_id AS CHAR) AS problem_id, sh.created_at FROM score_history sh JOIN user u ON u.id = sh.user_id${filter} ORDER BY sh.created_at DESC, sh.id DESC LIMIT ? OFFSET ?`,
+      `SELECT sh.id, sh.user_id, u.${this.handleColumn} AS display_name, u.${this.handleColumn} AS jungol_name, u.korean_name, sh.\`desc\`, sh.bias, sh.rule_type, sh.score_day, sh.event_id, CAST(sh.problem_id AS CHAR) AS problem_id, sh.created_at FROM score_history sh JOIN user u ON u.id = sh.user_id${filter} ORDER BY sh.created_at DESC, sh.id DESC LIMIT ? OFFSET ?`,
       [...values, limit, (page - 1) * limit],
       adminScoreHistorySchema,
     );

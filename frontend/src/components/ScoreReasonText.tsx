@@ -1,7 +1,7 @@
 import React, { type ReactNode } from "react";
 
-// 점수 사유에서는 숫자 문제 번호만 외부 링크로 변환한다.
-const problemReferencePattern = /#(\d+)/g;
+// 이관된 사유의 Event(#번호)는 이벤트 ID이므로 문제 링크로 바꾸지 않는다.
+const problemReferencePattern = /Event\(#\d+\)|#(\d+)|(\d+)번(?= 문제 해결)/g;
 
 type ScoreReasonTextProps = {
   readonly children: string | null | undefined;
@@ -17,7 +17,8 @@ export function ScoreReasonText({ children, className }: ScoreReasonTextProps) {
   let lastIndex = 0;
 
   for (const match of children.matchAll(problemReferencePattern)) {
-    const [reference, problemId] = match;
+    const [reference, taggedId, legacyId] = match;
+    const problemId = taggedId ?? legacyId;
     const index = match.index;
 
     if (!reference || !problemId || typeof index !== "number") {
@@ -31,7 +32,7 @@ export function ScoreReasonText({ children, className }: ScoreReasonTextProps) {
     content.push(
       <a
         className="underline underline-offset-2 hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        href={`https://jungol.co.kr/problem/${problemId}`}
+        href={`https://www.acmicpc.net/problem/${problemId}`}
         key={`${index}-${problemId}`}
         rel="noopener noreferrer"
         target="_blank"

@@ -44,10 +44,11 @@ export function createEventReads(factory: EventReadSessionFactory) {
       factory.withSession(async (repository) => {
         const page = pageValue(query.page, 1, Number.MAX_SAFE_INTEGER);
         const limit = pageValue(query.limit, 10, 100);
-        const [total, rows] = await Promise.all([
-          repository.count(),
-          repository.list(limit, (page - 1) * limit),
-        ]);
+        const { total, rows } = await repository.page(
+          limit,
+          (page - 1) * limit,
+          query.status === "active",
+        );
         return {
           success: true,
           data: rows.map((row) => ({

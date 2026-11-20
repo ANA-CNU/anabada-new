@@ -15,3 +15,5 @@
 !collector/package-lock.json
 !collector/src
 !collector/src/**
+!shared
+!shared/**

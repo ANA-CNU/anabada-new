@@ -11,6 +11,7 @@ COPY backend/package.json backend/bun.lock ./
 COPY backend/tsconfig.json backend/biome.json ./
 RUN bun install --frozen-lockfile
 COPY backend/src ./src
+COPY shared /shared
 COPY backend/test ./test
 COPY backend/tests ./tests
 COPY --from=collector-test-dependencies /collector /collector

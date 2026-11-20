@@ -1,5 +1,6 @@
 import type { DatabaseExecutor } from "../../infrastructure/mysql/database-session.js";
 import { BiasRepository } from "../../infrastructure/mysql/repositories/bias-repository.js";
+import type { UserHandleColumn } from "../../infrastructure/mysql/repositories/user-repository.js";
 
 export interface BiasUnitOfWork {
   unitOfWork<T>(work: (database: DatabaseExecutor) => Promise<T>): Promise<T>;
@@ -26,6 +27,7 @@ export class BiasService {
     private readonly reader: BiasReader,
     private readonly transactions: BiasUnitOfWork,
     private readonly clock: () => Date = () => new Date(),
+    private readonly handleColumn: UserHandleColumn = "jungol_name",
   ) {}
   async initialize(beginUtc: Date, endUtc: Date) {
     if (!isCurrentKstMonthWindow(beginUtc, endUtc, this.clock())) return null;
@@ -35,7 +37,7 @@ export class BiasService {
   }
   async list() {
     return this.reader.withSession((database) =>
-      new BiasRepository(database).list(this.clock()),
+      new BiasRepository(database, this.handleColumn).list(this.clock()),
     );
   }
 }

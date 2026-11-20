@@ -1,6 +1,6 @@
 services:
   # 배포 전 새 스키마만 순방향으로 적용하는 일회성 작업이다.
-  jungol-migrator:
+  database-migrator:
     build: {context: ./migrations, dockerfile: Dockerfile}
     environment:
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
@@ -17,7 +17,7 @@ services:
         VITE_KAKAO_MAP_API_KEY: ${VITE_KAKAO_MAP_API_KEY:-}
     networks: [bada-network]
     depends_on:
-      jungol-migrator: {condition: service_completed_successfully}
+      database-migrator: {condition: service_completed_successfully}
   anabada-middleware:
     # 관리자 인증과 프런트엔드 연결을 중계한다. stage의 localhost 공개 origin만 허용한다.
     build: {context: ./middleware, dockerfile: Dockerfile}
@@ -31,55 +31,36 @@ services:
       ALLOWED_ORIGIN: http://localhost:20050
     networks: [bada-network]
     depends_on:
-      jungol-migrator: {condition: service_completed_successfully}
+      database-migrator: {condition: service_completed_successfully}
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:80/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3
   anabada-backend:
-    # 내부 MySQL DNS와 jungol_bada 스키마를 고정하고, 선택 Webhook으로 긴급 장애만 알린다.
-    build: {context: ./backend, dockerfile: Dockerfile.prod}
+    # 내부 MySQL DNS와 boj_bada 스키마를 고정하고, 선택 Webhook으로 긴급 장애만 알린다.
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+      additional_contexts: {automatic_scoring: ./shared}
     ports: ["20031:3000"]
     environment:
       DB_HOST: anabada-mysql
       DB_PORT: "3306"
       DB_USER: root
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
-      DB_NAME: jungol_bada
+      DB_NAME: boj_bada
       NODE_ENV: stage
       ALLOWED_ORIGIN: http://localhost:20050
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
       WEBHOOK_URL: ${WEBHOOK_URL:-}
+      SOLVED_AC_CLIENT_ID: ${SOLVED_AC_CLIENT_ID:-}
+      SOLVED_AC_CLIENT_SECRET: ${SOLVED_AC_CLIENT_SECRET:-}
     networks: [bada-network]
     restart: unless-stopped
     depends_on:
       anabada-mysql: {condition: service_healthy}
-      jungol-migrator: {condition: service_completed_successfully}
-  jungol-collector:
-    # 외부 포트를 열지 않는 내부 수집기. 같은 DB를 사용하고 프로필 볼륨으로 Chromium 로그인 상태를 보존한다.
-    build:
-      context: ./collector
-      dockerfile: Dockerfile
-      args:
-        COLLECTOR_REVISION: ${COLLECTOR_REVISION:-unknown}
-    init: true
-    restart: unless-stopped
-    # Chromium 브라우저의 shared memory 부족으로 인한 불안정을 방지한다.
-    shm_size: 1gb
-    # 불필요한 Linux capability를 제거하고 권한 상승을 방지한다.
-    cap_drop: [ALL]
-    security_opt: ["no-new-privileges:true"]
-    networks: [bada-network]
-    depends_on:
-      anabada-mysql: {condition: service_healthy}
-      jungol-migrator: {condition: service_completed_successfully}
-    environment:
-      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
-      JUNGOL_USERNAME: ${JUNGOL_USERNAME:?Set JUNGOL_USERNAME}
-      JUNGOL_PASSWORD: ${JUNGOL_PASSWORD:?Set JUNGOL_PASSWORD}
-      WEBHOOK_URL: ${WEBHOOK_URL:-}
-    volumes: ["jungol-profile:/var/lib/jungol/profile"]
+      database-migrator: {condition: service_completed_successfully}
   bada-nginx:
     # stage의 공개 진입점이며 내부 서비스 프록시와 외부 DMOJ nginx 네트워크 연결을 담당한다.
     image: nginx:stable
@@ -106,9 +87,6 @@ services:
       timeout: 5s
       start_period: 60s
       retries: 12
-volumes:
-  # 재시작 뒤 Chromium 로그인 세션과 프로필을 재사용하기 위한 저장소.
-  jungol-profile:
 networks:
   # 기존 호스트 인프라가 제공하는 외부 애플리케이션 네트워크.
   bada-network:

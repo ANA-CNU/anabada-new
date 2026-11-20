@@ -1,4 +1,4 @@
-# Jungol Bada 활성 마이그레이션 규칙
+# 데이터베이스 마이그레이션
 
 ## 005: `user.ac_rating` 제거
 
@@ -33,7 +33,7 @@ MySQL DDL은 파일 전체가 원자적으로 rollback되지 않으므로 실패
 
 현재 점수 계약은 [점수 종류 문서](../docs/score-rules.md)를 참고하세요.
 
-이 디렉터리의 `NNN_snake_case.sql`만 자동 마이그레이터가 읽습니다. 현재 활성 버전은 `002`부터 연속되어야 하며, 새 변경은 마지막 버전보다 정확히 1 큰 세 자리 번호로 추가합니다.
+마이그레이터는 이 디렉터리 바로 아래 `NNN_snake_case.sql`을 읽습니다. 활성 버전은 `002`부터 연속되며, 정올과 백준 변경 모두 `jungol_bada.migrations`의 한 이력에 기록됩니다. 새 변경은 마지막 번호에 1을 더해 추가합니다.
 
 활성 SQL과 runner 소스는 이 디렉터리에 함께 있으며, stage/production의 이미지 build context도 이 디렉터리만 사용합니다. 따라서 저장소의 MySQL 데이터 디렉터리는 build context에 포함되지 않습니다.
 
@@ -41,4 +41,14 @@ MySQL DDL은 파일 전체가 원자적으로 rollback되지 않으므로 실패
 
 `legacy/000_initial_schema.sql`, `legacy/001_new_schema.sql`은 역사 기록일 뿐 자동 실행 대상이 아닙니다. 이미지에도 포함되지 않습니다. 기존에 `jungol_bada`가 있지만 `migrations` 테이블이 없는 DB는 관리되지 않은 DB로 보고 자동 변경 없이 실패합니다. 자동 rollback은 제공하지 않습니다.
 
-stage와 production은 별도 runner가 아니라 Compose 의존성으로 migration을 적용합니다. 각 환경 파일명을 명시해 아래 순서로 실행합니다. 먼저 `COMPOSE_BAKE=false docker compose --env-file .env -f docker-compose.stage.yaml config --quiet` 또는 `docker-compose.prod.yaml config --quiet`를 실행하고, 같은 파일로 `build`를 완료합니다. 그 뒤 `stop anabada-backend jungol-collector`만 실행하고, `up -d --no-build --remove-orphans --wait --wait-timeout 180`으로 다시 시작합니다. 마지막으로 `restart bada-nginx`와 `ps`를 실행합니다. Compose는 MySQL healthcheck와 `jungol-migrator`의 성공 종료 뒤 앱 시작을 강제합니다. 실패하면 Compose가 nonzero로 끝나며 종속 앱은 시작하지 않습니다. MySQL과 데이터 디렉터리는 이 순서에서 중지·삭제·초기화하지 않습니다. dev Compose에는 migrator가 없으므로 스키마 준비는 개발자 책임입니다.
+## 006·007 백준 스키마와 기존 데이터 이관
+
+`006_create_boj_bada.sql`은 `boj_bada` 스키마를 만듭니다. `007_import_anabada.sql`은 같은 MySQL 서버의 `anabada`에서 데이터와 이관 완료 표시를 한 트랜잭션으로 커밋합니다. 이관 완료 표시가 이미 있으면 다음 실행에서 `007`의 적용 기록만 남깁니다. 원본이 아직 없는 환경에서는 `006`까지 적용하고 `007`부터 순서대로 대기합니다. 자세한 내용은 [백준 이관 문서](../docs/boj-ingestion.md)를 참고하세요.
+
+dev, stage, production은 Compose의 `database-migrator`로 이 파일들을 적용합니다. 개발과 stage에서 `anabada` 원본이 없으면 `006`으로 만든 빈 백준 DB를 사용할 수 있습니다. 공용 이력에 `012`가 기록되면 백엔드가 백준 수집을 시작합니다.
+
+운영 배포는 `--require-boj-import`로 이관을 먼저 확인하고 백엔드를 교체합니다. 이관에 실패하면 기존 백엔드는 계속 동작합니다. 이미 적용된 파일의 번호와 checksum은 기존 이력으로 검증합니다.
+
+`011_boj_all_user_history.sql`은 수집 제외 상태가 아닌 기존 백준 회원 전원을 solved.ac 공식 API 과거 풀이 대기열에 등록합니다. 진행 중인 회원의 페이지와 재시도 시각은 보존하며, 실제 풀이 적재는 백엔드가 API 호출 제한에 맞춰 수행합니다.
+
+`012_simplify_boj_ingestion.sql`은 두 백준 수집 작업의 MySQL 잠금을 획득한 뒤 과거 풀이 핸들, 페이지, 재시도 시각을 `user`로 옮기고 사용이 끝난 테이블 4개를 제거합니다. `007`의 적용 여부는 공용 마이그레이션 이력으로 확인합니다.
