@@ -24,7 +24,11 @@ type Cell = {
   readonly resultClasses: Set<string>;
   readonly timestamps: string[];
 };
-type Row = { readonly id: string | null; readonly cells: Cell[] };
+type Row = {
+  readonly id: string | null;
+  readonly hidden: boolean;
+  readonly cells: Cell[];
+};
 type Table = {
   readonly headers: string[];
   readonly rows: Row[];
@@ -77,7 +81,11 @@ async function readTable(
     })
     .on(`${table} tbody tr`, {
       element(element) {
-        const current: Row = { id: element.getAttribute("id"), cells: [] };
+        const current: Row = {
+          id: element.getAttribute("id"),
+          hidden: element.getAttribute("data-can-view") === "",
+          cells: [],
+        };
         row = current;
         element.onEndTag(() => {
           rows.push(current);
@@ -208,26 +216,38 @@ const terminalResults: ReadonlySet<string> = new Set([
 export async function parseBojStatus(html: string, expectedHandle: string) {
   const table = await readTable(html, "status-table");
   const indexes = columnIndexes(table.headers, statusColumns);
-  const submissions = table.rows.map(({ id, cells }) => {
+  const submissions = table.rows.map(({ id, hidden, cells }) => {
     const submissionId = bojSubmissionId.safeParse(
       id?.match(/^solution-(\d+)$/)?.[1],
     );
     const idCell = cells[indexes.get("제출 번호") ?? -1];
     const userCell = cells[indexes.get("아이디") ?? -1];
+    const problemCell = cells[indexes.get("문제") ?? -1];
     const result = cells[indexes.get("결과") ?? -1];
     if (
       !submissionId.success ||
       idCell?.text.trim() !== submissionId.data ||
+      !result
+    )
+      throw new BojHtmlError("invalid_status_row");
+    // Hidden rows still occupy a submission ID in BOJ's pagination.
+    if (
+      hidden &&
+      [userCell, problemCell].every(
+        (cell) => cell?.text.trim() === "" && cell.hrefs.length === 0,
+      ) &&
+      result.resultClasses.size === 1 &&
+      result.resultClasses.has("result-text") &&
+      result.text.replaceAll("&nbsp;", "").trim() === ""
+    )
+      return { id: submissionId.data, verdict: "terminal" } as const;
+    if (
       linkedNumber(userCell, "/user/") !== expectedHandle ||
-      !result ||
       result.text.trim() === ""
     )
       throw new BojHtmlError("invalid_status_row");
     if (result.resultClasses.has("result-ac")) {
-      const problem = linkedNumber(
-        cells[indexes.get("문제") ?? -1],
-        "/problem/",
-      );
+      const problem = linkedNumber(problemCell, "/problem/");
       const timestamps = cells[indexes.get("제출한 시간") ?? -1]?.timestamps;
       const timestamp = timestamps?.[0];
       if (

@@ -1,6 +1,10 @@
 import { expect, test } from "bun:test";
 import { parseBojRank, parseBojStatus } from "../src/boj/html-source.js";
-import { bojSubmissionId, syncBojMember } from "../src/boj/member-sync.js";
+import {
+  type MemberSettlement,
+  bojSubmissionId,
+  syncBojMember,
+} from "../src/boj/member-sync.js";
 import { BojPageReader, BojReadError } from "../src/boj/page-reader.js";
 
 const signal = new AbortController().signal;
@@ -29,6 +33,12 @@ function submission(id: string, result = "result-ac", handle = "alpha") {
   return `<tr id="solution-${id}"><td>${id}</td><td><a href="/user/${handle}">${handle}</a></td>
     <td><a href="/problem/1000">1000</a></td><td><span class="${result}">채점 결과</span></td>
     <td>BOJ</td><td><a data-timestamp="1777205471" title="표시 시각">제출 시각</a></td></tr>`;
+}
+
+function hiddenSubmission(id: string) {
+  return `<tr id="solution-${id}" data-can-view=""><td>${id}</td><td></td><td></td>
+    <td class="result"><span class="result-text "><a href="/help/rte">&nbsp;</a></span></td>
+    <td>BOJ</td><td><a data-timestamp="1777205471">제출 시각</a></td></tr>`;
 }
 
 test("reads counts and handles by column name rather than the rank row text", async () => {
@@ -110,6 +120,69 @@ test("rejects an accepted submission whose displayed ID or timestamp is invalid"
   for (const row of [
     accepted.replace("<td>110</td>", "<td>109</td>"),
     accepted.replace('data-timestamp="1777205471"', 'data-timestamp=""'),
+  ]) {
+    await expect(
+      parseBojStatus(status("alpha", [row]), "alpha"),
+    ).rejects.toMatchObject({
+      reason: "invalid_status_row",
+    });
+  }
+});
+
+test("passes hidden rows through pagination and settles only visible accepted submissions", async () => {
+  const requestedTops: Array<string | null> = [];
+  const settlements: MemberSettlement[] = [];
+  await expect(
+    syncBojMember(
+      {
+        member: { handle: "alpha", solvedCount: 2, submissionCount: 4 },
+        checkpoint: {
+          committedThrough: bojSubmissionId.parse("106"),
+          submissionCount: 1,
+          solvedCount: 1,
+          retryRequired: false,
+        },
+        reconcile: false,
+        signal,
+      },
+      {
+        async readPage({ handle, top }) {
+          requestedTops.push(top);
+          return parseBojStatus(
+            top === null
+              ? status(
+                  handle,
+                  [hiddenSubmission("110"), hiddenSubmission("109")],
+                  "108",
+                )
+              : status(handle, [
+                  submission("108"),
+                  submission("106", "result-wa"),
+                ]),
+            handle,
+          );
+        },
+        async commit(settlement) {
+          settlements.push(settlement);
+        },
+      },
+    ),
+  ).resolves.toBe("settled");
+
+  expect(requestedTops).toEqual([null, "108"]);
+  expect(settlements).toEqual([
+    expect.objectContaining({
+      committedThrough: "110",
+      accepted: [expect.objectContaining({ id: "108" })],
+      retryRequired: false,
+    }),
+  ]);
+});
+
+test("rejects an unmarked blank row or a hidden row with a mismatched submission ID", async () => {
+  for (const row of [
+    hiddenSubmission("110").replace(' data-can-view=""', ""),
+    hiddenSubmission("110").replace("<td>110</td>", "<td>109</td>"),
   ]) {
     await expect(
       parseBojStatus(status("alpha", [row]), "alpha"),
