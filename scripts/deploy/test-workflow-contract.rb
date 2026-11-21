@@ -10,8 +10,8 @@ end
 
 root = File.expand_path('../..', __dir__)
 Dir.chdir(root)
-runtime = %w[DB_PASSWORD JWT_SECRET ADMIN_USERNAME ADMIN_PASSWORD]
-optional = %w[VITE_KAKAO_MAP_API_KEY WEBHOOK_URL SOLVED_AC_CLIENT_ID SOLVED_AC_CLIENT_SECRET]
+runtime = %w[DB_PASSWORD JWT_SECRET MINIO_ACCESS_KEY MINIO_SECRET_KEY]
+optional = %w[NEXT_PUBLIC_KAKAO_MAP_API_KEY WEBHOOK_URL SOLVED_AC_CLIENT_ID SOLVED_AC_CLIENT_SECRET]
 example = File.read('.env.example')
 check(example.scan(/^([A-Z_]+)=/).flatten.sort == (runtime + optional).sort, 'Unexpected .env.example assignments')
 inventory = example.lines.grep(/^#/).join.scan(/\b[A-Z][A-Z_]+\b/)
@@ -41,9 +41,9 @@ check(!deploy.match?(/DEPLOY_SHA|git status --porcelain|git merge --ff-only|git 
 check(!File.read('scripts/deploy/render-production-env.sh').include?('COLLECTOR_RUN_ONCE'), 'Local collector one-shot setting must not enter generated production env')
 
 expected = {
-  'anabada-frontend' => ['VITE_KAKAO_MAP_API_KEY'], 'anabada-mysql' => ['DB_PASSWORD'],
+  'anabada-frontend' => %w[NEXT_PUBLIC_KAKAO_MAP_API_KEY DB_PASSWORD JWT_SECRET SOLVED_AC_CLIENT_ID SOLVED_AC_CLIENT_SECRET MINIO_ACCESS_KEY MINIO_SECRET_KEY], 'anabada-mysql' => ['DB_PASSWORD'],
   'anabada-backend' => %w[DB_PASSWORD JWT_SECRET WEBHOOK_URL SOLVED_AC_CLIENT_ID SOLVED_AC_CLIENT_SECRET],
-  'anabada-middleware' => %w[JWT_SECRET ADMIN_USERNAME ADMIN_PASSWORD],
+  'minio' => %w[MINIO_ACCESS_KEY MINIO_SECRET_KEY],
   'database-migrator' => ['DB_PASSWORD'],
   'bada-nginx' => []
 }
@@ -93,11 +93,12 @@ check(deploy.include?('Deployment repository path is not a Git working tree'), '
     check(!config.key?('networks') && services.values.none? { |service| service.key?('networks') || service.key?('network_mode') }, 'Production must use the implicit Compose network')
     published_ports = services.select { |_, service| service.key?('ports') }.transform_values { |service| service.fetch('ports') }
     check(published_ports == { 'bada-nginx' => ['80:80'] }, 'Production must publish only Nginx on port 80')
-    %w[anabada-backend anabada-middleware].each do |service|
-      check(services.fetch(service).fetch('environment').fetch('ALLOWED_ORIGIN') == 'https://bada.anacnu.com', "Wrong production origin: #{service}")
-    end
+    check(services.fetch('anabada-backend').fetch('environment').fetch('ALLOWED_ORIGIN') == 'https://bada.anacnu.com', 'Wrong backend production origin')
+    check(services.fetch('anabada-frontend').fetch('environment').fetch('APP_ORIGIN') == 'https://bada.anacnu.com', 'Wrong frontend production origin')
+    check(!services.key?('anabada-middleware'), 'Production must send traffic to Next.js directly')
+    check(services.fetch('minio').fetch('volumes') == ['minio-data:/data'], 'Production board storage must persist')
   end
-  %w[anabada-frontend anabada-middleware anabada-backend].each do |service|
+  %w[anabada-frontend anabada-backend].each do |service|
     check(services.fetch(service).fetch('depends_on').fetch('database-migrator').fetch('condition') == 'service_completed_successfully', "#{mode}/#{service} must wait for migrator success")
   end
 
@@ -152,7 +153,7 @@ Dir.mktmpdir('deployment-git-contract-') do |dir|
   command_env.merge!(
     'HOME' => File.join(dir, 'checkout'), 'GITHUB_WORKSPACE' => root,
     'RUNNER_NAME' => 'bada_deploy', 'PATH' => "#{dir}:#{ENV.fetch('PATH')}",
-    'COMPOSE_LOG' => compose_log, 'VITE_KAKAO_MAP_API_KEY' => nil, 'WEBHOOK_URL' => nil,
+    'COMPOSE_LOG' => compose_log, 'NEXT_PUBLIC_KAKAO_MAP_API_KEY' => nil, 'WEBHOOK_URL' => nil,
     'SOLVED_AC_CLIENT_ID' => nil, 'SOLVED_AC_CLIENT_SECRET' => nil
   )
   _, errors, status = Open3.capture3('bash', '-n', stdin_data: fixture)

@@ -1,3 +1,5 @@
+"use client";
+
 import { SquircleSurface } from "@/components/ui/squircle";
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -5,11 +7,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Calendar, Clock, Trophy, Code } from "lucide-react";
 import { URL } from "@/resource/constant";
 
-interface EventData {
+export interface EventData {
   event_title: string;
   startDate: string;
   endDate: string;
-  problems: string;
+  problems: string | null;
 }
 
 interface EventsResponse {
@@ -24,12 +26,21 @@ interface EventsResponse {
 }
 
 
-function EventSection() {
-  const [ongoingEvents, setOngoingEvents] = useState<EventData[]>([]);
-  const [pastEvents, setPastEvents] = useState<EventData[]>([]);
-  const [loading, setLoading] = useState(true);
+export type EventDataSnapshot = { readonly ongoing: EventData[]; readonly past: EventData[]; readonly capturedAt: number };
+
+function problemNumbers(problems: string | null) {
+  return problems?.split(",").map((problem) => problem.trim()).filter(Boolean) ?? [];
+}
+
+function EventSection({ initialEvents }: { readonly initialEvents?: EventDataSnapshot }) {
+  const [ongoingEvents, setOngoingEvents] = useState<EventData[]>(initialEvents?.ongoing ?? []);
+  const [pastEvents, setPastEvents] = useState<EventData[]>(initialEvents?.past ?? []);
+  const [loading, setLoading] = useState(initialEvents === undefined);
+
+  const now = initialEvents?.capturedAt ?? Date.now();
 
   useEffect(() => {
+    if (initialEvents !== undefined) return;
     const fetchEvents = async () => {
       try {
         const [ongoingResponse, pastResponse] = await Promise.all([
@@ -54,11 +65,12 @@ function EventSection() {
     };
 
     fetchEvents();
-  }, []);
+  }, [initialEvents]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('ko-KR', {
+      timeZone: 'Asia/Seoul',
       year: 'numeric',
       month: 'long',
       day: 'numeric'
@@ -66,9 +78,7 @@ function EventSection() {
   };
 
   const getTimeRemaining = (endTime: string) => {
-    const now = new Date();
-    const end = new Date(endTime);
-    const diff = end.getTime() - now.getTime();
+    const diff = new Date(endTime).getTime() - now;
     
     if (diff <= 0) return "종료됨";
     
@@ -78,10 +88,10 @@ function EventSection() {
     return `${days}일 ${hours}시간 남음`;
   };
 
-  const formatProblems = (problems: string) => {
+  const formatProblems = (problems: string | null) => {
     if (!problems || problems === "") return "문제 없음";
     
-    const problemArray = problems.split(',').map(p => p.trim());
+    const problemArray = problemNumbers(problems);
     
     if (problemArray.length > 20) {
       const first20 = problemArray.slice(0, 20);
@@ -117,7 +127,7 @@ function EventSection() {
                         <div className="flex w-full min-w-0 items-center gap-3 sm:w-auto sm:flex-1 sm:justify-end">
                           {/* 문제 번호 목록 */}
                           <div tabIndex={0} aria-label="이벤트 문제 목록" className="flex min-w-0 flex-1 items-center gap-1 max-w-md overflow-x-auto scrollbar-thin scrollbar-thumb-blue-400/30 scrollbar-track-transparent">
-                            {event.problems.split(',').map((problem, idx) => (
+                            {problemNumbers(event.problems).map((problem, idx) => (
                               <SquircleSurface key={idx} radius="compact" asChild><span className="text-xs text-white bg-white/10 px-2 py-1 border-0 whitespace-nowrap flex-shrink-0">
                                 {problem.trim()}
                               </span></SquircleSurface>
@@ -148,7 +158,7 @@ function EventSection() {
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <span className="cursor-help hover:text-blue-300 transition-colors">
-                                문제 {event.problems.split(',').length}개
+                                문제 {problemNumbers(event.problems).length}개
                               </span>
                             </TooltipTrigger>
                             <TooltipContent className="max-w-md">
@@ -196,7 +206,7 @@ function EventSection() {
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <span className="cursor-help hover:text-purple-300 transition-colors">
-                              문제 {event.problems.split(',').length}개
+                              문제 {problemNumbers(event.problems).length}개
                             </span>
                           </TooltipTrigger>
                           <TooltipContent className="max-w-md">

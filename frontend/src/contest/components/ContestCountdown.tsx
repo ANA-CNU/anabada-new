@@ -1,6 +1,6 @@
 import { SquircleSurface } from "@/components/ui/squircle";
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 
 const ContestCountdown: React.FC = () => {
   const [timeLeft, setTimeLeft] = useState({
@@ -55,7 +55,7 @@ const ContestCountdown: React.FC = () => {
               </div></SquircleSurface>
             </div>
             <SquircleSurface asChild radius="control"><Link
-              to="/contest"
+              href="/contest"
               className="inline-flex items-center justify-center px-4 py-2 border border-white/30 hover:border-white/60 text-white/90 hover:text-white transition-colors"
             >
               대회 정보 보기

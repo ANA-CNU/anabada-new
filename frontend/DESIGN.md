@@ -1,8 +1,28 @@
-# Anabada design system
+# ANABADA design system
+
+## Public site
+
+Use a near-black canvas and grayscale typography around editorial covers and the existing dashboard widgets. The home starts with one square hero squircle containing a soft pastel gradient and the ANABADA wordmark. The existing rank dashboard sits alongside it. Stack monthly draw, contest archive, live activity, problem totals, events, and latest posts below. The public header and footer fit the window. The 1440px desktop content scrolls horizontally inside the page body when needed. The header keeps navigation centered and uses a second row when the controls need room. The footer uses one, two or three columns based on its own width.
+
+| Role | Token | Value |
+| --- | --- | --- |
+| Canvas | `--paper` | `#0b0b0c` |
+| Primary text and actions | `--ink` | `#f5f5f6` |
+| Supporting text | `--muted` | `#a6a6ad` |
+| Rules | `--line` | `#303036` |
+| Secondary display text | `--accent` | `#d4d4dc` |
+| Raised surface | `--surface` | `#151517` |
+| Raised selection or highlight | `--surface-hover` | `#202023` |
+
+Use Korean system sans, 14/16px text, restrained type weight and fluid display headings. The dashboard widgets retain their existing visual design. Primary actions are white capsules. The solved.ac sign-in action uses white text on green (`#087f3f`, `#066b35` on hover). Keyboard focus uses a visible light outline. Apply the same palette to sign-in, participation and the board.
+
+The home masthead blends light lavender (#e0cff5), peach (#f8d8ce), and mint (#cceedd) over cream (#f5e9d8) with graphite type (#181521). The cover adds a 28px lattice of small translucent white dots. Pointer proximity increases the dot radius up to 5.25px, with faster easing near the pointer. The dots settle at their original size on exit. Touch and reduced-motion environments display the static lattice. The contest archive uses soft lavender, mint, and peach gradients for its three series. Edition rows link to problems on Baekjoon or AOJ, with a separate link for the local editorial when available. The series keeps its three-column desktop layout. Side-by-side cards reserve two lines for the title to align descriptions and edition rows. The edition rows share the card inset and reserve two action slots. Board post cards use the existing surface squircle with soft mint, lilac, and peach gradients. The board archive and homepage use square covers in three columns. Post detail pages have a wide cover. Post titles and metadata sit beneath the image. The board title search uses a monochrome capsule control. The footer aligns the project, main features, and contributors in three equal desktop columns. The features and contributors lists use the same 28px row height. Each contributor occupies one row with a shared GitHub icon. Policy and contact controls sit below.
+
+## Dashboard and existing interactive screens
 
 ## 1. Atmosphere and identity
 
-Preserve the existing community dashboard: bright surfaces, blue accents, compact rankings, and readable Korean content. Continuous exponent-4 squircle corners are the shared surface signature. This migration changes geometry only.
+Preserve the existing community dashboard: bright surfaces, blue accents, compact rankings, and readable Korean content. Continuous exponent-4 squircle corners are the shared surface signature. These screens retain their existing design tokens.
 
 ## 2. Color
 
@@ -32,7 +52,7 @@ Use `SquircleSurface` from `@/components/ui/squircle`. Its default element is a 
 
 Use `ScoreReasonText` for score-history reasons wherever they are displayed: it preserves inherited compact text styling while rendering only `#<numeric problem id>` references as accessible external links with visible underline and keyboard focus.
 
-Native CSS uses `corner-shape: squircle` and semantic radius variables. Unsupported browsers use `@lisse/core` 0.7.2 superellipse paths with exponent 4, explicitly avoiding Lisse's default Figma curve. `data-squircle-mode` reports native/fallback; `data-squircle-fallback` on the document root forces the fallback for browser QA. Our React SquircleSurface is the framework adapter over Lisse core. The upstream React package is not installed because its hook mutates data-state/data-slot and its wrapper changes layout. Shadow mask IDs use a module-local increasing counter, so they remain unique across mounted instances without requiring crypto.randomUUID on older Safari.
+CSS paints the corner shape before hydration. Browsers with native `corner-shape: squircle` use the semantic radius tokens directly. Other browsers use a responsive polygon sampled from a fourth-power superellipse. `data-squircle-fallback` on the document root forces that CSS path for browser QA. After hydration `data-squircle-mode` reports the browser path. The fallback adds border and shadow effects through `@lisse/core` 0.7.2 without replacing the CSS clip path. Shadow mask IDs use a module-local counter to keep them unique.
 
 True circles (avatars, dots, spinners and circular glows), capsules (fully rounded pills), and geometry arrows are exceptions. Keep `rounded-full` only for these roles. Use `rounded-none` for intentionally square range middles. Any other radius exception requires a same-line `squircle-exception: <reason>` annotation reviewed with its consumer.
 
@@ -48,7 +68,7 @@ Keep existing hover, pressed, disabled, loading, and Radix open/closed states. G
 
 The monthly draw keeps the page background unboxed: its ranking cards sit directly on the existing atmosphere rather than inside a second panel. Those cards use the established `surface` squircle geometry and one `rgba(255,255,255,.045)` fill; medal distinction is limited to border and shadow. The shared flat gold crown raster is the only crown source, with CSS filters for silver and bronze variants.
 
-Native borders, shadows, and focus rings remain CSS-owned. In fallback mode the element owns content and its clip path; Lisse draws borders and shadows in an unclipped SVG sibling on its parent. Border width is retained for layout, while only border paint and box-shadow are transferred. The adapter refreshes effects on focus, hover, state/class/style changes, and completed transitions.
+Native borders, shadows, and focus rings remain CSS-owned. In fallback mode CSS clips the content on the first paint. After hydration Lisse draws borders and shadows in an unclipped SVG sibling on its parent. Border width is retained for layout, while only border paint and box-shadow are transferred. The adapter refreshes effects on focus, hover, state/class/style changes, and completed transitions.
 
 Focus effects must be on the semantic focus target. Do not put `overflow-hidden` on its effect anchor or ancestors unless the focus target has sufficient inset. A parent that clips overflow must provide a separate interior viewport and room for focus indicators. Portalled overlays retain their Radix portal boundaries. Sibling effects copy the host transform, transform origin, opacity, and fixed positioning; active CSS animations refresh this coordinate system each frame. Prefer animating a containing element when possible.
 
@@ -56,6 +76,6 @@ A clip path also clips pseudo-element hit targets. Put expanded touch targets on
 
 ## 8. Accessibility constraints and migration debt
 
-Keyboard users must retain visible focus, semantic roles, label associations, tab order, and disabled behavior. Korean labels must remain readable at mobile/tablet/desktop widths. Decorative SVGs are hidden from assistive technology and pointer input.
+Keyboard users must retain visible focus, semantic roles, label associations, tab order, and disabled behavior. Korean labels must remain readable at mobile/tablet/desktop widths. Decorative SVGs are hidden from assistive technology and pointer input. Side-by-side icons and labels share a vertically centered flex row. Use a decorative SVG for action arrows. When an icon describes a group with multiple lines, center it against the complete text group.
 
 Wave 1 intentionally reports existing corner usages with `npm run check:corners -- --baseline` (or `--report`). Wave 4 removes unapproved usages and enables the default strict check. Existing baseline lint failures are tracked by execution evidence, not waived as new design rules. Broad color, typography, performance, and dev-tool migrations are outside this geometry-only approved plan.

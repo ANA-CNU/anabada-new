@@ -1,37 +1,19 @@
-# 1단계: 빌드 스테이지
 FROM node:22.15.0-alpine AS builder
-
 WORKDIR /app
-
-# package.json과 package-lock.json 복사
+ENV NEXT_TELEMETRY_DISABLED=1
 COPY package.json package-lock.json ./
-
-# 의존성 설치
 RUN npm ci
-
-# 소스 코드 복사
 COPY . .
-
-# 프로덕션 빌드
-ARG VITE_KAKAO_MAP_API_KEY
-ENV VITE_KAKAO_MAP_API_KEY=${VITE_KAKAO_MAP_API_KEY}
+ARG NEXT_PUBLIC_KAKAO_MAP_API_KEY
+ENV NEXT_PUBLIC_KAKAO_MAP_API_KEY=${NEXT_PUBLIC_KAKAO_MAP_API_KEY}
 RUN npm run build
 
-# 환경변수 설정
-ENV NODE_ENV=production
-
-# 다단계 빌드.
 FROM node:22.15.0-alpine AS runner
-
 WORKDIR /app
-
-# serve 설치
-RUN npm install -g serve
-
-# 빌드된 파일 복사
-COPY --from=builder /app/dist ./dist
-
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=20030
+COPY --from=builder --chown=node:node /app/.next/standalone ./
+COPY --from=builder --chown=node:node /app/.next/static ./.next/static
+COPY --from=builder --chown=node:node /app/public ./public
+USER node
 EXPOSE 20030
-
-# 정적 파일 서빙
-CMD ["serve", "-s", "dist", "-l", "20030"]
+CMD ["node", "server.js"]

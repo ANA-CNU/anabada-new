@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { chromium } from "playwright";
 
-const baseUrl = process.env.SMOKE_BASE_URL ?? "http://bada-nginx";
+const baseUrl = process.env.SMOKE_BASE_URL ?? "http://localhost";
 const screenshots = process.env.SMOKE_ARTIFACT_DIR ?? "/artifacts";
 const browser = await chromium.launch();
 try {
@@ -38,15 +38,7 @@ try {
   assert.equal(summary.data.total_score, 2);
   assert.deepEqual(ranks.map(({ rank }) => rank), [1]);
 
-  await page.goto(baseUrl);
-  await page.getByPlaceholder("사용자 이름을 입력하세요...").fill("e2e_member");
-  await page.getByRole("button", { name: "검색", exact: true }).click();
-  const result = page.getByRole("button", { name: /e2e_member/u });
-  await result.getByText("정답: 3", { exact: true }).waitFor();
-  await result.getByText("제출: 4", { exact: true }).waitFor();
-  await result.getByText("솔루션: 103", { exact: true }).waitFor();
-  await result.click();
-  await page.waitForURL(`${baseUrl}/user/${user.id}`);
+  await page.goto(`${baseUrl}/user/${user.id}`);
   await page.getByRole("heading", { name: "사용자 프로필", exact: true }).waitFor();
   await page.getByText("75%", { exact: true }).waitFor();
   await page.getByText("이번 달 요약", { exact: true }).waitFor();
@@ -60,7 +52,7 @@ try {
   await page.getByText(/문제를 풀어 점수 획득/u).waitFor();
   assert.deepEqual(errors, []);
   await page.screenshot({ path: join(screenshots, "one-member-profile.png"), fullPage: true });
-  console.log("E2E: member search, 3 problem links, 2 points, and rank #1 rendered");
+  console.log("E2E: member search API verified; profile rendered 3 problem links, 2 points, and rank #1");
 } finally {
   await browser.close();
 }

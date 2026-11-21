@@ -52,3 +52,7 @@ dev, stage, production은 Compose의 `database-migrator`로 이 파일들을 적
 `011_boj_all_user_history.sql`은 수집 제외 상태가 아닌 기존 백준 회원 전원을 solved.ac 공식 API 과거 풀이 대기열에 등록합니다. 진행 중인 회원의 페이지와 재시도 시각은 보존하며, 실제 풀이 적재는 백엔드가 API 호출 제한에 맞춰 수행합니다.
 
 `012_simplify_boj_ingestion.sql`은 두 백준 수집 작업의 MySQL 잠금을 획득한 뒤 과거 풀이 핸들, 페이지, 재시도 시각을 `user`로 옮기고 사용이 끝난 테이블 4개를 제거합니다. `007`의 적용 여부는 공용 마이그레이션 이력으로 확인합니다.
+
+`013_accounts_and_board.sql`은 기존 백준 회원을 가리키는 solved.ac 계정 연결·관리자 권한 테이블과 게시판 메타데이터·태그 테이블을 추가합니다. 기존 회원·점수·이벤트를 수정하거나 관리자 권한을 자동 부여하지 않습니다.
+
+`014_board_drafts_and_media.sql`은 블로그 임시저장과 업로드 이미지의 소유권을 기록하는 테이블을 추가합니다.

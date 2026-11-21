@@ -8,33 +8,47 @@ services:
     depends_on:
       anabada-mysql: {condition: service_healthy}
     restart: "no"
-  # 브라우저에 공개되는 정적 화면; Kakao 키는 이미지 빌드 시점에만 주입한다.
+  # Next.js가 웹 페이지를 서버 렌더링합니다. Kakao 키는 이미지 빌드 때 사용합니다.
   anabada-frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod
       args:
-        VITE_KAKAO_MAP_API_KEY: ${VITE_KAKAO_MAP_API_KEY:-}
-    depends_on:
-      database-migrator: {condition: service_completed_successfully}
-  anabada-middleware:
-    # 관리자 인증과 프런트엔드 연결을 중계한다. 운영 도메인 origin만 허용한다.
-    build: {context: ./middleware, dockerfile: Dockerfile}
+        NEXT_PUBLIC_KAKAO_MAP_API_KEY: ${NEXT_PUBLIC_KAKAO_MAP_API_KEY:-}
     environment:
-      PORT: "80"
-      NODE_ENV: production
+      APP_ORIGIN: https://bada.anacnu.com
+      BACKEND_URL: http://anabada-backend:3000
+      DB_HOST: anabada-mysql
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      DB_NAME: boj_bada
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
-      ADMIN_USERNAME: ${ADMIN_USERNAME:?Set ADMIN_USERNAME}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD}
-      FRONTEND_URL: http://anabada-frontend:20030
-      ALLOWED_ORIGIN: https://bada.anacnu.com
+      SOLVED_AC_CLIENT_ID: ${SOLVED_AC_CLIENT_ID:-}
+      SOLVED_AC_CLIENT_SECRET: ${SOLVED_AC_CLIENT_SECRET:-}
+      MINIO_ENDPOINT: minio
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?Set MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?Set MINIO_SECRET_KEY}
     depends_on:
       database-migrator: {condition: service_completed_successfully}
+      anabada-backend: {condition: service_healthy}
+      minio: {condition: service_started}
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:80/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
-      interval: 30s
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:20030/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
       timeout: 5s
-      retries: 3
+      retries: 12
+
+  minio:
+    image: cgr.dev/chainguard/minio@sha256:e9cf6b99c226e9539ed0f14b6f00e37b07da153c7ba1f4f8709c807574b471ec
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:?Set MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?Set MINIO_SECRET_KEY}
+    volumes: ["minio-data:/data"]
+    restart: unless-stopped
+
   anabada-backend:
     # 내부 MySQL DNS와 boj_bada 스키마를 고정하고, 선택 Webhook으로 긴급 장애만 알린다.
     build:
@@ -63,8 +77,7 @@ services:
     volumes: ["./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro"]
     ports: ["80:80"]
     depends_on:
-      anabada-backend: {condition: service_healthy}
-      anabada-middleware: {condition: service_healthy}
+      anabada-frontend: {condition: service_healthy}
   anabada-mysql:
     # 운영 DB는 호스트 bind mount에 보관해 배포 컨테이너 교체 후에도 데이터를 유지한다.
     image: mysql:9.3.0
@@ -81,3 +94,6 @@ services:
       timeout: 5s
       start_period: 60s
       retries: 12
+
+volumes:
+  minio-data:

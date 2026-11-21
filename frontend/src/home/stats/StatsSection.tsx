@@ -1,8 +1,10 @@
+"use client";
+
 import React from "react";
 import MonthlyContributionChart from "../charts/MonthlyContributionChart";
 import ContributionStats from "../components/ContributionStats";
 
-const StatsSection = React.memo(() => {
+const StatsSection = React.memo(({ initialTotal }: { readonly initialTotal?: number }) => {
   return (
     <div className="w-full h-min flex flex-col items-center justify-center px-8 pt-10 mb-10">
       <div className="w-full flex flex-col md:flex-row">
@@ -13,7 +15,7 @@ const StatsSection = React.memo(() => {
         
         {/* 오른쪽 - 통계 영역 (35%) / 위쪽 (모바일) */}
         <div className="w-full md:w-[35%] h-full md:h-auto md:order-2 order-1">
-          <ContributionStats />
+          <ContributionStats initialTotal={initialTotal} />
         </div>
       </div>
     </div>

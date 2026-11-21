@@ -287,6 +287,12 @@ try {
   const connection = await pool.getConnection();
   try {
     await seedPreview(connection);
+    await connection.query(
+      "INSERT IGNORE INTO solved_ac_accounts (solved_ac_id, user_id, solved_ac_handle) VALUES (7001, 1, 'alpha'), (7002, 2, 'beta')",
+    );
+    await connection.query(
+      "INSERT IGNORE INTO admin_users (user_id) VALUES (1)",
+    );
   } finally {
     connection.release();
   }

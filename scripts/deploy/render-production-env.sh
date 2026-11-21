@@ -12,8 +12,8 @@ if [[ -d "$output" ]]; then
   printf 'Output must be a file.\n' >&2
   exit 1
 fi
-required=(DB_PASSWORD JWT_SECRET ADMIN_USERNAME ADMIN_PASSWORD)
-keys=("${required[@]}" VITE_KAKAO_MAP_API_KEY WEBHOOK_URL SOLVED_AC_CLIENT_ID SOLVED_AC_CLIENT_SECRET)
+required=(DB_PASSWORD JWT_SECRET MINIO_ACCESS_KEY MINIO_SECRET_KEY)
+keys=("${required[@]}" NEXT_PUBLIC_KAKAO_MAP_API_KEY WEBHOOK_URL SOLVED_AC_CLIENT_ID SOLVED_AC_CLIENT_SECRET)
 for key in "${required[@]}"; do
   if [[ -z "${!key:-}" ]]; then
     printf 'Required environment variable is missing or empty: %s\n' "$key" >&2

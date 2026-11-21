@@ -1116,9 +1116,17 @@ test("serves the admin queries from the migrated BOJ schema and writes only to i
     loadConfig: () => config,
     clock: { now: () => currentTime },
   });
-  const session = encodeURIComponent(
-    `Bearer ${jwt.sign({ role: "admin" }, config.JWT_SECRET)}`,
+  await rows(
+    "INSERT INTO solved_ac_accounts(solved_ac_id,user_id,solved_ac_handle) VALUES(871,41,'alpha')",
   );
+  await rows("INSERT INTO admin_users(user_id) VALUES(41)");
+  const session = jwt.sign({ solvedAcId: "871" }, config.JWT_SECRET, {
+    algorithm: "HS256",
+    subject: "41",
+    issuer: "anabada",
+    audience: "anabada-web",
+    expiresIn: 3600,
+  });
   const request = (
     path: string,
     method = "GET",
@@ -1129,7 +1137,12 @@ test("serves the admin queries from the migrated BOJ schema and writes only to i
       new Request(`http://integration.test${path}`, {
         method,
         headers: {
-          ...(authorized ? { cookie: `accessToken=${session}` } : {}),
+          ...(authorized
+            ? {
+                cookie: `anabada_session=${session}`,
+                origin: config.ALLOWED_ORIGIN,
+              }
+            : {}),
           ...(body ? { "content-type": "application/json" } : {}),
         },
         body: body ? JSON.stringify(body) : undefined,
@@ -1242,6 +1255,8 @@ test("serves the admin queries from the migrated BOJ schema and writes only to i
       ]),
     });
   } finally {
+    await rows("DELETE FROM admin_users WHERE user_id=41");
+    await rows("DELETE FROM solved_ac_accounts WHERE solved_ac_id=871");
     await app.close();
   }
 });

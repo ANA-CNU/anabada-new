@@ -1,3 +1,5 @@
+"use client";
+
 import { SquircleSurface } from "@/components/ui/squircle";
 import React from "react";
 import Background from "../home/stats/Background";
@@ -28,7 +30,7 @@ const ContestPage: React.FC = () => {
               <ContestCalender anchorISO="2025-09-27" weeks={3} />
             </div>
             <ul className="space-y-2 text-white/90">
-              <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-400"></span> 2025.09.27 (토)</li>
+              <li className="flex items-center gap-2"><span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-emerald-400"></span> 2025.09.27 (토)</li>
               <li className="text-white/70 text-sm">12:00 ~ 13:00 특별 특강</li>
               <li className="text-white/70 text-sm">13:00 ~ 13:30 대회 OT</li>
               <li className="text-white/70 text-sm">13:30 ~ 16:30 대회 진행</li>
@@ -85,9 +87,9 @@ const ContestPage: React.FC = () => {
               <div className="p-6 max-h-[238px] overflow-auto">
               <h2 className="text-lg font-bold mb-4">참가 자격</h2>
               <ul className="space-y-2 text-white/90">
-                <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 rounded-full bg-cyan-400"></span> 충남대학교 학생</li>
-                <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 rounded-full bg-cyan-400"></span> COSS 컨소시엄 소속 학생</li>
-                <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 rounded-full bg-cyan-400"></span> 1~3인 팀 구성</li>
+                <li className="flex items-center gap-2"><span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-cyan-400"></span> 충남대학교 학생</li>
+                <li className="flex items-center gap-2"><span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-cyan-400"></span> COSS 컨소시엄 소속 학생</li>
+                <li className="flex items-center gap-2"><span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-cyan-400"></span> 1~3인 팀 구성</li>
               </ul>
               </div>
             </div></SquircleSurface>
@@ -96,9 +98,9 @@ const ContestPage: React.FC = () => {
             <SquircleSurface asChild radius="surface"><div className="bg-white/5 border border-white/10 p-6">
               <h2 className="text-lg font-bold mb-4">장소 · 접수</h2>
               <ul className="space-y-2 text-white/90">
-                <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 rounded-full bg-violet-400"></span> 장소: 충남대학교 교내 (추후 공지)</li>
-                <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 rounded-full bg-violet-400"></span> 접수: 9월 8일 (월) ~ 9월 19일 (금)</li>
-                <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 rounded-full bg-violet-400"></span> 대회: 9월 27일 (토) 12:00 ~ 17:30</li>
+                <li className="flex items-center gap-2"><span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-violet-400"></span> 장소: 충남대학교 교내 (추후 공지)</li>
+                <li className="flex items-center gap-2"><span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-violet-400"></span> 접수: 9월 8일 (월) ~ 9월 19일 (금)</li>
+                <li className="flex items-center gap-2"><span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-violet-400"></span> 대회: 9월 27일 (토) 12:00 ~ 17:30</li>
               </ul>
               <SquircleSurface asChild radius="control"><div className="mt-4 overflow-hidden border border-white/10">
                 <KakaoMap lat={36.36660422255552} lng={127.34434347433623} level={3} markerTitle="충남대학교 공과대학 5호관" className="w-full h-64 md:h-80" />

@@ -2,7 +2,6 @@ import {
   acquirePosition,
   createDropShadow,
   createSvgEffects,
-  generateClipPath,
   generatePath,
   getLayoutSize,
   observeResize,
@@ -61,15 +60,11 @@ function attachEffects(element: HTMLElement, options: SmoothCornerOptions, dispo
   const shadowGroup = document.createElementNS("http://www.w3.org/2000/svg", "g")
   shadowGroup.setAttribute("mask", `url(#${maskId})`)
   shadowLayer?.append(shadowGroup)
-  const originalClip = element.style.clipPath
-  const originalRadius = element.style.borderRadius
   let originalBorder = element.style.borderColor
   let originalShadow = element.style.boxShadow
   let frame = 0
   disposers.push(() => {
     cancelAnimationFrame(frame)
-    element.style.clipPath = originalClip
-    element.style.borderRadius = originalRadius
     element.style.borderColor = originalBorder
     element.style.boxShadow = originalShadow
   })
@@ -105,8 +100,6 @@ function attachEffects(element: HTMLElement, options: SmoothCornerOptions, dispo
     const offset = { x: element.offsetLeft, y: element.offsetTop }
     element.style.borderColor = uniformBorder ? "transparent" : originalBorder
     element.style.boxShadow = "none"
-    element.style.borderRadius = "0"
-    element.style.clipPath = generateClipPath(width, height, options)
     maskShape.setAttribute("d", generatePath(width, height, options))
     cancelTransferredPaintTransitions()
     border.update(options, {

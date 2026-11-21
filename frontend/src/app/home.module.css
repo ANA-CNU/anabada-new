@@ -1,0 +1,56 @@
+.main {
+  padding-block: 48px 88px;
+  padding-inline: 32px;
+}
+.opening {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(20px, 4cqw, 56px);
+  align-items: center;
+}
+.cover {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  inline-size: 100%;
+  aspect-ratio: 1;
+  align-items: end;
+  padding: clamp(24px, 4.8cqw, 64px);
+  background:
+    radial-gradient(ellipse at 2% 88%, #cceedd, transparent 66%),
+    radial-gradient(ellipse at 53% 0%, #e0cff5, transparent 63%),
+    radial-gradient(ellipse at 95% 64%, #f8d8ce, transparent 72%),
+    #f5e9d8;
+  color: #181521;
+}
+.coverGrid {
+  --cover-dot-spacing: 28px;
+  --cover-dot-radius: 1.25px;
+  --cover-dot-ink: rgb(255 255 255 / 60%);
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  pointer-events: none;
+  background-image: radial-gradient(circle, var(--cover-dot-ink) var(--cover-dot-radius), transparent calc(var(--cover-dot-radius) + .4px));
+  background-size: var(--cover-dot-spacing) var(--cover-dot-spacing);
+  background-position: center;
+}
+.coverGrid[data-ready] { background-image: none; }
+.coverTitle { position: relative; min-width: 0; }
+.cover h1 {
+  margin: 0;
+  font-size: clamp(38px, 6.1cqw, 96px);
+  line-height: .98;
+  letter-spacing: -.085em;
+  font-weight: 780;
+}
+.cover p { margin: 16px 0 0; font-size: 14px; font-weight: 600; }
+.ranking { min-width: 0; display: flex; flex-direction: column; align-items: center; }
+.draw { margin-block: 16px 32px; }
+.section, .legacySection { margin-block-end: 80px; }
+.main > :last-child { margin-block-end: 0; }
+.sectionHeading { display: flex; justify-content: space-between; gap: 16px; align-items: center; border-bottom: 1px solid var(--line); padding-bottom: 16px; margin-bottom: 24px; }
+.sectionHeading h2 { margin: 0; font-size: clamp(28px, 3.6cqw, 48px); line-height: 1.15; letter-spacing: -.06em; font-weight: 650; }
+.sectionHeading a { flex-shrink: 0; }
+.empty { border-bottom: 1px solid var(--line); min-height: 120px; color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }

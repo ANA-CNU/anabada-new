@@ -122,7 +122,9 @@ jobs:
           npm ci --ignore-scripts --no-audit --no-fund
           node scripts/problem-reason-links.test.mjs
           node scripts/contest-landing.test.mjs
-          node --experimental-strip-types --test scripts/admin-dashboard.test.mjs
+          node --experimental-strip-types --test scripts/admin-dashboard.test.mjs scripts/board/board.test.ts scripts/last-update-time.test.mjs
+          bun test src/server/auth/auth.test.ts
+          npm run typecheck
           npm run lint
           npm run check:corners
           npm run build
@@ -131,9 +133,9 @@ jobs:
         env:
           DB_PASSWORD: ci-placeholder-not-a-live-secret
           JWT_SECRET: ci-placeholder-not-a-live-secret
-          ADMIN_USERNAME: ci-placeholder
-          ADMIN_PASSWORD: ci-placeholder-not-a-live-secret
-          VITE_KAKAO_MAP_API_KEY: ci-map-build-placeholder
+          MINIO_ACCESS_KEY: ci-placeholder
+          MINIO_SECRET_KEY: ci-placeholder-not-a-live-secret
+          NEXT_PUBLIC_KAKAO_MAP_API_KEY: ci-map-build-placeholder
           WEBHOOK_URL: https://discord.com/api/webhooks/ci-placeholder/not-live
         run: |
           set -euo pipefail
@@ -155,16 +157,19 @@ jobs:
                 ($m.networks | has(if $mode == "prod" then "default" else "bada-network" end)) and
                 ($m.depends_on["anabada-mysql"].condition == "service_healthy") and
                 ($m.restart == "no") and ($m.ports == null) and ($m.volumes == null) and
-                ($root.services["anabada-frontend"].build.args | has("VITE_KAKAO_MAP_API_KEY")) and
-                (["anabada-frontend", "anabada-middleware", "anabada-backend"] |
+                ($root.services["anabada-frontend"].build.args | has("NEXT_PUBLIC_KAKAO_MAP_API_KEY")) and
+                (["anabada-frontend", "anabada-backend"] |
                   all(.[]; $root.services[.].depends_on["database-migrator"].condition == "service_completed_successfully")) and
                 ($root.secrets == null) and
                 ($root.services | all(.[]; .secrets == null and .env_file == null)) and
                 ($m.environment.DB_PASSWORD == $root.services["anabada-mysql"].environment.MYSQL_ROOT_PASSWORD) and
                 ($m.environment.DB_PASSWORD == $root.services["anabada-backend"].environment.DB_PASSWORD) and
                 ($root.services["anabada-backend"].environment.DB_USER == "root") and
-                ($root.services["anabada-backend"].environment.JWT_SECRET == $root.services["anabada-middleware"].environment.JWT_SECRET) and
+                ($root.services["anabada-backend"].environment.JWT_SECRET == $root.services["anabada-frontend"].environment.JWT_SECRET) and
                 ($root.services["anabada-backend"].environment.DB_NAME == "boj_bada") and
+                ($root.services["minio"].ports == null) and
+                ($root.services["minio"].volumes | any(.[]; .target == "/data")) and
+                ($root.services["anabada-frontend"].environment.MINIO_ACCESS_KEY == $root.services["minio"].environment.MINIO_ROOT_USER) and
                 ($root.services["anabada-backend"].depends_on["database-migrator"].condition == "service_completed_successfully") and
                 ($root.services["anabada-mysql"].healthcheck.test | join(" ") | contains("mysqladmin")) and
                 ($root.services["anabada-mysql"].volumes | any(.[]; .type == "bind" and (.source | endswith("/database/my.cnf")) and .target == "/etc/mysql/conf.d/my.cnf" and .read_only == true)) and
@@ -175,11 +180,11 @@ jobs:
                   ($root.services | with_entries(select((.value.ports // []) | length > 0)) | keys == ["bada-nginx"]) and
                   ($root.services["bada-nginx"].ports | length == 1 and all(.[]; .published == "80" and .target == 80 and .protocol == "tcp")) and
                   ($root.services["anabada-backend"].environment.ALLOWED_ORIGIN == "https://bada.anacnu.com") and
-                  ($root.services["anabada-middleware"].environment.ALLOWED_ORIGIN == "https://bada.anacnu.com")
+                  ($root.services["anabada-frontend"].environment.APP_ORIGIN == "https://bada.anacnu.com")
                 elif $mode == "stage" then
                   $root.services["anabada-backend"].ports | any(.[]; .published == "20031" and .target == 3000 and .protocol == "tcp")
                 else true end) and
-                ($root.services["anabada-mysql"].volumes | all(.[]; (.target | startswith("/docker-entrypoint-initdb.d") | not))) and
+                (if $mode == "dev" then true else ($root.services["anabada-mysql"].volumes | all(.[]; (.target | startswith("/docker-entrypoint-initdb.d") | not))) end) and
                 ($root.services["anabada-mysql"].volumes |
                   if $mode == "dev" then
                     any(.[]; .type == "volume" and .source == "mysql-data" and .target == "/var/lib/mysql")
@@ -189,5 +194,5 @@ jobs:
                 )'
           done
           # 실제 배포 이미지와 프런트엔드의 빌드 인자도 확인한다.
-          timeout 900 docker compose --env-file "$secret_dir/.env" -p "anabada-ci-$GITHUB_RUN_ID" -f docker-compose.dev.yaml build database-migrator anabada-backend anabada-frontend anabada-middleware
-          docker run --rm --entrypoint sh "anabada-ci-$GITHUB_RUN_ID-anabada-frontend" -ec 'grep -Rq ci-map-build-placeholder /app/dist'
+          timeout 900 docker compose --env-file "$secret_dir/.env" -p "anabada-ci-$GITHUB_RUN_ID" -f docker-compose.dev.yaml build database-migrator anabada-backend anabada-frontend
+          docker run --rm --entrypoint sh "anabada-ci-$GITHUB_RUN_ID-anabada-frontend" -ec 'grep -Rq ci-map-build-placeholder /app/.next/static'

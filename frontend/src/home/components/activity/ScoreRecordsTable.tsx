@@ -12,10 +12,11 @@ import { ScoreReasonText } from "@/components/ScoreReasonText";
 
 interface ScoreRecordsTableProps {
   records: ScoreRecord[];
+  readonly now: number;
 }
 
-function ScoreRecordsTable({ records }: ScoreRecordsTableProps) {
-  const [items, setItems] = useState<ScoreRecord[]>([]);
+function ScoreRecordsTable({ records, now }: ScoreRecordsTableProps) {
+  const [items, setItems] = useState<ScoreRecord[]>(records);
   const [page, setPage] = useState(1);
   const limit = 10;
   const [loading, setLoading] = useState(false);
@@ -34,6 +35,7 @@ function ScoreRecordsTable({ records }: ScoreRecordsTableProps) {
   }
 
   useEffect(() => {
+    if (page === 1) return;
     let cancelled = false;
     const fetchPage = async () => {
       setLoading(true);
@@ -142,7 +144,7 @@ function ScoreRecordsTable({ records }: ScoreRecordsTableProps) {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <span className="cursor-help hover:text-white/80 transition-colors">
-                            {formatRelativeTime(record.time)}
+                            {formatRelativeTime(record.time, now)}
                           </span>
                         </TooltipTrigger>
                         <TooltipContent>

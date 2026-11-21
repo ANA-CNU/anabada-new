@@ -34,14 +34,14 @@ const unauthorized = { success: false, message: "관리자 권한이 없습니�
 
 export type ScoreHistoryRouteDependencies = Readonly<{
   service: ScoreHistoryService;
-  authorize: (request: Request) => boolean;
+  authorize: (request: Request) => boolean | Promise<boolean>;
 }>;
 export function createScoreHistoryRoutes(
   dependencies: ScoreHistoryRouteDependencies,
 ) {
   return new Elysia()
     .post("/api/score-history/bulk", async ({ body, request, set }) => {
-      if (!dependencies.authorize(request)) {
+      if (!(await dependencies.authorize(request))) {
         set.status = 401;
         return unauthorized;
       }
@@ -58,7 +58,7 @@ export function createScoreHistoryRoutes(
       };
     })
     .get("/api/admin/score-history", async ({ query, request, set }) => {
-      if (!dependencies.authorize(request)) {
+      if (!(await dependencies.authorize(request))) {
         set.status = 401;
         return unauthorized;
       }
@@ -84,7 +84,7 @@ export function createScoreHistoryRoutes(
       };
     })
     .put("/api/score-history/:id", async ({ body, params, request, set }) => {
-      if (!dependencies.authorize(request)) {
+      if (!(await dependencies.authorize(request))) {
         set.status = 401;
         return unauthorized;
       }
@@ -101,7 +101,7 @@ export function createScoreHistoryRoutes(
       return { success: true, message: "수정 완료" };
     })
     .delete("/api/score-history/:id", async ({ params, request, set }) => {
-      if (!dependencies.authorize(request)) {
+      if (!(await dependencies.authorize(request))) {
         set.status = 401;
         return unauthorized;
       }
