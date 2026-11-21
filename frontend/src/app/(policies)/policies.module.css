@@ -1,0 +1,62 @@
+.page {
+  max-width: 760px;
+  padding-block: 64px 80px;
+}
+
+.document {
+  font-size: 16px;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+
+.document h1 {
+  margin: 0 0 36px;
+  font-size: 48px;
+  font-weight: 650;
+  line-height: 1.15;
+  letter-spacing: -.06em;
+}
+
+.document section {
+  padding-block: 24px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.document h2 {
+  margin: 0 0 12px;
+  font-size: 20px;
+  font-weight: 650;
+  color: var(--ink);
+}
+
+.document :is(p, ul) + :is(p, ul, .contact) {
+  margin-top: 8px;
+}
+
+.document ul {
+  list-style: disc;
+  padding-inline-start: 24px;
+}
+
+.document li + li {
+  margin-top: 4px;
+}
+
+.contact {
+  padding: 16px;
+  background: var(--surface);
+}
+
+.contact a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.effectiveDate {
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 14px;
+}
