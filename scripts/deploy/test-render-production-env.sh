@@ -6,8 +6,8 @@ script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 renderer="$script_dir/render-production-env.sh"
 test_dir=$(mktemp -d)
 trap 'rm -rf -- "$test_dir"' EXIT
-required=(DB_PASSWORD JWT_SECRET ADMIN_USERNAME ADMIN_PASSWORD)
-keys=("${required[@]}" VITE_KAKAO_MAP_API_KEY WEBHOOK_URL SOLVED_AC_CLIENT_ID SOLVED_AC_CLIENT_SECRET)
+required=(DB_PASSWORD JWT_SECRET MINIO_ACCESS_KEY MINIO_SECRET_KEY)
+keys=("${required[@]}" NEXT_PUBLIC_KAKAO_MAP_API_KEY WEBHOOK_URL SOLVED_AC_CLIENT_ID SOLVED_AC_CLIENT_SECRET)
 fail() { printf 'FAIL: %s\n' "$1" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$1"; }
 fixture=$' fixture # $INERT ${INERT:?do-not-expand} single\' double" slash\\ literal\\n tab\t tail\\ '
@@ -50,8 +50,8 @@ done
 pass 'each required key missing/empty and every key with CR/LF fail while preserving output'
 
 # Given optional input omitted, when rendered, then it is explicitly empty.
-(unset VITE_KAKAO_MAP_API_KEY WEBHOOK_URL; bash "$renderer" "$test_dir/optional.env")
-grep -Fqx 'VITE_KAKAO_MAP_API_KEY=""' "$test_dir/optional.env" || fail 'optional default is not empty'
+(unset NEXT_PUBLIC_KAKAO_MAP_API_KEY WEBHOOK_URL; bash "$renderer" "$test_dir/optional.env")
+grep -Fqx 'NEXT_PUBLIC_KAKAO_MAP_API_KEY=""' "$test_dir/optional.env" || fail 'optional default is not empty'
 grep -Fqx 'WEBHOOK_URL=""' "$test_dir/optional.env" || fail 'optional webhook default is not empty'
 # Given an optional Discord-compatible webhook, when rendered, then its exact value is retained without logs.
 webhook_fixture='https://discord.com/api/webhooks/000000000000000000/placeholder-not-live'

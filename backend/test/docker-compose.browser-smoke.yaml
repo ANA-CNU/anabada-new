@@ -45,8 +45,8 @@ services:
       DB_PASSWORD: browser-smoke-only
       DB_NAME: boj_bada
       NODE_ENV: test
-      ALLOWED_ORIGIN: http://bada-nginx
-      JWT_SECRET: browser-smoke-jwt
+      ALLOWED_ORIGIN: http://localhost
+      JWT_SECRET: browser-smoke-only-session-secret-material
       WEBHOOK_URL: ""
     depends_on:
       browser-smoke-seed: { condition: service_completed_successfully }
@@ -57,27 +57,34 @@ services:
       retries: 30
       start_period: 5s
 
+  minio:
+    image: cgr.dev/chainguard/minio@sha256:e9cf6b99c226e9539ed0f14b6f00e37b07da153c7ba1f4f8709c807574b471ec
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: smoke-minio
+      MINIO_ROOT_PASSWORD: smoke-minio-key
+    tmpfs:
+      - /data:uid=65532,gid=65532
+
   anabada-frontend:
     build: { context: ../../frontend, dockerfile: Dockerfile.prod }
-    depends_on:
-      browser-smoke-seed: { condition: service_completed_successfully }
-
-  anabada-middleware:
-    build: { context: ../../middleware, dockerfile: Dockerfile }
     environment:
-      PORT: "80"
-      NODE_ENV: test
-      JWT_SECRET: browser-smoke-jwt
-      ADMIN_USERNAME: smoke-admin
-      ADMIN_PASSWORD: smoke-password
-      FRONTEND_URL: http://anabada-frontend:20030
-      ALLOWED_ORIGIN: http://bada-nginx
+      APP_ORIGIN: http://localhost
+      BACKEND_URL: http://anabada-backend:3000
+      DB_HOST: anabada-mysql
+      DB_PASSWORD: browser-smoke-only
+      JWT_SECRET: browser-smoke-only-session-secret-material
+      MINIO_ENDPOINT: minio
+      MINIO_ACCESS_KEY: smoke-minio
+      MINIO_SECRET_KEY: smoke-minio-key
     depends_on:
       browser-smoke-seed: { condition: service_completed_successfully }
+      anabada-backend: { condition: service_healthy }
+      minio: { condition: service_started }
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:80/').then((r)=>process.exit(r.ok ? 0 : 1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:20030/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 2s
-      timeout: 2s
+      timeout: 6s
       retries: 30
       start_period: 5s
 
@@ -87,12 +94,14 @@ services:
       - ../../nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       anabada-backend: { condition: service_healthy }
-      anabada-middleware: { condition: service_healthy }
+      anabada-frontend: { condition: service_healthy }
 
   browser-smoke:
     build: { context: ../.., dockerfile: frontend/test/Dockerfile.browser-smoke }
+    network_mode: service:bada-nginx
     environment:
-      SMOKE_BASE_URL: http://bada-nginx
+      SMOKE_SESSION_SECRET: browser-smoke-only-session-secret-material
+      SMOKE_BASE_URL: http://localhost
       SMOKE_ARTIFACT_DIR: /artifacts
     volumes:
       - ../../test-output/frontend-smoke:/artifacts

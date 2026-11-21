@@ -32,13 +32,13 @@ export type BiasRouteDependencies = Readonly<{
     initialize(beginUtc: Date, endUtc: Date): Promise<number | null>;
     list(): Promise<readonly unknown[]>;
   }>;
-  authorize: (request: Request) => boolean;
+  authorize: (request: Request) => boolean | Promise<boolean>;
   clock?: () => Date;
 }>;
 export function createBiasRoutes(dependencies: BiasRouteDependencies) {
   return new Elysia()
     .post("/api/bias/date-init", async ({ request, body, set }) => {
-      if (!dependencies.authorize(request)) {
+      if (!(await dependencies.authorize(request))) {
         set.status = 401;
         return unauthorized;
       }
@@ -85,7 +85,7 @@ export function createBiasRoutes(dependencies: BiasRouteDependencies) {
       };
     })
     .get("/api/bias/all", async ({ request, set }) => {
-      if (!dependencies.authorize(request)) {
+      if (!(await dependencies.authorize(request))) {
         set.status = 401;
         return unauthorized;
       }

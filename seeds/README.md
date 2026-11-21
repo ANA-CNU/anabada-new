@@ -4,7 +4,7 @@
 
 시드는 고정 demo ID와 UPSERT를 사용하므로 같은 dedicated preview DB에서 반복 실행해도 중복 행을 만들지 않습니다. 백준 스키마를 준비하는 006까지 새 DB에 적용되고 시드가 완료돼야 앱이 시작됩니다. `start.sh`가 local Docker context와 고정 Compose project를 검사하며, SQL은 이 전용 Compose의 `anabada-mysql` / `boj_bada`를 대상으로 작성되었습니다.
 
-데이터셋은 가짜 사용자 30명, 사용자당 6개 AC(반복 AC 포함), 7개 순위 보드(각 30명), 과거·진행·예정 이벤트와 문제 칩, 일일·이벤트·수동(감점 포함) 점수 원장으로 구성됩니다. 관리자 로그인은 새 계정을 만들지 않고 루트 `.env`의 `ADMIN_USERNAME`과 `ADMIN_PASSWORD`를 그대로 사용합니다.
+데이터셋은 가짜 사용자 30명, 사용자당 6개 AC(반복 AC 포함), 7개 순위 보드(각 30명), 과거·진행·예정 이벤트와 문제 칩, 일일·이벤트·수동(감점 포함) 점수 원장으로 구성됩니다. 미리보기 데이터는 가짜 회원이므로 일반적인 solved.ac 로그인 검증에는 실제 ANA 회원이 필요합니다. 격리된 관리자 브라우저 검증은 저장소 루트에서 `sh backend/test/run-browser-smoke.sh`로 실행합니다.
 
 브라우저는 `http://localhost:20050`에서 열 수 있습니다. backend의 `WEBHOOK_URL`은 빈 값으로 강제되어 외부 알림이 발생하지 않습니다.
 

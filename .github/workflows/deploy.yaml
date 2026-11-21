@@ -19,9 +19,9 @@ jobs:
     env:
       DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
-      ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
-      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
-      VITE_KAKAO_MAP_API_KEY: ${{ secrets.VITE_KAKAO_MAP_API_KEY }}
+      MINIO_ACCESS_KEY: ${{ secrets.MINIO_ACCESS_KEY }}
+      MINIO_SECRET_KEY: ${{ secrets.MINIO_SECRET_KEY }}
+      NEXT_PUBLIC_KAKAO_MAP_API_KEY: ${{ secrets.NEXT_PUBLIC_KAKAO_MAP_API_KEY || secrets.VITE_KAKAO_MAP_API_KEY }}
       # 선택값이며 비어 있으면 backend 긴급 Discord 알림만 비활성화된다.
       WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
       SOLVED_AC_CLIENT_ID: ${{ secrets.SOLVED_AC_CLIENT_ID }}
@@ -37,7 +37,7 @@ jobs:
             exit 1
           fi
           missing=()
-          for key in DB_PASSWORD JWT_SECRET ADMIN_USERNAME ADMIN_PASSWORD; do
+          for key in DB_PASSWORD JWT_SECRET MINIO_ACCESS_KEY MINIO_SECRET_KEY; do
             if [[ -z "${!key:-}" ]]; then missing+=("$key"); fi
           done
           if (( ${#missing[@]} )); then
@@ -66,7 +66,7 @@ jobs:
             cd "$repository"
           fi
           bash "$GITHUB_WORKSPACE/scripts/deploy/render-production-env.sh" "$repository/.env"
-          unset DB_PASSWORD JWT_SECRET ADMIN_USERNAME ADMIN_PASSWORD VITE_KAKAO_MAP_API_KEY WEBHOOK_URL SOLVED_AC_CLIENT_ID SOLVED_AC_CLIENT_SECRET
+          unset DB_PASSWORD JWT_SECRET MINIO_ACCESS_KEY MINIO_SECRET_KEY NEXT_PUBLIC_KAKAO_MAP_API_KEY WEBHOOK_URL SOLVED_AC_CLIENT_ID SOLVED_AC_CLIENT_SECRET
           sudo -n docker compose --env-file .env -f docker-compose.prod.yaml config --quiet
           # CI에서 확인된 구버전 Compose/Bake 조합의 이미지 선택 결함을 피한다.
           timeout 1200 sudo -n COMPOSE_BAKE=false docker compose --env-file .env -f docker-compose.prod.yaml build

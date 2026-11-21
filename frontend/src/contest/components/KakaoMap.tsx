@@ -49,9 +49,9 @@ const KakaoMap: React.FC<KakaoMapProps> = ({ lat, lng, level = 3, markerTitle, c
     let active = true;
     let releaseMap: (() => void) | undefined;
     let ownedScript: HTMLScriptElement | undefined;
-    const apiKey = import.meta.env.VITE_KAKAO_MAP_API_KEY;
+    const apiKey = process.env.NEXT_PUBLIC_KAKAO_MAP_API_KEY;
     if (!apiKey) {
-      console.warn("Kakao Map API key is missing. Set VITE_KAKAO_MAP_API_KEY.");
+      console.warn("Kakao Map API key is missing. Set NEXT_PUBLIC_KAKAO_MAP_API_KEY.");
       return;
     }
 

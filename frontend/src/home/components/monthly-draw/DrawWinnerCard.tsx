@@ -1,5 +1,5 @@
 import { SquircleSurface } from "@/components/ui/squircle"
-import type { MonthlyDrawEntry } from "../LastMonthRanking"
+import type { MonthlyDrawEntry } from "./data"
 import styles from "./monthly-draw.module.css"
 
 type DrawWinnerCardProps = {

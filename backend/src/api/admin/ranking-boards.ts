@@ -56,7 +56,7 @@ export function createAdminRankingBoardRoutes(
 ) {
   return new Elysia()
     .get("/api/admin/ranking-boards", async ({ query, request, set }) => {
-      if (!dependencies.authorizer.isAdmin(request)) {
+      if (!(await dependencies.authorizer.isAdmin(request))) {
         set.status = 401;
         return unauthorized;
       }
@@ -85,7 +85,7 @@ export function createAdminRankingBoardRoutes(
       };
     })
     .get("/api/admin/ranking-boards/:id", async ({ params, request, set }) => {
-      if (!dependencies.authorizer.isAdmin(request)) {
+      if (!(await dependencies.authorizer.isAdmin(request))) {
         set.status = 401;
         return unauthorized;
       }
@@ -109,7 +109,7 @@ export function createAdminRankingBoardRoutes(
     .patch(
       "/api/admin/ranking-boards/:id/active",
       async ({ params, body, request, set }) => {
-        if (!dependencies.authorizer.isAdmin(request)) {
+        if (!(await dependencies.authorizer.isAdmin(request))) {
           set.status = 401;
           return unauthorized;
         }

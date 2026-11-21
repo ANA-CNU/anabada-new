@@ -17,11 +17,12 @@ export interface MonthlyProblem {
   id: string;
   user: string;
   problemCount: number;
+  totalSolved?: number;
 }
 
 // 시간 포맷팅 유틸리티 함수들
-export const formatRelativeTime = (timeString: string) => {
-  const now = new Date();
+export const formatRelativeTime = (timeString: string, nowMs = Date.now()) => {
+  const now = new Date(nowMs);
   const time = new Date(timeString);
 
   const diffInMs = now.getTime() - time.getTime();
@@ -41,6 +42,7 @@ export const formatRelativeTime = (timeString: string) => {
 export const formatExactTime = (timeString: string) => {
   const date = new Date(timeString);
   return date.toLocaleString('ko-KR', {
+    timeZone: 'Asia/Seoul',
     year: 'numeric',
     month: 'long',
     day: 'numeric',

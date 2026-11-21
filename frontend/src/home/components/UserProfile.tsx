@@ -1,20 +1,21 @@
+"use client";
+
 import { ChartTooltip } from "./ChartTooltip";
 import { ScoreReasonText } from "@/components/ScoreReasonText";
 import { SquircleSurface } from "@/components/ui/squircle";
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { ArrowLeft, Trophy, Target, TrendingUp, Calendar } from 'lucide-react';
-import { URL } from '@/resource/constant';
 import UserRankHistoryChart from './UserRankHistoryChart';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import Background from '../stats/Background';
-import { useNavigate, useParams } from 'react-router-dom';
+import Link from 'next/link';
 import { StatCard } from '../../components/ui/stat-card';
 import type { 
   User, 
-  ScoreHistory, 
+  RecentScore,
   Problem, 
   RankPoint, 
   MonthlySummary 
@@ -23,88 +24,26 @@ import {
   getTierName, 
   getTierColor, 
   formatDate, 
-  calculateAccuracy, 
-  calculateAverageScore 
+  calculateAccuracy
 } from '../../lib/utils';
 
-type ProfileActivity = {
-  scores: ScoreHistory[] | null;
+export type ProfileActivity = {
+  scores: RecentScore[] | null;
   problems: Problem[] | null;
   ranks: RankPoint[] | null;
   monthly: MonthlySummary | null;
 };
 
-async function readActivity<T>(path: string, signal: AbortSignal): Promise<T> {
-  const response = await fetch(`${URL}${path}`, { signal });
-  if (!response.ok) throw new Error(`Activity request failed: ${response.status}`);
-  return response.json();
-}
-
-function resultOrNull<T>(result: PromiseSettledResult<T>): T | null {
-  return result.status === 'fulfilled' ? result.value : null;
-}
-
-const UserProfile: React.FC = () => {
-  const { id } = useParams();
-  return <Profile key={id} id={id} />;
+type ProfileProps = {
+  readonly initialUser: User;
+  readonly initialActivity: ProfileActivity;
 };
 
-const Profile: React.FC<{ id: string | undefined }> = ({ id }) => {
-  const navigate = useNavigate();
-
-  const [profile, setProfile] = useState<{ user: User } | { error: string } | null>(null);
-  const [activity, setActivity] = useState<ProfileActivity | null>(null);
-  const scoreHistory = activity?.scores ?? [];
-  const recentProblems = activity?.problems ?? [];
-  const rankHistory = activity?.ranks ?? [];
-  const monthly = activity?.monthly;
-  const user = profile && 'user' in profile ? profile.user : null;
-  const userId = user?.id;
-
-  useEffect(() => {
-    const controller = new AbortController();
-    const loadProfile = async () => {
-      try {
-        const userRes = await fetch(`${URL}/api/users/${id}`, { signal: controller.signal });
-        if (userRes.status === 400 || userRes.status === 404) {
-          setProfile({ error: '사용자를 찾을 수 없습니다.' });
-          return;
-        }
-        if (!userRes.ok) throw new Error(`Profile request failed: ${userRes.status}`);
-        const json = await userRes.json();
-        if (!json?.success || !json.data) throw new Error('Missing profile data');
-        setProfile({ user: json.data });
-      } catch {
-        if (!controller.signal.aborted) {
-          setProfile({ error: '사용자 정보를 불러오지 못했습니다.' });
-        }
-      }
-    };
-    void loadProfile();
-    return () => controller.abort();
-  }, [id]);
-
-  useEffect(() => {
-    if (!userId) return;
-    const controller = new AbortController();
-    const { signal } = controller;
-    void Promise.allSettled([
-      readActivity<ScoreHistory[]>(`/api/score_history/user/${userId}`, signal),
-      readActivity<Problem[]>(`/api/user/${userId}/problems`, signal),
-      readActivity<RankPoint[]>(`/api/board/user/${userId}/rank-history`, signal),
-      readActivity<{ data: MonthlySummary }>(`/api/user/${userId}/monthly-summary`, signal),
-    ]).then(([scores, problems, ranks, summary]) => {
-      if (!signal.aborted) {
-        setActivity({
-          scores: resultOrNull(scores),
-          problems: resultOrNull(problems),
-          ranks: resultOrNull(ranks),
-          monthly: resultOrNull(summary)?.data ?? null,
-        });
-      }
-    });
-    return () => controller.abort();
-  }, [userId]);
+const UserProfile = ({ initialUser: user, initialActivity: activity }: ProfileProps) => {
+  const scoreHistory = activity.scores ?? [];
+  const recentProblems = activity.problems ?? [];
+  const rankHistory = activity.ranks ?? [];
+  const monthly = activity.monthly;
 
   // 랭크 분포 및 확률 계산 (1~8위 + 9위 이상)
   const rankCounts: Record<string, number> = {};
@@ -132,21 +71,6 @@ const Profile: React.FC<{ id: string | undefined }> = ({ id }) => {
 
   const barData = tableRows.map(r => ({ label: r.label, count: r.count }));
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-[#0a1026] flex flex-col items-center justify-center gap-4 p-6 text-center text-white">
-        {profile && 'error' in profile ? (
-          <>
-            <p role="alert">{profile.error}</p>
-            <Button onClick={() => navigate('/')} variant="ghost" className="text-white hover:bg-white/10">
-              <ArrowLeft className="w-5 h-5 mr-2" />
-              뒤로 가기
-            </Button>
-          </>
-        ) : <p role="status">로딩 중...</p>}
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-[#0a1026]">
@@ -154,13 +78,11 @@ const Profile: React.FC<{ id: string | undefined }> = ({ id }) => {
         <div className="max-w-6xl mx-auto p-6">
           {/* 헤더 */}
           <div className="flex items-center gap-4 mb-8">
-            <Button
-              onClick={() => navigate('/')}
-              variant="ghost"
-              className="text-white hover:bg-white/10"
-            >
-              <ArrowLeft className="w-5 h-5 mr-2" />
-              뒤로 가기
+            <Button asChild variant="ghost" className="text-white hover:bg-white/10">
+              <Link href="/">
+                <ArrowLeft className="w-5 h-5 mr-2" aria-hidden="true" />
+                홈으로
+              </Link>
             </Button>
             <h1 className="text-3xl font-bold text-white">사용자 프로필</h1>
           </div>
@@ -208,13 +130,12 @@ const Profile: React.FC<{ id: string | undefined }> = ({ id }) => {
             />
             <StatCard
               icon={Calendar}
-              value={activity?.scores ? calculateAverageScore(scoreHistory) : "—"}
+              value={activity?.scores ? (scoreHistory.length ? Number((scoreHistory.reduce((sum, record) => sum + record.bias, 0) / scoreHistory.length).toFixed(1)) : 0) : "—"}
               label="평균 점수"
               iconColor="text-purple-400"
             />
           </div>
 
-          {!activity && <p role="status" className="mb-8 text-gray-300">활동 기록을 불러오는 중...</p>}
 
           {activity?.ranks && (
             <div className="mb-8">

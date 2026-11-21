@@ -168,16 +168,17 @@ try {
     readFileSync(join(root, "backend/test/boj/legacy-fixture.sql"), "utf8"),
   ].join("\n"));
   check(runMigrator().status === 0, "pending legacy import failed after restoring the source");
-  check(sql("SELECT GROUP_CONCAT(version ORDER BY version) FROM jungol_bada.migrations") === "2,3,4,5,6,7,8,9,10,11,12", "BOJ migrations were not applied in order");
-  cpSync(join(root, "scripts/database/test-fixtures/003_fail_after_sentinel.sql"), join(fixture, "013_fail_after_sentinel.sql"));
+  check(sql("SELECT GROUP_CONCAT(version ORDER BY version) FROM jungol_bada.migrations") === "2,3,4,5,6,7,8,9,10,11,12,13,14", "BOJ migrations were not applied in order");
+  check(sql("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='boj_bada' AND table_name IN ('solved_ac_accounts','admin_users','board_post','board_post_tag','board_draft','board_image')") === "6", "account and board tables were not created");
+  cpSync(join(root, "scripts/database/test-fixtures/003_fail_after_sentinel.sql"), join(fixture, "015_fail_after_sentinel.sql"));
   const fixtureMounts = [
-    "-v", `${join(fixture, "013_fail_after_sentinel.sql")}:/app/013_fail_after_sentinel.sql:ro`,
+    "-v", `${join(fixture, "015_fail_after_sentinel.sql")}:/app/015_fail_after_sentinel.sql:ro`,
   ];
   check(runMigrator(fixtureMounts).status !== 0, "failing pending migration unexpectedly succeeded");
   check(sql("SELECT COUNT(*) FROM jungol_bada.migration_failure_probe") === "1", "failing migration did not execute its probe");
-  check(sql("SELECT COUNT(*) FROM jungol_bada.migrations WHERE version=13") === "0", "failed migration was recorded");
+  check(sql("SELECT COUNT(*) FROM jungol_bada.migrations WHERE version=15") === "0", "failed migration was recorded");
   check(sql("SELECT COUNT(*) FROM jungol_bada.user WHERE jungol_name='sentinel_after_reset'") === "1", "failed migration lost sentinel");
-  writeFileSync(join(fixture, "013_fail_after_sentinel.sql"), "SELECT SLEEP(2); CREATE TABLE lock_probe (id INT PRIMARY KEY);\n");
+  writeFileSync(join(fixture, "015_fail_after_sentinel.sql"), "SELECT SLEEP(2); CREATE TABLE lock_probe (id INT PRIMARY KEY);\n");
   const [first, second] = await Promise.all([
     runMigratorAsync(fixtureMounts),
     runMigratorAsync(fixtureMounts),
@@ -186,7 +187,7 @@ try {
     first.code === 0 && second.code === 0,
     `concurrent migrators did not serialize: ${first.errorCode ?? first.code},${second.errorCode ?? second.code}`,
   );
-  check(sql("SELECT COUNT(*) FROM jungol_bada.migrations WHERE version=13") === "1", "concurrent migration was not recorded once");
+  check(sql("SELECT COUNT(*) FROM jungol_bada.migrations WHERE version=15") === "1", "concurrent migration was not recorded once");
   check(output(["image", "inspect", image, "--format", "{{.Config.User}}"] ) === "node", "migrator image is not non-root");
   check(docker([
     "run", "--rm", "--entrypoint", "sh", image, "-ec",

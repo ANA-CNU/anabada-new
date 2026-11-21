@@ -12,9 +12,9 @@ const UserRankHistoryChart: React.FC<{ data: readonly RankPoint[] }> = ({ data }
     return data.map(d => {
       const ts = new Date(d.created_at).getTime();
       return {
-        date: new Date(d.created_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }),
+        date: new Date(d.created_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', timeZone: 'Asia/Seoul' }),
         rank: d.rank,
-        fullDate: new Date(d.created_at).toLocaleDateString('ko-KR'),
+        fullDate: new Date(d.created_at).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' }),
         boardId: d.board_id,
         timestamp: d.created_at,
         ts,
@@ -103,7 +103,7 @@ const UserRankHistoryChart: React.FC<{ data: readonly RankPoint[] }> = ({ data }
                     dataKey="ts"
                     type="number"
                     domain={["dataMin", "dataMax"]}
-                    tickFormatter={(value) => new Date(value).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}
+                    tickFormatter={(value) => new Date(value).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric', timeZone: 'Asia/Seoul' })}
                     tick={{ fill: '#94a3b8', fontSize: 11 }}
                     tickLine={false}
                     axisLine={{ stroke: 'rgba(255,255,255,0.2)' }}
