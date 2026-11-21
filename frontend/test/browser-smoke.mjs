@@ -198,9 +198,12 @@ async function checkPublicChrome(target) {
   assert.ok(panelBox && panelBox.x >= 0 && panelBox.x + panelBox.width <= 390);
   await target.keyboard.press("Escape");
   await panel.waitFor({ state: "hidden" });
-  await target.getByRole("contentinfo").getByRole("button", { name: "이용약관", exact: true }).click();
-  await target.getByRole("dialog", { name: "이용약관", exact: true }).waitFor();
-  await target.keyboard.press("Escape");
+  const previousUrl = target.url();
+  await target.getByRole("contentinfo").getByRole("link", { name: "이용약관", exact: true }).click();
+  await target.waitForURL(`${baseUrl}/terms`);
+  await target.getByRole("heading", { name: "이용약관", level: 1, exact: true }).waitFor();
+  await target.goBack();
+  await target.waitForURL(previousUrl);
 }
 
 async function assertUserProfile(target) {
@@ -355,16 +358,23 @@ async function checkFooter() {
   assert.equal(await footer.getByRole("link", { name: "참여 안내", exact: true }).getAttribute("href"), "/enter");
   assert.equal(await footer.getByRole("link", { name: "문의하기", exact: true }).getAttribute("href"), "https://github.com/ANA-CNU/anabada-new/issues");
 
-  for (const name of ["개인정보처리방침", "이용약관"]) {
-    const trigger = footer.getByRole("button", { name, exact: true });
-    await trigger.press("Enter");
-    const dialog = page.getByRole("dialog", { name, exact: true });
-    await dialog.waitFor();
-    assert.ok(await dialog.getByRole("heading", { level: 3 }).count() > 0);
-    await capture(name === "이용약관" ? "terms-dialog" : "privacy-dialog");
-    await page.keyboard.press("Escape");
-    await dialog.waitFor({ state: "hidden" });
-    await trigger.and(page.locator(":focus")).waitFor();
+  const previousUrl = page.url();
+  const policies = [
+    { name: "개인정보처리방침", route: "/privacy", sections: 8 },
+    { name: "이용약관", route: "/terms", sections: 9 },
+  ];
+  for (const { name, route, sections } of policies) {
+    const link = footer.getByRole("link", { name, exact: true });
+    assert.equal(await link.getAttribute("href"), route);
+    await link.press("Enter");
+    await page.waitForURL(baseUrl + route);
+    await page.getByRole("heading", { name, level: 1, exact: true }).waitFor();
+    const document = page.getByRole("article");
+    assert.equal(await document.getByRole("heading", { level: 2 }).count(), sections);
+    assert.equal(await document.locator("time").getAttribute("datetime"), "2025-09-01");
+    await capture(route.slice(1) + "-page");
+    await page.goBack();
+    await page.waitForURL(previousUrl);
   }
   await footer.screenshot({ path: join(artifactDirectory, "footer.png") });
 }

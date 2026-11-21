@@ -1,8 +1,6 @@
 import { Code, Github, ListChecks, Users } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import PrivacyPolicyModal from "./PrivacyPolicyModal";
-import TermsOfServiceModal from "./TermsOfServiceModal";
 
 const repository = "https://github.com/ANA-CNU/anabada-new";
 
@@ -89,8 +87,8 @@ export default function Footer({ className }: { readonly className?: string }) {
             <p className="mt-1 text-xs">이 프로젝트는 교육 및 학습 목적으로 제작되었습니다.</p>
           </div>
           <nav aria-label="정책 및 문의" className="flex flex-wrap gap-x-5">
-            <PrivacyPolicyModal trigger={<button type="button" className={cn(footerLink, "cursor-pointer")}>개인정보처리방침</button>} />
-            <TermsOfServiceModal trigger={<button type="button" className={cn(footerLink, "cursor-pointer")}>이용약관</button>} />
+            <Link href="/privacy" className={footerLink}>개인정보처리방침</Link>
+            <Link href="/terms" className={footerLink}>이용약관</Link>
             <a href={`${repository}/issues`} target="_blank" rel="noopener noreferrer" className={footerLink}>문의하기</a>
           </nav>
         </div>
