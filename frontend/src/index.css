@@ -6,14 +6,30 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@custom-variant sm {
+  @container desktop (width >= 40rem) { @slot; }
+}
+@custom-variant md {
+  @container desktop (width >= 48rem) { @slot; }
+}
+@custom-variant lg {
+  @container desktop (width >= 64rem) { @slot; }
+}
+@custom-variant xl {
+  @container desktop (width >= 80rem) { @slot; }
+}
+@custom-variant 2xl {
+  @container desktop (width >= 96rem) { @slot; }
+}
+
 /* Global CSS Reset */
-html, body, #root {
+.legacy-app {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-* {
+.legacy-app * {
   box-sizing: inherit;
 }
 
@@ -56,6 +72,7 @@ html, body, #root {
 }
 
 :root {
+  --desktop-width: 1440px;
   --squircle-radius-compact: 10px;
   --squircle-radius-control: 16px;
   --squircle-radius-surface: 28px;
@@ -95,10 +112,72 @@ html, body, #root {
   --sidebar-ring: oklch(0.708 0 0);
 }
 
+html {
+  background: #0b0b0c;
+}
+
+.desktop-site {
+  width: var(--desktop-width);
+  margin-inline: auto;
+  container: desktop / inline-size;
+}
+
 .squircle-surface {
   --squircle-radius: var(--squircle-radius-surface);
-  border-radius: var(--squircle-radius);
-  corner-shape: squircle;
+  --sq-tl: var(--squircle-radius);
+  --sq-tr: var(--squircle-radius);
+  --sq-br: var(--squircle-radius);
+  --sq-bl: var(--squircle-radius);
+  --sq-tl-x: min(var(--sq-tl), 50%);
+  --sq-tl-y: min(var(--sq-tl), 50%);
+  --sq-tr-x: min(var(--sq-tr), 50%);
+  --sq-tr-y: min(var(--sq-tr), 50%);
+  --sq-br-x: min(var(--sq-br), 50%);
+  --sq-br-y: min(var(--sq-br), 50%);
+  --sq-bl-x: min(var(--sq-bl), 50%);
+  --sq-bl-y: min(var(--sq-bl), 50%);
+  /* Points on the same fourth-power superellipse used by the fallback border and shadow. */
+  clip-path: polygon(
+    calc(100% - var(--sq-tr-x)) 0,
+    calc(100% - var(--sq-tr-x) * 0.55831) calc(var(--sq-tr-y) * 0.00965),
+    calc(100% - var(--sq-tr-x) * 0.38139) calc(var(--sq-tr-y) * 0.03881),
+    calc(100% - var(--sq-tr-x) * 0.25463) calc(var(--sq-tr-y) * 0.08815),
+    calc(100% - var(--sq-tr-x) * 0.15910) calc(var(--sq-tr-y) * 0.15910),
+    calc(100% - var(--sq-tr-x) * 0.08815) calc(var(--sq-tr-y) * 0.25463),
+    calc(100% - var(--sq-tr-x) * 0.03881) calc(var(--sq-tr-y) * 0.38139),
+    calc(100% - var(--sq-tr-x) * 0.00965) calc(var(--sq-tr-y) * 0.55831),
+    100% var(--sq-tr-y),
+
+    100% calc(100% - var(--sq-br-y)),
+    calc(100% - var(--sq-br-x) * 0.00965) calc(100% - var(--sq-br-y) * 0.55831),
+    calc(100% - var(--sq-br-x) * 0.03881) calc(100% - var(--sq-br-y) * 0.38139),
+    calc(100% - var(--sq-br-x) * 0.08815) calc(100% - var(--sq-br-y) * 0.25463),
+    calc(100% - var(--sq-br-x) * 0.15910) calc(100% - var(--sq-br-y) * 0.15910),
+    calc(100% - var(--sq-br-x) * 0.25463) calc(100% - var(--sq-br-y) * 0.08815),
+    calc(100% - var(--sq-br-x) * 0.38139) calc(100% - var(--sq-br-y) * 0.03881),
+    calc(100% - var(--sq-br-x) * 0.55831) calc(100% - var(--sq-br-y) * 0.00965),
+    calc(100% - var(--sq-br-x)) 100%,
+
+    var(--sq-bl-x) 100%,
+    calc(var(--sq-bl-x) * 0.55831) calc(100% - var(--sq-bl-y) * 0.00965),
+    calc(var(--sq-bl-x) * 0.38139) calc(100% - var(--sq-bl-y) * 0.03881),
+    calc(var(--sq-bl-x) * 0.25463) calc(100% - var(--sq-bl-y) * 0.08815),
+    calc(var(--sq-bl-x) * 0.15910) calc(100% - var(--sq-bl-y) * 0.15910),
+    calc(var(--sq-bl-x) * 0.08815) calc(100% - var(--sq-bl-y) * 0.25463),
+    calc(var(--sq-bl-x) * 0.03881) calc(100% - var(--sq-bl-y) * 0.38139),
+    calc(var(--sq-bl-x) * 0.00965) calc(100% - var(--sq-bl-y) * 0.55831),
+    0 calc(100% - var(--sq-bl-y)),
+
+    0 var(--sq-tl-y),
+    calc(var(--sq-tl-x) * 0.00965) calc(var(--sq-tl-y) * 0.55831),
+    calc(var(--sq-tl-x) * 0.03881) calc(var(--sq-tl-y) * 0.38139),
+    calc(var(--sq-tl-x) * 0.08815) calc(var(--sq-tl-y) * 0.25463),
+    calc(var(--sq-tl-x) * 0.15910) calc(var(--sq-tl-y) * 0.15910),
+    calc(var(--sq-tl-x) * 0.25463) calc(var(--sq-tl-y) * 0.08815),
+    calc(var(--sq-tl-x) * 0.38139) calc(var(--sq-tl-y) * 0.03881),
+    calc(var(--sq-tl-x) * 0.55831) calc(var(--sq-tl-y) * 0.00965),
+    var(--sq-tl-x) 0
+  );
 }
 
 [data-squircle-space-parent] > [data-squircle-space-terminal] {
@@ -108,11 +187,22 @@ html, body, #root {
 .squircle-surface[data-squircle-radius="control"] { --squircle-radius: var(--squircle-radius-control); }
 .squircle-surface[data-squircle-radius="panel"] { --squircle-radius: var(--squircle-radius-panel); }
 .squircle-surface[data-squircle-radius="hero"] { --squircle-radius: var(--squircle-radius-hero); }
-.squircle-surface[data-squircle-corners="left"] { border-radius: var(--squircle-radius) 0 0 var(--squircle-radius); }
-.squircle-surface[data-squircle-corners="right"] { border-radius: 0 var(--squircle-radius) var(--squircle-radius) 0; }
-.squircle-surface[data-squircle-corners="top"] { border-radius: var(--squircle-radius) var(--squircle-radius) 0 0; }
-.squircle-surface[data-squircle-corners="bottom"] { border-radius: 0 0 var(--squircle-radius) var(--squircle-radius); }
-.squircle-surface[data-squircle-corners="none"] { border-radius: 0; } /* squircle-exception: square range middle */
+.squircle-surface:is([data-squircle-corners="top"], [data-squircle-corners="right"]) { --sq-bl: 0px; }
+.squircle-surface:is([data-squircle-corners="top"], [data-squircle-corners="left"]) { --sq-br: 0px; }
+.squircle-surface:is([data-squircle-corners="bottom"], [data-squircle-corners="right"]) { --sq-tl: 0px; }
+.squircle-surface:is([data-squircle-corners="bottom"], [data-squircle-corners="left"]) { --sq-tr: 0px; }
+.squircle-surface[data-squircle-corners="none"] {
+  --squircle-radius: 0px;
+  clip-path: none;
+}
+
+@supports (corner-shape: squircle) {
+  :where(:root:not([data-squircle-fallback])) .squircle-surface {
+    clip-path: none;
+    border-radius: var(--sq-tl) var(--sq-tr) var(--sq-br) var(--sq-bl); /* squircle-exception: native semantic corner tokens */
+    corner-shape: squircle;
+  }
+}
 
 .dark {
   --background: oklch(0.145 0 0);
@@ -153,10 +243,10 @@ html, body, #root {
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
 @layer base {
-  * {
+  .legacy-app * {
     @apply border-border outline-ring/50;
   }
-  body {
+  .legacy-app {
     @apply bg-background text-foreground;
   }
 }

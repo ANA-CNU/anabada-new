@@ -122,29 +122,6 @@ try {
   assert.deepEqual(await (await search()).json(), []);
   console.log("E2E: zero users, problems, and score rows");
 
-  const kst = (offset: number) =>
-    new Date(Date.now() + offset + 9 * 3_600_000)
-      .toISOString()
-      .slice(0, 19)
-      .replace("T", " ");
-  const event = await app.handle(
-    new Request("http://test.local/api/event/create", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        cookie: `accessToken=${encodeURIComponent(`Bearer ${jwt.sign({ role: "admin" }, config.JWT_SECRET)}`)}`,
-      },
-      body: JSON.stringify({
-        title: eventTitle,
-        begin: kst(-3_600_000),
-        end: kst(3_600_000),
-        problems: [eventProblem],
-      }),
-    }),
-  );
-  assert.equal(event.status, 200);
-  assert.equal((await event.json()).success, true);
-
   await runCycle();
   assert.deepEqual(requestPaths, [
     "/group/ranklist/13872/1",
@@ -157,6 +134,37 @@ try {
   assert.equal(members[0].jungol_name, handle);
   assert.equal(members[0].solution, "100");
   assert.ok(requestPaths.includes(`/api/v4/users/${handle}`));
+  await database.rawPool.execute(
+    "INSERT INTO solved_ac_accounts(solved_ac_id,user_id,solved_ac_handle) VALUES(871,?,?)",
+    [members[0].id, handle],
+  );
+  await database.rawPool.execute("INSERT INTO admin_users(user_id) VALUES(?)", [
+    members[0].id,
+  ]);
+  const kst = (offset: number) =>
+    new Date(Date.now() + offset + 9 * 3_600_000)
+      .toISOString()
+      .slice(0, 19)
+      .replace("T", " ");
+  const event = await app.handle(
+    new Request("http://test.local/api/event/create", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: config.ALLOWED_ORIGIN,
+        cookie: `anabada_session=${jwt.sign({ solvedAcId: "871" }, config.JWT_SECRET, { algorithm: "HS256", subject: String(members[0].id), issuer: "anabada", audience: "anabada-web", expiresIn: 3600 })}`,
+      },
+      body: JSON.stringify({
+        title: eventTitle,
+        begin: kst(-3_600_000),
+        end: kst(3_600_000),
+        problems: [eventProblem],
+      }),
+    }),
+  );
+  assert.equal(event.status, 200);
+  assert.equal((await event.json()).success, true);
+
   const eventAcceptedTime = Math.floor(Date.now() / 1000);
 
   // The production history scheduler and the per-member job are both due after 30 seconds.

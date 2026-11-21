@@ -1,17 +1,12 @@
+"use client";
+
+import { Triangle } from "lucide-react";
 import { SquircleSurface } from "@/components/ui/squircle";
-import { URL } from "@/resource/constant";
-import React, { useEffect, useRef, useState } from "react";
+import { useAnimate, useReducedMotion } from "motion/react";
+import { useEffect, useState } from "react";
 import LastUpdateTime from "./LastUpdateTime";
+import type { UpdateTime } from "../update-time";
 import type { LatestBiasRanking } from "@/types";
-
-// API 응답 타입 (/api/v2/ranking/bias)
-type RankingItemV2 = LatestBiasRanking;
-
-interface ApiV2Response {
-  success: boolean;
-  data: RankingItemV2[];
-  message?: string;
-}
 
 const trophyByRank: Record<number, { src: string; alt: string; fallback: string }> = {
   1: { src: "/gold_tropy.png", alt: "gold", fallback: "🥇" },
@@ -29,80 +24,27 @@ const highlightSecondClass =
 const highlightThirdClass =
   "bg-gradient-to-r from-orange-400/25 via-orange-300/15 to-white/5 outline outline-1 outline-orange-300/30 outline-offset-0";
 
-export default function UnifiedRankList() {
-  const [list, setList] = useState<RankingItemV2[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const imgErrorRef = useRef<Record<number, boolean>>({});
-  const [animate, setAnimate] = useState(false);
+export default function UnifiedRankList({ ranking, initialUpdateTime }: {
+  readonly ranking: readonly LatestBiasRanking[];
+  readonly initialUpdateTime: UpdateTime;
+}) {
+  const [scope, animate] = useAnimate<HTMLDivElement>();
+  const reduceMotion = useReducedMotion();
+  const [failedTrophyImages, setFailedTrophyImages] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        setAnimate(false);
-        const res = await fetch(`${URL}/api/v2/ranking/bias`);
-        const json: ApiV2Response = await res.json();
-        if (!mounted) return;
-        if (json.success && Array.isArray(json.data)) {
-          setList(json.data);
-          // DOM 페인트 후 순차 애니메이션 시작
-          setTimeout(() => setAnimate(true), 60);
-        } else {
-          setError(json.message || "랭킹 데이터를 가져오지 못했습니다.");
-        }
-      } catch {
-        setError("서버 연결 실패");
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="w-full max-w-[680px] lg:max-w-[560px] px-3 max-h-[600px] overflow-y-auto unified-scroll">
-        <style>{`
-          .unified-scroll::-webkit-scrollbar { 
-            width: 0 !important; 
-            height: 0 !important; 
-            display: none !important; 
-            background: transparent !important;
-          }
-          .unified-scroll { 
-            -ms-overflow-style: none; 
-            scrollbar-width: none; 
-            -webkit-overflow-scrolling: touch;
-          }
-        `}</style>
-        
-        {/* 로딩 중 보이지 않는 플레이스홀더 카드들 */}
-        {Array.from({ length: 8 }).map((_, index) => (
-          <div
-            key={`loading-${index}`}
-            className="flex items-center justify-between w-full px-5 mb-3 py-4 bg-transparent border border-transparent"
-            style={{ height: '72px' }} // 실제 카드와 동일한 높이
-          />
-        ))}
-      </div>
+    if (reduceMotion || ranking.length === 0) return;
+    const animation = animate(
+      "[data-ranking-card]",
+      { opacity: [0.68, 1, 1], y: [18, -2, 0] },
+      { duration: 0.62, ease: "easeOut", times: [0, 0.78, 1], delay: (index) => Math.min(index * 0.055, 0.33) },
     );
-  }
-
-  if (error) {
-    return (
-      <div className="w-full max-w-[640px] lg:max-w-[520px] px-3 text-red-400 text-sm">
-        {error}
-      </div>
-    );
-  }
+    return () => animation.complete();
+  }, [animate, ranking, reduceMotion]);
 
   return (
     <div
+      ref={scope}
       className="w-full max-w-[680px] lg:max-w-[560px] px-3 max-h-[600px] overflow-y-auto unified-scroll"
       style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', zIndex: 3 }}
     >
@@ -120,12 +62,11 @@ export default function UnifiedRankList() {
         }
       `}</style>
 
-      <LastUpdateTime />
+      <LastUpdateTime initialUpdateTime={initialUpdateTime} />
 
-      {list.map((u) => {
+      {ranking.map((u) => {
         const isTop = u.rank <= 3;
         const trophy = trophyByRank[u.rank];
-        const isTopThree = u.rank <= 3;
         const highlightClass = u.rank === 1
           ? highlightFirstClass
           : u.rank === 2
@@ -133,15 +74,24 @@ export default function UnifiedRankList() {
           : u.rank === 3
           ? highlightThirdClass
           : "";
-        const rowClass = isTopThree 
+        const rowClass = isTop
           ? `flex items-center justify-between w-full px-4 mb-3 py-4 ${highlightClass} box-border overflow-visible`
           : `${rowBaseClass} ${highlightClass}`;
-        const deltaBadge = (u.delta || 0) === 0 ? (
-          <span className="text-xs text-gray-300">-</span>
-        ) : (u.delta || 0) < 0 ? (
-          <span className="text-xs text-rose-400">▼ {Math.abs(u.delta)}</span>
+        const delta = u.delta ?? 0;
+        const deltaBadge = delta === 0 ? (
+          <span className="text-gray-300">-</span>
         ) : (
-          <span className="text-xs text-emerald-400">▲ {u.delta}</span>
+          <span className={`inline-flex items-center gap-1 ${delta < 0 ? "text-rose-400" : "text-emerald-400"}`}>
+            <Triangle
+              role="img"
+              aria-label={delta < 0 ? "하락" : "상승"}
+              size={8}
+              fill="currentColor"
+              strokeWidth={0}
+              className={delta < 0 ? "shrink-0 rotate-180" : "shrink-0"}
+            />
+            {Math.abs(delta)}
+          </span>
         );
         const leftSlotClass = isTop
           ? "w-12 h-12 flex items-center justify-center"
@@ -149,26 +99,19 @@ export default function UnifiedRankList() {
         const trophyImgClass = isTop ? "w-10 h-10 object-contain" : "w-6 h-6 object-contain";
         const trophyEmojiClass = isTop ? "text-3xl" : "text-xl";
 
-        const motionClass = animate ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3";
         return (
-          <div
-            key={u.jungol_name}
-            className={`transition-opacity transition-transform duration-500 ease-out ${motionClass}`}
-            style={{ transitionDelay: `${(u.rank - 1) * 60}ms` }}
-          >
+          <div key={u.jungol_name} data-ranking-card>
             <SquircleSurface className={rowClass}>
             {/* Left - Rank & Trophy & Username */}
             <div className="flex items-center gap-4 min-w-0">
               <div className={leftSlotClass}>
                 {isTop ? (
-                  (!imgErrorRef.current[u.rank] && trophy) ? (
+                  (!failedTrophyImages[u.rank] && trophy) ? (
                     <img
                       src={trophy.src}
                       alt={trophy.alt}
                       className={trophyImgClass}
-                      onError={() => {
-                        imgErrorRef.current[u.rank] = true;
-                      }}
+                      onError={() => setFailedTrophyImages((previous) => ({ ...previous, [u.rank]: true }))}
                     />
                   ) : (
                     <span className={trophyEmojiClass}>
@@ -189,7 +132,7 @@ export default function UnifiedRankList() {
                 <div className="text-xs text-white/60 flex items-center gap-2">
                   <span>티어: {u.tier}</span>
                   <span className="text-white/20">|</span>
-                  <span>순위 변화: {deltaBadge}</span>
+                  <span className="inline-flex items-center gap-1">순위 변화: {deltaBadge}</span>
                 </div>
               </div>
             </div>

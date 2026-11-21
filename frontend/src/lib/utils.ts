@@ -43,7 +43,7 @@ export const getTierColor = (tier: number): string => {
 
 // 날짜 포맷팅
 export const formatDate = (dateString: string): string => {
-  return new Date(dateString).toLocaleDateString('ko-KR');
+  return new Date(dateString).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
 };
 
 // 정확도 계산

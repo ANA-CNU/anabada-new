@@ -6,12 +6,13 @@ interface TotalProblemsData {
   total_problems: number;
 }
 
-function ContributionStats() {
-  const [totalProblems, setTotalProblems] = useState<TotalProblemsData | null>(null);
-  const [loading, setLoading] = useState(true);
+function ContributionStats({ initialTotal }: { readonly initialTotal?: number }) {
+  const [totalProblems, setTotalProblems] = useState<TotalProblemsData | null>(initialTotal === undefined ? null : { total_problems: initialTotal });
+  const [loading, setLoading] = useState(initialTotal === undefined);
 
   // API에서 전체 문제 수 가져오기
   useEffect(() => {
+    if (initialTotal !== undefined) return;
     const fetchTotalProblems = async () => {
       try {
         const response = await fetch(`${URL}/api/statistics/total-problems`);
@@ -28,7 +29,7 @@ function ContributionStats() {
     };
 
     fetchTotalProblems();
-  }, []);
+  }, [initialTotal]);
 
   // 총 누적 기여수 계산 (API 데이터 사용)
   const totalCumulativeContribution = useMemo(() => {
@@ -36,7 +37,7 @@ function ContributionStats() {
   }, [totalProblems]);
 
   // 애니메이션용 상태
-  const [animatedValue, setAnimatedValue] = useState(0);
+  const [animatedValue, setAnimatedValue] = useState(initialTotal ?? 0);
 
   // 숫자 포맷팅 함수 (3자리마다 쉼표)
   const formatNumber = (num: number) => {
@@ -45,6 +46,7 @@ function ContributionStats() {
 
   // 5초 커스텀 애니메이션 효과 (최적화된 버전)
   useEffect(() => {
+    if (initialTotal !== undefined) return;
     const duration = 5000; // 5초
     const startTime = performance.now(); // performance.now() 사용으로 더 정확한 타이밍
     const startValue = 0;
@@ -81,7 +83,7 @@ function ContributionStats() {
         cancelAnimationFrame(animationId);
       }
     };
-  }, [totalCumulativeContribution]);
+  }, [initialTotal, totalCumulativeContribution]);
 
   if (loading) {
     return (
@@ -95,14 +97,14 @@ function ContributionStats() {
     <div className="w-full h-full flex flex-col items-center justify-center">
       <div className="text-center">
         <h2 className="text-white text-2xl font-bold mb-2">아나바다의</h2>
-        <h1 className="text-4xl font-bold mb-4" style={{
+        <h2 className="text-4xl font-bold mb-4" style={{
           background: "linear-gradient(90deg, #8ec5fc 0%, #e0c3fc 100%)",
           WebkitBackgroundClip: "text",
           WebkitTextFillColor: "transparent",
           backgroundClip: "text"
         }}>
           전체 문제 수
-        </h1>
+        </h2>
         <div 
           className="text-6xl font-bold text-white mb-4"
           style={{

@@ -1,0 +1,16 @@
+.page { max-width: 960px; min-height: 65vh; padding-block: clamp(42px, 8cqw, 96px); }
+.page h1 { font-size: clamp(2.5rem, 6cqw, 4.75rem); line-height: 1.06; font-weight: 670; letter-spacing: -.06em; }
+.account { color: var(--muted); display: flex; align-items: center; gap: 8px; margin-top: 20px; overflow-wrap: anywhere; }
+.section { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(0, 1.5fr); gap: clamp(24px, 6cqw, 64px); border-top: 1px solid var(--line); margin-top: 32px; padding-top: 32px; }
+.section h2 { font-size: 1.25rem; font-weight: 650; }
+.section p { color: var(--muted); margin-top: 8px; line-height: 1.6; font-size: .9375rem; }
+.form { display: grid; gap: 20px; }
+.field { display: grid; gap: 8px; font-size: .9375rem; }
+.field label { font-weight: 600; }
+.field input { min-height: 48px; width: 100%; background: var(--surface); color: var(--ink); border: 1px solid var(--line); padding: 10px 14px; }
+.field input[aria-invalid=true] { border-color: #ff9f9f; }
+.field .error, .actions .error { color: #ff9f9f; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.actions button { cursor: pointer; }
+.actions button:disabled { cursor: wait; opacity: .65; }
+.actions p { margin: 0; }

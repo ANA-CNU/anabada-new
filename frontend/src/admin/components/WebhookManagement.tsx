@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, Edit, Trash2, Power, PowerOff, ExternalLink } from "lucide-react";
+import { Plus, Edit, Trash2, Power, PowerOff, ExternalLink, X } from "lucide-react";
 import { URL } from "@/resource/constant";
 
 interface Webhook {
@@ -263,15 +263,15 @@ export default function WebhookManagement() {
       </div>
 
       {error && (
-        <SquircleSurface radius="control" className="bg-red-50 border border-red-200 text-red-700 px-4 py-3">
-          {error}
+        <SquircleSurface radius="control" className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 px-4 py-3" role="alert">
+          <span className="flex-1">{error}</span>
           <Button
             variant="ghost"
-            size="sm"
-            className="ml-2"
+            size="icon"
+            aria-label="오류 메시지 닫기"
             onClick={() => setError(null)}
           >
-            ✕
+            <X aria-hidden="true" />
           </Button>
         </SquircleSurface>
       )}

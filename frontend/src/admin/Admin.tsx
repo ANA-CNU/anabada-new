@@ -1,5 +1,6 @@
+"use client";
+
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { 
   Users, 
   History, 
@@ -16,8 +17,6 @@ import {
   TrendingUp,
   AlertCircle,
   Plus,
-  Menu,
-  X,
   ExternalLink,
   Trophy,
 } from "lucide-react";
@@ -46,29 +45,6 @@ function Admin() {
 
   
   const [activeSection, setActiveSection] = useState("dashboard");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    // httpOnly 쿠키는 서버에서만 삭제 가능하므로
-    // 서버에 요청을 보내거나, 그냥 리다이렉트만 해도 됨
-    // 서버에서 인증 체크할 때 쿠키가 없으면 자동으로 로그인 페이지로 보냄
-    
-    // 방법 1: 서버에 로그아웃 요청 (권장)
-    fetch("/logout", {
-      method: "POST",
-      credentials: "include",
-    }).catch(error => {
-      console.error("로그아웃 요청 실패:", error);
-    });
-    
-    // 방법 2: 그냥 리다이렉트 (간단하지만 쿠키는 남아있음)
-    // navigate("/login");
-    
-    // 로그인 페이지로 리다이렉트
-    navigate("/login");
-  };
-
   const [userList, setUserList] = useState<User[] | null>();
   const [activeEventCount, setActiveEventCount] = useState<number | null>();
 
@@ -201,39 +177,16 @@ function Admin() {
   // 모바일에서 메뉴 클릭 시 사이드바 닫기
   const handleMenuClick = (sectionId: string) => {
     setActiveSection(sectionId);
-    setSidebarOpen(false);
   };
 
   try {
     return (
       <div className="flex h-screen bg-background">
-        {/* Mobile Sidebar Overlay */}
-        {sidebarOpen && (
-          <div 
-            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
-
-        {/* Sidebar */}
-        <div className={`
-          fixed lg:static inset-y-0 left-0 z-50 w-64 border-r bg-background transform transition-transform duration-300 ease-in-out
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-        `}>
+        <div className="w-64 shrink-0 border-r bg-background">
           <div className="flex h-full flex-col">
             {/* Header */}
             <div className="flex h-16 items-center justify-between border-b px-6">
               <h1 className="text-xl font-bold">Anabada</h1>
-              {/* Mobile close button */}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="lg:hidden"
-                onClick={() => setSidebarOpen(false)}
-                aria-label="관리자 메뉴 닫기"
-              >
-                <X className="h-4 w-4" />
-              </Button>
             </div>
             
             {/* Navigation */}
@@ -284,14 +237,12 @@ function Admin() {
                   <Settings className="mr-2 h-4 w-4" />
                   설정
                 </Button>
-                <Button 
-                  variant="ghost" 
-                  className="w-full justify-start"
-                  onClick={handleLogout}
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  로그아웃
-                </Button>
+                <form action="/auth/logout" method="post">
+                  <Button type="submit" variant="ghost" className="w-full justify-start">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    로그아웃
+                  </Button>
+                </form>
               </div>
             </div>
           </div>
@@ -299,23 +250,7 @@ function Admin() {
         
         {/* Main Content */}
         <div className="flex-1 overflow-auto">
-          {/* Mobile Header */}
-          <div className="lg:hidden border-b bg-background p-4">
-            <div className="flex items-center justify-between">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSidebarOpen(true)}
-                aria-label="관리자 메뉴 열기"
-              >
-                <Menu className="h-5 w-5" />
-              </Button>
-              <h1 className="text-lg font-semibold">Anabada Admin</h1>
-              <div className="w-10"></div> {/* 균형을 위한 빈 공간 */}
-            </div>
-          </div>
-
-          <div className="container mx-auto p-4 lg:p-6">
+          <div className="mx-auto p-6">
             {renderContent()}
           </div>
         </div>

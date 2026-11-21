@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { z } from "zod";
 import { AdminAuthenticator } from "./auth.js";
 import {
   type BojRuntimeSources,
@@ -69,10 +70,25 @@ export async function bootstrap(
   const boj = bojEnabled
     ? createBojRuntime(database, credentials, dependencies.bojSources, reporter)
     : undefined;
+  const rawPool = database.rawPool;
   return {
     app: createApplication({
       databasePool: database.pool,
-      authorizer: new AdminAuthenticator(config.JWT_SECRET),
+      authorizer: new AdminAuthenticator(
+        config.JWT_SECRET,
+        async (userId, solvedAcId) => {
+          const [rows] = await rawPool.query({
+            sql: "SELECT u.id FROM boj_bada.admin_users a JOIN boj_bada.user u ON u.id=a.user_id JOIN boj_bada.solved_ac_accounts s ON s.user_id=u.id WHERE u.id=? AND s.solved_ac_id=? AND u.ignored=0 LIMIT 1",
+            values: [userId, solvedAcId],
+            timeout: 2000,
+          });
+          return (
+            z.array(z.object({ id: z.number().int().positive() })).parse(rows)
+              .length === 1
+          );
+        },
+        config.ALLOWED_ORIGIN,
+      ),
       incidentReporter: reporter,
       clock: dependencies.clock,
       config,

@@ -1,0 +1,97 @@
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 32px 20px;
+  align-items: start;
+}
+.series {
+  --series-inset: clamp(20px, 2.3cqw, 30px);
+  --series-title-size: clamp(26px, 3.1cqw, 44px);
+  --series-title-line: calc(var(--series-title-size) * 1.08);
+  min-width: 0;
+}
+.seriesCover {
+  display: grid;
+  grid-template-rows: minmax(calc(2 * var(--series-title-line)), auto) auto;
+  row-gap: 10px;
+  padding: var(--series-inset);
+  color: #16131b;
+}
+.violet {
+  background:
+    radial-gradient(ellipse at 12% 93%, #daccf2, transparent 80%),
+    radial-gradient(ellipse at 92% 8%, #f4ddee, transparent 74%),
+    #eee6f6;
+}
+.lime {
+  background:
+    radial-gradient(ellipse at 12% 90%, #cce6d5, transparent 80%),
+    radial-gradient(ellipse at 94% 10%, #f7efcf, transparent 75%),
+    #eaf1df;
+}
+.peach {
+  background:
+    radial-gradient(ellipse at 9% 94%, #f2d0d7, transparent 78%),
+    radial-gradient(ellipse at 90% 8%, #faedcf, transparent 74%),
+    #fae7dc;
+}
+.seriesCover :is(h2, h3) {
+  align-self: start;
+  margin: 0;
+  font-size: var(--series-title-size);
+  line-height: var(--series-title-line);
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  font-weight: 650;
+  letter-spacing: -.06em;
+}
+.seriesCover p { margin: 0; font-size: 14px; line-height: 1.6; }
+.editions { list-style: none; margin: 14px 0 0; padding: 0; }
+.edition {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  padding-inline: var(--series-inset);
+  border-bottom: 1px solid var(--line);
+}
+.editionLabel { font-size: 20px; line-height: 44px; font-weight: 600; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+.actionContent { display: inline-flex; align-items: center; gap: var(--contest-action-gap, 8px); }
+.actionText { line-height: 1.5; }
+.actionIcon { flex: none; overflow: visible; }
+.actionIcon[data-leading] { order: -1; }
+
+.editionActions { --contest-action-gap: 4px; display: grid; grid-template-columns: repeat(2, 3.5rem); column-gap: 10px; }
+.editionActions a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.editionActions a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 4px; }
+.archive { padding-block: 48px 80px; }
+.heading { margin-bottom: 40px; max-width: 800px; }
+.eyebrow { margin: 0 0 20px; color: var(--muted); font-size: 14px; }
+.heading h1 { margin: 0; font-size: clamp(40px, 6cqw, 72px); font-weight: 650; line-height: 1.12; letter-spacing: -.065em; }
+.heading > p:last-child { color: var(--muted); line-height: 1.8; margin-top: 20px; }
+.archiveFooter { margin-top: 32px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px 24px; color: var(--muted); font-size: 14px; }
+.detailHero { padding: clamp(24px, 5cqw, 56px); background: var(--contest-violet, #e2d8f6); color: var(--paper); }
+.detailHero .eyebrow { color: inherit; }
+.detailHero h1 { margin: 0; font-size: clamp(40px, 7cqw, 88px); line-height: 1.05; letter-spacing: -.065em; font-weight: 650; }
+.detailHero h1 span { display: block; }
+.detailHero > p { margin-top: 24px; line-height: 1.8; }
+.detailHero a:focus-visible { outline-color: var(--paper); }
+.detailActions { --contest-action-gap: 12px; display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.detailActions a { display: inline-flex; align-items: center; padding: 12px 20px; min-height: 48px; background: var(--paper); color: var(--ink); font-size: 14px; font-weight: 600; }
+.detailActions a:hover { text-decoration: underline; text-underline-offset: 4px; }
+.problems { margin-top: 48px; }
+.problems h2 { margin: 0; font-size: 28px; letter-spacing: -.045em; font-weight: 650; }
+.problems > p { color: var(--muted); margin: 12px 0 24px; font-size: 14px; line-height: 1.7; }
+.problemList { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 40px; }
+.problemList li { display: flex; align-items: baseline; gap: 16px; padding-block: 16px; border-top: 1px solid var(--line); }
+.problemList span { color: var(--muted); width: 20px; font-size: 14px; }
+.problemList strong { font-weight: 500; }
+.problemList small { margin-left: auto; color: var(--muted); font-size: 12px; }
+.historic { padding-block: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+.historic p { margin: 4px 0 0; color: var(--muted); font-size: 14px; line-height: 1.6; }

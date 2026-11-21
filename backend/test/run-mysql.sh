@@ -24,7 +24,7 @@ mysql_test() {
 }
 run_with_pending_file() {
   $compose run --rm \
-    -v "$repository_dir/backend/test/boj/013_fixture.sql:/app/013_fixture.sql:ro" jungol-migrator
+    -v "$repository_dir/backend/test/boj/015_fixture.sql:/app/015_fixture.sql:ro" jungol-migrator
 }
 # A fresh database prepares the schema and leaves the import and later files pending.
 run_with_pending_file
@@ -56,12 +56,12 @@ test "$(mysql_test boj_bada -N -e 'SELECT CONCAT(solved_ac_history_page,":",solv
 test "$(mysql_test boj_bada -N -e 'SELECT COUNT(*) FROM user WHERE solved_ac_history_page IS NOT NULL')" = '3'
 test "$(mysql_test -N -e "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='boj_bada' AND TABLE_NAME IN ('boj_tier','boj_import','boj_member_admission','boj_solved_history')")" = '0'
 # Replaying 012 after its DDL committed must retain the migrated progress.
-mysql_test jungol_bada -e 'DELETE FROM migrations WHERE version=12'
+mysql_test jungol_bada -e 'DELETE FROM migrations WHERE version>=12'
 $compose run --rm jungol-migrator node dist/cli.js up --require-boj-import
 test "$(mysql_test boj_bada -N -e 'SELECT solved_ac_history_page FROM user WHERE id=41')" = '7'
 run_with_pending_file
 run_with_pending_file
-test "$(mysql_test jungol_bada -N -e 'SELECT GROUP_CONCAT(version ORDER BY version) FROM migrations')" = '2,3,4,5,6,7,8,9,10,11,12,13'
+test "$(mysql_test jungol_bada -N -e 'SELECT GROUP_CONCAT(version ORDER BY version) FROM migrations')" = '2,3,4,5,6,7,8,9,10,11,12,13,14,15'
 test "$(mysql_test jungol_bada -N -e 'SELECT id FROM migration_probe')" = '1'
 mysql_test boj_bada -e 'UPDATE user SET solved_ac_history_page=0,solved_ac_handle=NULL WHERE id=41'
 test "$(mysql_test -N -e "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='boj_bada' AND TABLE_NAME='migrations'")" = '0'

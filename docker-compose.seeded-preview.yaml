@@ -5,8 +5,10 @@ services:
   anabada-mysql:
     image: mysql:9.3.0
     environment:
+      MYSQL_DATABASE: anabada
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the explicit env file}
     volumes:
+      - ./migrations/legacy/001_new_schema.sql:/docker-entrypoint-initdb.d/00-empty-boj-source.sql:ro
       - ./database/my.cnf:/etc/mysql/conf.d/my.cnf:ro
       - anabada-dev-seeded_mysql-data:/var/lib/mysql
     networks: [seeded-preview]
@@ -20,6 +22,7 @@ services:
 
   jungol-migrator:
     build: {context: ./migrations, dockerfile: Dockerfile}
+    command: ["node", "dist/cli.js", "up", "--require-boj-import"]
     environment:
       DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the explicit env file}
     networks: [seeded-preview]
@@ -46,29 +49,42 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.prod
       args:
-        VITE_KAKAO_MAP_API_KEY: ${VITE_KAKAO_MAP_API_KEY:-}
-    networks: [seeded-preview]
-    depends_on:
-      preview-seeder: {condition: service_completed_successfully}
-
-  anabada-middleware:
-    build: {context: ./middleware, dockerfile: Dockerfile}
+        NEXT_PUBLIC_KAKAO_MAP_API_KEY: ${NEXT_PUBLIC_KAKAO_MAP_API_KEY:-}
     environment:
-      PORT: "80"
-      NODE_ENV: development
-      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in the explicit env file}
-      ADMIN_USERNAME: ${ADMIN_USERNAME:?Set ADMIN_USERNAME in the explicit env file}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in the explicit env file}
-      FRONTEND_URL: http://anabada-frontend:20030
-      ALLOWED_ORIGIN: http://localhost:20050
+      APP_ORIGIN: http://localhost:20050
+      BACKEND_URL: http://anabada-backend:3000
+      DB_HOST: anabada-mysql
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      DB_NAME: boj_bada
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+      SOLVED_AC_CLIENT_ID: ${SOLVED_AC_CLIENT_ID:-}
+      SOLVED_AC_CLIENT_SECRET: ${SOLVED_AC_CLIENT_SECRET:-}
+      MINIO_ENDPOINT: minio
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-anabada-local}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-anabada-local-minio-dev}
     networks: [seeded-preview]
     depends_on:
       preview-seeder: {condition: service_completed_successfully}
+      anabada-backend: {condition: service_healthy}
+      minio: {condition: service_started}
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:80/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
-      interval: 30s
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:20030/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
       timeout: 5s
-      retries: 3
+      retries: 12
+
+  minio:
+    image: cgr.dev/chainguard/minio@sha256:e9cf6b99c226e9539ed0f14b6f00e37b07da153c7ba1f4f8709c807574b471ec
+    command: ["server", "/data"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-anabada-local}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-anabada-local-minio-dev}
+    volumes: ["minio-data:/data"]
+    networks: [seeded-preview]
+    restart: unless-stopped
 
   anabada-backend:
     build:
@@ -102,10 +118,10 @@ services:
     ports: ["127.0.0.1:20050:80"]
     networks: [seeded-preview]
     depends_on:
-      anabada-backend: {condition: service_healthy}
-      anabada-middleware: {condition: service_healthy}
+      anabada-frontend: {condition: service_healthy}
 
 volumes:
+  minio-data:
   # 기존 dev/prod 데이터와 공유하지 않는 전용 named volume이다.
   anabada-dev-seeded_mysql-data:
     name: anabada-dev-seeded_mysql-data

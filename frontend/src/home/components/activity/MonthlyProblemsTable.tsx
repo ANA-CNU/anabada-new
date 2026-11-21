@@ -26,9 +26,10 @@ interface MonthlyProblemRow {
 }
 
 function MonthlyProblemsTable({ problems: initialProblems }: MonthlyProblemsTableProps) {
-  const [problems, setProblems] = useState<MonthlyProblemRow[]>([]);
+  const [problems, setProblems] = useState<MonthlyProblemRow[]>((initialProblems ?? []).map(p => ({ ...p, totalSolved: p.totalSolved ?? 0 })));
 
   useEffect(() => {
+    if (initialProblems !== undefined) return;
     const fetchMonthlyProblems = async () => {
       try {
         const response = await fetch(`${URL}/api/ranking/monthly-solved`);
@@ -47,17 +48,7 @@ function MonthlyProblemsTable({ problems: initialProblems }: MonthlyProblemsTabl
         }
       } catch (error) {
         console.error('이번 달 문제 해결 데이터 가져오기 실패:', error);
-        // API 실패 시 초기 데이터 사용
-        if (initialProblems) {
-          setProblems(
-            initialProblems.map((p, idx) => ({
-              id: p.id ?? String(idx + 1),
-              user: p.user,
-              problemCount: p.problemCount,
-              totalSolved: 0,
-            }))
-          );
-        }
+
       }
     };
 

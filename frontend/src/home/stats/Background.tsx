@@ -14,7 +14,7 @@ function Background({ children }: BackgroundProps) {
       }} />
       {/* 상단 강원들 (3개) - GPU 최적화 */}
       <div 
-        className="pointer-events-none absolute left-[15%] top-[15%] -translate-x-1/2 -translate-y-1/2 w-[35vw] h-[35vw] rounded-full opacity-35 blur-3xl animate-glow1"
+        className="pointer-events-none absolute left-[15%] top-[15%] -translate-x-1/2 -translate-y-1/2 w-[35cqw] h-[35cqw] rounded-full opacity-35 blur-3xl animate-glow1"
         style={{
           background: "radial-gradient(circle, #e0c3fc 0%, #8ec5fc 60%, transparent 100%)", 
           zIndex: 1,
@@ -25,7 +25,7 @@ function Background({ children }: BackgroundProps) {
         }} 
       />
       <div 
-        className="pointer-events-none absolute left-[50%] top-[20%] -translate-x-1/2 -translate-y-1/2 w-[25vw] h-[25vw] rounded-full opacity-30 blur-2xl animate-glow2"
+        className="pointer-events-none absolute left-[50%] top-[20%] -translate-x-1/2 -translate-y-1/2 w-[25cqw] h-[25cqw] rounded-full opacity-30 blur-2xl animate-glow2"
         style={{
           background: "radial-gradient(circle, #fffbe6 0%, #a18cd1 60%, transparent 100%)", 
           zIndex: 1,
@@ -36,7 +36,7 @@ function Background({ children }: BackgroundProps) {
         }} 
       />
       <div 
-        className="pointer-events-none absolute left-[80%] top-[25%] -translate-x-1/2 -translate-y-1/2 w-[20vw] h-[20vw] rounded-full opacity-25 blur-2xl animate-glow3"
+        className="pointer-events-none absolute left-[80%] top-[25%] -translate-x-1/2 -translate-y-1/2 w-[20cqw] h-[20cqw] rounded-full opacity-25 blur-2xl animate-glow3"
         style={{
           background: "radial-gradient(circle, #fbc2eb 0%, #a6c1ee 60%, transparent 100%)", 
           zIndex: 1,
@@ -49,7 +49,7 @@ function Background({ children }: BackgroundProps) {
       
       {/* 중간 강원 (1개) - GPU 최적화 */}
       <div 
-        className="pointer-events-none absolute left-[40%] top-[50%] -translate-x-1/2 -translate-y-1/2 w-[30vw] h-[30vw] rounded-full opacity-20 blur-3xl animate-glow4"
+        className="pointer-events-none absolute left-[40%] top-[50%] -translate-x-1/2 -translate-y-1/2 w-[30cqw] h-[30cqw] rounded-full opacity-20 blur-3xl animate-glow4"
         style={{
           background: "radial-gradient(circle, #a8edea 0%, #fed6e3 60%, transparent 100%)", 
           zIndex: 1,
@@ -62,7 +62,7 @@ function Background({ children }: BackgroundProps) {
       
       {/* 하단 오른쪽 강원 (1개) - GPU 최적화 */}
       <div 
-        className="pointer-events-none absolute left-[75%] top-[82%] -translate-x-1/2 -translate-y-1/2 w-[25vw] h-[25vw] rounded-full opacity-30 blur-2xl animate-glow5"
+        className="pointer-events-none absolute left-[75%] top-[82%] -translate-x-1/2 -translate-y-1/2 w-[25cqw] h-[25cqw] rounded-full opacity-30 blur-2xl animate-glow5"
         style={{
           background: "radial-gradient(circle, #ffecd2 0%,rgb(63, 35, 26) 60%, transparent 100%)", 
           zIndex: 1,

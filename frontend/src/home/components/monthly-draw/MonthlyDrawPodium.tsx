@@ -1,4 +1,4 @@
-import type { MonthlyDrawEntry } from "../LastMonthRanking"
+import type { MonthlyDrawEntry } from "./data"
 import { DrawWinnerCard } from "./DrawWinnerCard"
 import styles from "./monthly-draw.module.css"
 

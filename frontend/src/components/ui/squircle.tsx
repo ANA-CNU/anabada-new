@@ -1,3 +1,5 @@
+"use client"
+
 import { Slot } from "@radix-ui/react-slot"
 import { useLayoutEffect, useRef, type ComponentProps, type Ref } from "react"
 import { cn } from "@/lib/utils"

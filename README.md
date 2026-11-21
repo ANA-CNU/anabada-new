@@ -6,28 +6,20 @@
 ### 구성
 
 - backend: Bun + Elysia + MySQL2 (API 서버)
-- middleware: Proxy/Auth 미들웨어 (선택)
-- frontend: React + Vite + Tailwind (웹 UI)
-- nginx: 정적 자원/리버스 프록시 (배포용)
+- frontend: Next.js App Router (SSR, solved.ac 로그인, 게시판)
+- minio: 게시판 본문을 보관하는 비공개 객체 저장소
+- nginx: 공개 HTTP 진입점
 
 ---
 
 ## 1) 환경 변수 (.env) 설정
 
-프로젝트 루트의 [.env.example](./.env.example)을 같은 위치의 `.env`로 복사한 뒤 아래 필수 네 값을 채웁니다. 서비스별 환경 파일은 만들지 않습니다. 실제 값은 커밋하지 않고 파일 권한을 0600으로 제한합니다.
+프로젝트 루트의 [.env.example](./.env.example)을 같은 위치의 `.env`로 복사하세요. DB 비밀번호와 32자 이상의 JWT 키를 지정합니다. solved.ac Backstage 앱 자격 증명으로 로그인과 풀이 수집을 활성화합니다. 운영에서는 MinIO 계정과 암호도 필수입니다. 실제 값은 GitHub `production` Environment Secrets와 로컬 `.env`에만 저장하세요.
 
-```dotenv
-DB_PASSWORD=
-JWT_SECRET=
-ADMIN_USERNAME=
-ADMIN_PASSWORD=
+Backstage 앱에 OAuth 콜백을 등록합니다.
 
-# 선택: 프런트엔드 빌드에 사용하는 공개 Kakao JavaScript 앱 키
-VITE_KAKAO_MAP_API_KEY=
-
-# 선택: backend 긴급 Discord 장애 알림 주소
-WEBHOOK_URL=
-```
+- 운영 `https://bada.anacnu.com/auth/solved-ac/callback`
+- 로컬 `http://localhost:20050/auth/solved-ac/callback`
 
 MySQL과 backend는 root 계정과 동일한 `DB_PASSWORD`를 사용합니다. DB 주소·이름, 서비스 URL·포트·모드와 수집 설정은 코드/Compose에 고정되어 있습니다. Compose는 각 서비스에 필요한 값만 전달합니다. 기존 MySQL 데이터가 있으면 `DB_PASSWORD` 변경만으로 실제 root 비밀번호가 바뀌지 않으므로 운영자가 계정 비밀번호와 배포 값을 맞춰야 합니다.
 
@@ -44,13 +36,13 @@ docker compose --env-file .env -f docker-compose.dev.yaml config --quiet
 docker compose --env-file .env -f docker-compose.dev.yaml up -d anabada-mysql
 ```
 
-dev·stage·production의 Compose는 MySQL healthcheck 뒤 일회성 마이그레이터를 실행하고, 성공(`Exited (0)`)한 뒤에만 frontend·middleware·backend를 시작합니다. API와 백준 수집기는 같은 `boj_bada` DB를 사용합니다. 활성 파일 규칙과 불변 checksum 정책은 [migrations 안내](./migrations/README.md)를 따릅니다.
+dev·stage·production의 Compose는 MySQL healthcheck 뒤 일회성 마이그레이터를 실행하고, 성공(`Exited (0)`)한 뒤에만 backend와 Next.js를 시작합니다. API와 백준 수집기는 같은 `boj_bada` DB를 사용합니다. 활성 파일 규칙과 불변 checksum 정책은 [migrations 안내](./migrations/README.md)를 따릅니다.
 
 ```sh
 docker compose --env-file .env -f docker-compose.dev.yaml up -d --build --wait
 ```
 
-개발 접속 주소는 `http://localhost:20050`입니다. stage와 production은 루트 `.env`를 사용합니다. stage에는 사전에 생성한 외부 네트워크가 필요합니다. production 서비스는 Compose 기본 네트워크에 연결되며, Nginx가 VM의 80번 포트에서 `bada.anacnu.com` 요청을 받습니다. 배포에는 반드시 `COMPOSE_BAKE=false`와 `--build`를 포함한 일반 Compose 실행을 사용합니다. 이는 CI에서 확인된 구버전 Compose/Bake 조합의 이미지 선택 결함을 피하기 위한 호환성 설정으로, Bake 위임만 끄고 BuildKit 캐시·단일 `up`·migration 의존성은 유지합니다. 근거는 [Compose v2.38.2](https://github.com/docker/compose/blob/v2.38.2/pkg/compose/build_bake.go#L333-L343)와 [v2.39.4](https://github.com/docker/compose/blob/v2.39.4/pkg/compose/build_bake.go#L376-L388)의 이미지 결과 매핑 변경입니다.
+개발 접속 주소는 `http://localhost:20050`입니다. 새 개발용 볼륨은 테스트용 빈 백준 원본으로 기존 이관 경로를 초기화합니다. 이관 없이 만든 기존 개발용 볼륨을 보존하려면 MySQL에 `anabada` 데이터베이스를 만든 뒤 `migrations/legacy/001_new_schema.sql`을 그 스키마에 적용하고 다시 Compose를 실행합니다. stage와 production은 루트 `.env`를 사용합니다. stage에는 사전에 생성한 외부 네트워크가 필요합니다. production 서비스는 Compose 기본 네트워크에 연결되며, Nginx가 VM의 80번 포트에서 `bada.anacnu.com` 요청을 받습니다. 배포에는 반드시 `COMPOSE_BAKE=false`와 `--build`를 포함한 일반 Compose 실행을 사용합니다. 이는 CI에서 확인된 구버전 Compose/Bake 조합의 이미지 선택 결함을 피하기 위한 호환성 설정으로, Bake 위임만 끄고 BuildKit 캐시·단일 `up`·migration 의존성은 유지합니다. 근거는 [Compose v2.38.2](https://github.com/docker/compose/blob/v2.38.2/pkg/compose/build_bake.go#L333-L343)와 [v2.39.4](https://github.com/docker/compose/blob/v2.39.4/pkg/compose/build_bake.go#L376-L388)의 이미지 결과 매핑 변경입니다.
 
 ```sh
 COMPOSE_BAKE=false docker compose --env-file .env -f docker-compose.stage.yaml up -d --build --wait --wait-timeout 180
@@ -76,7 +68,20 @@ docker compose --env-file .env -f docker-compose.prod.yaml ps
 - 통계: 월별 기여도, 최근 풀이/점수 이력 표시
 - 이벤트: 이벤트 목록/추가/수정/삭제, 문제 세트 관리
 - 관리자: 유저/점수/로그/가중치 관리, 반응형 사이드바/목록 UI
-- 인증: 쿠키 기반 관리자 인증 (JWT)
+- 인증: solved.ac의 검증된 백준 계정과 기존 ANA 회원을 연결하고 JWT 세션을 발급합니다.
+- 게시판: 관심 태그로 필터링하고 로그인 후 글을 쓰거나 자신이 작성한 글을 수정·삭제할 수 있습니다. 글 목록은 MySQL, 본문은 비공개 MinIO에 저장합니다. 운영 백업에는 MySQL과 `minio-data` 볼륨을 함께 포함합니다.
+
+### 관리자 등록
+
+관리자 권한은 기존 백준 회원 ID에 부여합니다. SQL을 실행할 때 `existing_boj_handle`을 대상 회원의 실제 핸들로 바꾸세요.
+
+```sql
+INSERT INTO boj_bada.admin_users (user_id)
+SELECT id FROM boj_bada.`user` WHERE handle = 'existing_boj_handle' AND ignored = FALSE
+ON DUPLICATE KEY UPDATE user_id = VALUES(user_id);
+```
+
+해당 회원이 solved.ac로 로그인한 뒤 `/admin`에 들어갑니다. `admin_users`에서 회원의 행을 삭제하면 현재 세션에도 권한 회수가 반영됩니다.
 
 ---
 
@@ -99,6 +104,6 @@ docker compose --env-file .env -f docker-compose.prod.yaml ps
   - 해당 환경 Compose에 고정된 origin과 nginx 프록시 경로 확인
   - 개발 환경은 `http://localhost:20050`으로 접속
 - 관리자 로그인 문제
-  - `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `JWT_SECRET` 재확인
+  - solved.ac 앱의 콜백 URL, 회원의 백준 계정 연결, `admin_users`의 권한과 `JWT_SECRET`을 확인합니다.
 
 <img width="801" height="526" alt="image" src="https://github.com/user-attachments/assets/32cf44ae-acd7-4b07-8afd-66008a07a23f" />

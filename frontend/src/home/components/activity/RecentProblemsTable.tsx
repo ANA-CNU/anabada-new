@@ -11,6 +11,7 @@ import type { RecentSolved } from "@/types";
 
 interface RecentProblemsTableProps {
   problems?: RecentProblem[];
+  readonly now: number;
 }
 
 interface ApiResponse {
@@ -20,11 +21,12 @@ interface ApiResponse {
 }
 
 
-function RecentProblemsTable({ problems: initialProblems }: RecentProblemsTableProps) {
-  const [problems, setProblems] = useState<RecentProblem[]>([]);
-  const [loading, setLoading] = useState(true);
+function RecentProblemsTable({ problems: initialProblems, now }: RecentProblemsTableProps) {
+  const [problems, setProblems] = useState<RecentProblem[]>(initialProblems ?? []);
+  const [loading, setLoading] = useState(initialProblems === undefined);
 
   useEffect(() => {
+    if (initialProblems !== undefined) return;
     const fetchRecentProblems = async () => {
       try {
         const response = await fetch(`${URL}/api/statistics/recently-solved`);
@@ -43,10 +45,7 @@ function RecentProblemsTable({ problems: initialProblems }: RecentProblemsTableP
         }
       } catch (error) {
         console.error('최근 해결한 문제 데이터 가져오기 실패:', error);
-        // API 실패 시 초기 데이터 사용
-        if (initialProblems) {
-          setProblems(initialProblems);
-        }
+
       } finally {
         setLoading(false);
       }
@@ -135,7 +134,7 @@ function RecentProblemsTable({ problems: initialProblems }: RecentProblemsTableP
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span className="cursor-help hover:text-white/80 transition-colors">
-                        {formatRelativeTime(problem.solvedAt)}
+                        {formatRelativeTime(problem.solvedAt, now)}
                       </span>
                     </TooltipTrigger>
                     <TooltipContent>

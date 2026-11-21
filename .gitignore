@@ -51,3 +51,8 @@ coverage/
 .playwright/
 playwright-report/
 blob-report/
+
+# Next.js generated files
+frontend/.next/
+frontend/next-env.d.ts
+frontend/*.tsbuildinfo

@@ -1,23 +1,25 @@
+"use client";
+
 import { SquircleSurface } from "@/components/ui/squircle";
 import React from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
 
 interface TermsOfServiceModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+  readonly trigger: React.ReactElement;
 }
 
-const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({ isOpen, onClose }) => {
+const TermsOfServiceModal: React.FC<TermsOfServiceModalProps> = ({ trigger }) => {
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] grid-rows-[auto_minmax(0,1fr)] bg-gray-900 border-gray-700 text-white no-scrollbar">
+    <Dialog>
+      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      <DialogContent aria-describedby={undefined} className="max-w-2xl max-h-[80vh] grid-rows-[auto_minmax(0,1fr)] bg-gray-900 border-gray-700 text-white no-scrollbar">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-white">
             이용약관
           </DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-6 text-sm leading-relaxed break-keep [overflow-wrap:anywhere] min-h-0 overflow-y-auto no-scrollbar pr-2">
+        <div tabIndex={0} className="space-y-6 text-sm leading-relaxed break-keep [overflow-wrap:anywhere] min-h-0 overflow-y-auto no-scrollbar pr-2">
           <section>
             <h3 className="text-lg font-semibold text-blue-400 mb-3">1. 서비스 이용 목적</h3>
             <p className="text-gray-300 mb-2">

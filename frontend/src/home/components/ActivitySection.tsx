@@ -1,10 +1,19 @@
+"use client";
+
 import { Target } from "lucide-react";
 import ScoreRecordsTable from "./activity/ScoreRecordsTable";
 import RecentProblemsTable from "./activity/RecentProblemsTable";
 import MonthlyProblemsTable from "./activity/MonthlyProblemsTable";
-import { dummyScoreRecords, dummyRecentProblems, dummyMonthlyProblems } from "./activity/dummyData";
+import type { ScoreRecord, RecentProblem, MonthlyProblem } from "./activity/types";
 
-function ActivitySection() {
+export type ActivityData = {
+  readonly capturedAt: number;
+  readonly scores: ScoreRecord[];
+  readonly recent: RecentProblem[];
+  readonly monthly: MonthlyProblem[];
+};
+
+function ActivitySection({ initialActivity }: { readonly initialActivity: ActivityData }) {
 
   return (
     <div className="w-full px-4 py-4 md:px-6 md:py-6">
@@ -15,9 +24,9 @@ function ActivitySection() {
         </h2>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-          <ScoreRecordsTable records={dummyScoreRecords} />
-          <RecentProblemsTable problems={dummyRecentProblems} />
-          <MonthlyProblemsTable problems={dummyMonthlyProblems} />
+          <ScoreRecordsTable records={initialActivity.scores} now={initialActivity.capturedAt} />
+          <RecentProblemsTable problems={initialActivity.recent} now={initialActivity.capturedAt} />
+          <MonthlyProblemsTable problems={initialActivity.monthly} />
         </div>
       </div>
     </div>

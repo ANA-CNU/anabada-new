@@ -1,4 +1,4 @@
-import { createSvgEffects, generateClipPath, observeResize } from "@lisse/core";
+import { createSvgEffects, observeResize } from "@lisse/core";
 
 export function createKakaoLabel(title: string) {
   const host = document.createElement("div");
@@ -13,14 +13,12 @@ export function createKakaoLabel(title: string) {
   surface.dataset.squircleMode = native ? "native" : "fallback";
   const border = native ? undefined : createSvgEffects(host, surface);
   if (!native) {
-    surface.style.borderRadius = "0";
     surface.style.borderColor = "transparent";
   }
   const disconnect = native ? () => {} : observeResize(surface, (measurement) => {
     if (!measurement) return;
     const radius = Number.parseFloat(getComputedStyle(surface).getPropertyValue("--squircle-radius-compact"));
     const options = { radius, curve: "superellipse", exponent: 4 } as const;
-    surface.style.clipPath = generateClipPath(measurement.width, measurement.height, options);
     border?.update(options, { innerBorder: { width: 1, color: "#000000", opacity: 0.06 } }, measurement.width, measurement.height);
   });
   return { content: host, destroy: () => { disconnect(); border?.destroy(); } };
